@@ -26,6 +26,7 @@ Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe —
 - [VImage](#vimage)
 - [useImage](#useimage)
 - [vLazyImg](#vlazyimg)
+- [ThumbHash placeholder](#thumbhash-placeholder)
 - [Blurhash placeholder](#blurhash-placeholder)
 - [LQIP — base64 preview](#lqip--base64-preview)
 - [srcset + sizes](#srcset--sizes)
@@ -39,7 +40,6 @@ Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe —
 - [Architecture](#architecture)
 - [CLI — generate images](#cli--generate-images)
 - [CDN adapters](#cdn-adapters)
-- [ThumbHash placeholder](#thumbhash-placeholder)
 - [buildSizes helper](#buildsizes-helper)
 - [generatePreloadLink](#generatepreloadlink)
 - [useImagePreloader](#useimagepreloader)
@@ -527,6 +527,77 @@ const cards = [
   border-radius: 12px;
 }
 </style>
+```
+
+---
+
+## ThumbHash placeholder
+
+ThumbHash is a modern alternative to BlurHash with **alpha channel support**, better visual quality on photos, and a shorter hash string. It decodes to a PNG data URL.
+
+**`thumbhash` prop — the simplest way:**
+
+```vue
+<VImage
+  src="/photo.png"
+  alt="Photo with transparency"
+  thumbhash="3OcRJYB4d3h/iIeHeEh3eIhw+j5n"
+/>
+```
+
+VImage decodes the hash automatically and uses it as a blur-up placeholder. No manual decoding needed.
+
+**Using the decoder directly** (for custom markup or `v-lazy-img`):
+
+```ts
+import { decodeThumbHash } from 'vue-image-kit'
+
+const dataUrl = decodeThumbHash('3OcRJYB4d3h/iIeHeEh3eIhw+j5n')
+// → 'data:image/png;base64,...'
+```
+
+**`placeholder` prop** — equivalent when you already have the data URL:
+
+```vue
+<VImage
+  src="/photo.png"
+  alt="Photo"
+  :placeholder="decodeThumbHash('3OcRJYB4d3h/iIeHeEh3eIhw+j5n')"
+/>
+```
+
+If both `thumbhash` and `placeholder` are provided, `placeholder` takes priority.
+
+**Generating ThumbHash hashes at build time:**
+
+Use the CLI with `--thumbhash` flag (requires `thumbhash` as a dev dependency):
+
+```bash
+npm install thumbhash --save-dev
+
+npx vue-image-kit generate \
+  --input ./src/images \
+  --manifest ./src/assets/images.ts \
+  --thumbhash
+```
+
+The manifest will include a `thumbhash` field for each image alongside `blurhash` and `placeholder`.
+
+Or generate manually in Node.js:
+
+```ts
+import { rgbaToThumbHash } from 'thumbhash'
+import sharp from 'sharp'
+
+const { data, info } = await sharp('photo.jpg')
+  .resize(100, 100, { fit: 'inside' })
+  .ensureAlpha()
+  .raw()
+  .toBuffer({ resolveWithObject: true })
+
+const hash = rgbaToThumbHash(info.width, info.height, new Uint8Array(data.buffer))
+const hashBase64 = Buffer.from(hash).toString('base64')
+// Store in DB / manifest, pass as thumbhash prop
 ```
 
 ---
@@ -1253,77 +1324,6 @@ const cdn = cloudinary({ cloudName: 'my-cloud' })
     sizes="(max-width: 768px) 100vw, 50vw"
   />
 </template>
-```
-
----
-
-## ThumbHash placeholder
-
-ThumbHash is a modern alternative to BlurHash with **alpha channel support**, better visual quality on photos, and a shorter hash string. It decodes to a PNG data URL.
-
-**`thumbhash` prop — the simplest way:**
-
-```vue
-<VImage
-  src="/photo.png"
-  alt="Photo with transparency"
-  thumbhash="3OcRJYB4d3h/iIeHeEh3eIhw+j5n"
-/>
-```
-
-VImage decodes the hash automatically and uses it as a blur-up placeholder. No manual decoding needed.
-
-**Using the decoder directly** (for custom markup or `v-lazy-img`):
-
-```ts
-import { decodeThumbHash } from 'vue-image-kit'
-
-const dataUrl = decodeThumbHash('3OcRJYB4d3h/iIeHeEh3eIhw+j5n')
-// → 'data:image/png;base64,...'
-```
-
-**`placeholder` prop** — equivalent when you already have the data URL:
-
-```vue
-<VImage
-  src="/photo.png"
-  alt="Photo"
-  :placeholder="decodeThumbHash('3OcRJYB4d3h/iIeHeEh3eIhw+j5n')"
-/>
-```
-
-If both `thumbhash` and `placeholder` are provided, `placeholder` takes priority.
-
-**Generating ThumbHash hashes at build time:**
-
-Use the CLI with `--thumbhash` flag (requires `thumbhash` as a dev dependency):
-
-```bash
-npm install thumbhash --save-dev
-
-npx vue-image-kit generate \
-  --input ./src/images \
-  --manifest ./src/assets/images.ts \
-  --thumbhash
-```
-
-The manifest will include a `thumbhash` field for each image alongside `blurhash` and `placeholder`.
-
-Or generate manually in Node.js:
-
-```ts
-import { rgbaToThumbHash } from 'thumbhash'
-import sharp from 'sharp'
-
-const { data, info } = await sharp('photo.jpg')
-  .resize(100, 100, { fit: 'inside' })
-  .ensureAlpha()
-  .raw()
-  .toBuffer({ resolveWithObject: true })
-
-const hash = rgbaToThumbHash(info.width, info.height, new Uint8Array(data.buffer))
-const hashBase64 = Buffer.from(hash).toString('base64')
-// Store in DB / manifest, pass as thumbhash prop
 ```
 
 ---
