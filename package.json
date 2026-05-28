@@ -1,0 +1,127 @@
+{
+  "name": "@macrulez/vue-image-kit",
+  "version": "1.0.0",
+  "description": "Vue 3 image optimization: lazy loading, blurhash, LQIP, srcset, WebP/AVIF, CDN adapters, CLI",
+  "type": "module",
+  "main": "./dist/vue-image-kit.cjs",
+  "module": "./dist/vue-image-kit.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "vue-image-kit": "./dist/cli/bin.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/vue-image-kit.js",
+      "require": "./dist/vue-image-kit.cjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./cdn": {
+      "import": "./dist/cdn/index.js",
+      "require": "./dist/cdn/index.cjs",
+      "types": "./dist/cdn/index.d.ts"
+    },
+    "./cli": {
+      "import": "./dist/cli/bin.js",
+      "types": "./dist/cli/bin.d.ts"
+    },
+    "./nuxt": {
+      "import": "./dist/nuxt/module.js",
+      "types": "./dist/nuxt/module.d.ts"
+    },
+    "./vite": {
+      "import": "./dist/vite/plugin.js",
+      "require": "./dist/vite/plugin.cjs",
+      "types": "./dist/vite/plugin.d.ts"
+    }
+  },
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vite build && npm run build:cdn && npm run build:nuxt && npm run build:cli",
+    "build:cdn": "vite build --config vite.cdn.config.ts",
+    "build:nuxt": "vite build --config vite.nuxt.config.ts",
+    "build:cli": "tsc -p tsconfig.cli.json && node scripts/fix-cli-shebang.cjs",
+    "demo": "cd demo && npm install && npm run dev",
+    "demo:dev": "cd demo && npm run dev",
+    "demo:build": "cd demo && npm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.cli.json --noEmit",
+    "prepublishOnly": "npm run build",
+    "lint": "eslint . --ext .vue,.js,.jsx,.ts,.tsx --fix",
+    "format": "prettier --write src/",
+    "lint:style": "stylelint \"src/**/*.{css,scss,vue}\""
+  },
+  "keywords": [
+    "vue",
+    "vue3",
+    "image",
+    "lazy-loading",
+    "blurhash",
+    "thumbhash",
+    "lqip",
+    "webp",
+    "avif",
+    "srcset",
+    "cdn",
+    "cloudinary",
+    "imgix",
+    "cli",
+    "vite-plugin"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/macrulezru/vue-image-kit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/macrulezru/vue-image-kit/issues"
+  },
+  "homepage": "https://github.com/macrulezru/vue-image-kit#readme",
+  "peerDependencies": {
+    "sharp": ">=0.33.0",
+    "thumbhash": ">=0.1.0",
+    "vue": "^3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "sharp": {
+      "optional": true
+    },
+    "thumbhash": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@nuxt/kit": "^4.4.6",
+    "@nuxt/schema": "^4.4.6",
+    "@types/node": "^25.9.1",
+    "@vitejs/plugin-vue": "^5.0.0",
+    "@vitest/coverage-v8": "^1.6.1",
+    "@vue/test-utils": "^2.4.0",
+    "eslint": "^10.4.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.9.1",
+    "globals": "^17.6.0",
+    "jsdom": "^24.0.0",
+    "postcss-html": "^1.8.1",
+    "prettier": "^3.8.3",
+    "sharp": "^0.34.5",
+    "stylelint": "^17.12.0",
+    "stylelint-config-standard": "^40.0.0",
+    "thumbhash": "^0.1.1",
+    "typescript": "^5.4.0",
+    "typescript-eslint": "^8.60.0",
+    "vite": "^5.0.0",
+    "vite-plugin-dts": "^3.9.0",
+    "vitest": "^1.6.0",
+    "vue": "^3.4.0"
+  }
+}
