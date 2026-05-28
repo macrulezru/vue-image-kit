@@ -1,6 +1,6 @@
 {
   "name": "@macrulez/vue-image-kit",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Vue 3 image optimization: lazy loading, blurhash, LQIP, srcset, WebP/AVIF, CDN adapters, CLI",
   "type": "module",
   "main": "./dist/vue-image-kit.cjs",
