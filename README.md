@@ -37,7 +37,6 @@ Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe —
 - [TypeScript types](#typescript-types)
 - [SSR compatibility](#ssr-compatibility)
 - [Architecture](#architecture)
-- [Bundle size & peer dependencies](#bundle-size--peer-dependencies)
 - [CLI — generate images](#cli--generate-images)
 - [CDN adapters](#cdn-adapters)
 - [ThumbHash placeholder](#thumbhash-placeholder)
@@ -49,6 +48,7 @@ Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe —
 - [Nuxt module](#nuxt-module)
 - [Vite plugin](#vite-plugin)
 - [Demo](#demo)
+- [Bundle size & peer dependencies](#bundle-size--peer-dependencies)
 
 ---
 
@@ -1104,27 +1104,6 @@ Utils (pure functions, zero Vue deps)
 
 ---
 
-## Bundle size & peer dependencies
-
-| Entry point | Raw | Gzip | Peer deps |
-|---|---|---|---|
-| `vue-image-kit` ESM | 20.6 kB | **6.8 kB** | `vue ^3.0` |
-| `vue-image-kit` CJS | 15.3 kB | **5.9 kB** | `vue ^3.0` |
-| `vue-image-kit/cdn` ESM | 5.0 kB | 1.4 kB | — |
-
-Ships as tree-shakeable **ESM** (`vue-image-kit.js`) and **CommonJS** (`vue-image-kit.cjs`).
-`"sideEffects": false` in `package.json` — unused exports are eliminated by the bundler. If you only import `vLazyImg` or a single composable, the bundler will exclude everything else (VImage, blurhash decoder, etc.).
-
-**Tree-shaking example — use only the directive:**
-
-```ts
-// Only vLazyImg and its IO logic is included in the bundle.
-// VImage, useBlurhash, decodeBlurhash are not imported → not bundled.
-import { vLazyImg } from 'vue-image-kit'
-app.directive('lazy-img', vLazyImg)
-```
-
----
 
 ## CLI — generate images
 
@@ -1543,6 +1522,28 @@ The dev server starts at `http://localhost:5173`. No extra setup required — th
 
 ---
 
+## Bundle size & peer dependencies
+
+| Entry point | Raw | Gzip | Peer deps |
+|---|---|---|---|
+| `vue-image-kit` ESM | 20.6 kB | **6.8 kB** | `vue ^3.0` |
+| `vue-image-kit` CJS | 15.3 kB | **5.9 kB** | `vue ^3.0` |
+| `vue-image-kit/cdn` ESM | 5.0 kB | 1.4 kB | — |
+
+Ships as tree-shakeable **ESM** (`vue-image-kit.js`) and **CommonJS** (`vue-image-kit.cjs`).
+`"sideEffects": false` in `package.json` — unused exports are eliminated by the bundler. If you only import `vLazyImg` or a single composable, the bundler will exclude everything else (VImage, blurhash decoder, etc.).
+
+**Tree-shaking example — use only the directive:**
+
+```ts
+// Only vLazyImg and its IO logic is included in the bundle.
+// VImage, useBlurhash, decodeBlurhash are not imported → not bundled.
+import { vLazyImg } from 'vue-image-kit'
+app.directive('lazy-img', vLazyImg)
+```
+
+---
+
 ## License
 
 MIT
@@ -1551,7 +1552,7 @@ MIT
 
 ## Author
 
-macrulezru
+Danil Lisin Vladimirovich aka Macrulez
 
 GitHub: [macrulezru](https://github.com/macrulezru) · Website: [macrulez.ru/en](https://macrulez.ru/en)
 
