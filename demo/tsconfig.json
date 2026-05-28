@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "jsx": "preserve",
+    "skipLibCheck": true,
+    "paths": {
+      "vue-image-kit": ["../src/index.ts"],
+      "vue-image-kit/cdn": ["../src/cdn/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.vue", "../src/**/*.ts", "../src/**/*.vue"]
+}

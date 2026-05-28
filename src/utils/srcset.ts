@@ -1,0 +1,59 @@
+export function generateSrcset(src: string, widths: number[]): string {
+  if (widths.length === 0) return ''
+  return widths.map((w) => `${src} ${w}w`).join(', ')
+}
+
+export function generateSizes(sizes?: string): string {
+  return sizes ?? '100vw'
+}
+
+/**
+ * Builds a `sizes` attribute string from a breakpoint-keyed object.
+ * The `'default'` key becomes the trailing fallback (no media condition).
+ *
+ * @example
+ * buildSizes(
+ *   { sm: '100vw', md: '50vw', default: '33vw' },
+ *   { sm: '(max-width: 640px)', md: '(max-width: 1024px)' }
+ * )
+ * // → '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw'
+ */
+export function buildSizes(
+  sizes: Record<string, string>,
+  breakpoints: Record<string, string> = {},
+): string {
+  const parts: string[] = []
+  let fallback = ''
+
+  for (const [key, value] of Object.entries(sizes)) {
+    if (key === 'default') {
+      fallback = value
+      continue
+    }
+    const media = breakpoints[key]
+    if (media) parts.push(`${media} ${value}`)
+  }
+
+  if (fallback) parts.push(fallback)
+  return parts.join(', ')
+}
+
+/**
+ * Generates an HTML `<link rel="preload">` string for a critical above-the-fold image.
+ * Pass the output to Nuxt's `useHead` or inject into SSR `<head>`.
+ *
+ * @example
+ * generatePreloadLink('/hero.jpg', { srcset: '/hero-400.jpg 400w, /hero-800.jpg 800w', sizes: '100vw' })
+ * // → '<link rel="preload" as="image" href="/hero.jpg" imagesrcset="..." imagesizes="100vw">'
+ */
+export function generatePreloadLink(
+  href: string,
+  options: { srcset?: string; sizes?: string; type?: string } = {},
+): string {
+  const attrs: string[] = [`rel="preload"`, `as="image"`, `href="${href}"`]
+  if (options.srcset) attrs.push(`imagesrcset="${options.srcset}"`)
+  if (options.sizes)  attrs.push(`imagesizes="${options.sizes}"`)
+  if (options.type)   attrs.push(`type="${options.type}"`)
+  return `<link ${attrs.join(' ')}>`
+}
+
