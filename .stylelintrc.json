@@ -3,9 +3,9 @@
   "customSyntax": "postcss-html",
   "rules": {
     "selector-class-pattern": [
-      "^(vvsk|demo)(-[a-z0-9]+)*(--[a-z0-9]+(-[a-z0-9]+)*)?(__[a-z0-9]+(-[a-z0-9]+)*)?(--[a-z0-9]+(-[a-z0-9]+)*)?$",
+      "^(vik|demo)(-[a-z0-9]+)*(--[a-z0-9]+(-[a-z0-9]+)*)?(__[a-z0-9]+(-[a-z0-9]+)*)?(--[a-z0-9]+(-[a-z0-9]+)*)?$",
       {
-        "message": "Class names must follow BEM convention with vvsk- or demo- prefix"
+        "message": "Class names must follow BEM convention with vik- or demo- prefix"
       }
     ],
     "no-descending-specificity": null,

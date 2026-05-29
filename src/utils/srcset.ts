@@ -8,6 +8,35 @@ export function generateSizes(sizes?: string): string {
 }
 
 /**
+ * Builds a density-descriptor srcset (`1x`, `2x`, …) for fixed-size images —
+ * icons, avatars, logos — where width-based candidates don't apply.
+ *
+ * Pass either a single URL (same asset at every density; useful when the URL
+ * itself encodes DPR via a CDN) or a per-density URL map for distinct files.
+ * Density (`x`) and width (`w`) descriptors must not be mixed in one srcset.
+ *
+ * @example
+ * generateDensitySrcset('/logo.png', [1, 2, 3])
+ * // → '/logo.png 1x, /logo.png 2x, /logo.png 3x'
+ *
+ * generateDensitySrcset({ 1: '/a.png', 2: '/a@2x.png' }, [1, 2])
+ * // → '/a.png 1x, /a@2x.png 2x'
+ */
+export function generateDensitySrcset(
+  src: string | Record<number, string>,
+  densities: number[],
+): string {
+  if (densities.length === 0) return ''
+  return densities
+    .map((d) => {
+      const url = typeof src === 'string' ? src : src[d]
+      return url ? `${url} ${d}x` : null
+    })
+    .filter((entry): entry is string => entry !== null)
+    .join(', ')
+}
+
+/**
  * Builds a `sizes` attribute string from a breakpoint-keyed object.
  * The `'default'` key becomes the trailing fallback (no media condition).
  *

@@ -5,116 +5,102 @@
  * Unlike BlurHash, ThumbHash supports alpha channels and returns a PNG data URL.
  */
 
-function thumbHashToRGBA(hash: Uint8Array): { w: number; h: number; rgba: Uint8Array } {
-  // Header is packed into the first 5 bytes
-  const h24 = hash[0]! | (hash[1]! << 8) | (hash[2]! << 16)
-  const h16 = hash[3]! | (hash[4]! << 8)
+// Aspect ratio from the header alone — used to derive output dimensions.
+function thumbHashToApproximateAspectRatio(hash: Uint8Array): number {
+  const header = hash[3] ?? 0
+  const hasAlpha = (hash[2] ?? 0) & 0x80
+  const isLandscape = (hash[4] ?? 0) & 0x80
+  const lx = isLandscape ? (hasAlpha ? 5 : 7) : header & 7
+  const ly = isLandscape ? header & 7 : hasAlpha ? 5 : 7
+  return lx / ly
+}
 
-  const lDC     = (h24 & 63) / 63
-  const pDC     = ((h24 >> 6) & 63) / 31.5 - 1
-  const qDC     = ((h24 >> 12) & 63) / 31.5 - 1
-  const lScale  = ((h24 >> 18) & 31) / 31
-  const hasAlpha = (h24 >> 23) & 1
-  const pScale  = ((h16 >> (hasAlpha ? 6 : 0)) & 63) / 63 * lScale
-  const qScale  = ((h16 >> (hasAlpha ? 12 : 6)) & 63) / 63 * lScale
-  const isLandscape = (h16 >> 15) & 1
+/**
+ * Faithful port of Evan Wallace's reference `thumbHashToRGBA`
+ * (github.com/evanw/thumbhash). AC terms are packed as 4-bit nibbles in a
+ * triangular (low-frequency) scan; chroma is boosted 1.25× to offset
+ * quantization. Returns the decoded thumbnail as raw RGBA.
+ */
+export function thumbHashToRGBA(hash: Uint8Array): { w: number; h: number; rgba: Uint8Array } {
+  const { PI, min, max, cos, round } = Math
+  const at = (i: number): number => hash[i] ?? 0
 
-  // Number of DCT frequency components per direction
-  const lx = Math.max(3, isLandscape ? (hasAlpha ? 5 : 7) - (h16 & 7) : (h16 & 7) + 2)
-  const ly = Math.max(3, isLandscape ? (h16 & 7) + 2 : (hasAlpha ? 5 : 7) - (h16 & 7))
+  // Read the constants
+  const header24 = at(0) | (at(1) << 8) | (at(2) << 16)
+  const header16 = at(3) | (at(4) << 8)
+  const lDC = (header24 & 63) / 63
+  const pDC = ((header24 >> 6) & 63) / 31.5 - 1
+  const qDC = ((header24 >> 12) & 63) / 31.5 - 1
+  const lScale = ((header24 >> 18) & 31) / 31
+  const hasAlpha = header24 >> 23
+  const pScale = ((header16 >> 3) & 63) / 63
+  const qScale = ((header16 >> 9) & 63) / 63
+  const isLandscape = header16 >> 15
+  const lx = max(3, isLandscape ? (hasAlpha ? 5 : 7) : header16 & 7)
+  const ly = max(3, isLandscape ? header16 & 7 : hasAlpha ? 5 : 7)
+  const aDC = hasAlpha ? (at(5) & 15) / 15 : 1
+  const aScale = (at(5) >> 4) / 15
 
-  // Image dimensions (max 32 px on the longer side)
-  const w = isLandscape ? 32 : Math.max(1, Math.round(32 * lx / ly))
-  const h = isLandscape ? Math.max(1, Math.round(32 * ly / lx)) : 32
-
-  // Bit reader — starts after the 5-byte header
-  let ptr = 40
-  function readBits(n: number): number {
-    let v = 0
-    for (let i = 0; i < n; i++) {
-      v |= ((hash[ptr >> 3]! >> (ptr & 7)) & 1) << i
-      ptr++
-    }
-    return v
+  // Read the varying factors (chroma boosted 1.25× to compensate for quantization)
+  const acStart = hasAlpha ? 6 : 5
+  let acIndex = 0
+  const decodeChannel = (nx: number, ny: number, scale: number): number[] => {
+    const ac: number[] = []
+    for (let cy = 0; cy < ny; cy++)
+      for (let cx = cy ? 0 : 1; cx * ny < nx * (ny - cy); cx++)
+        ac.push((((at(acStart + (acIndex >> 1)) >> ((acIndex++ & 1) << 2)) & 15) / 7.5 - 1) * scale)
+    return ac
   }
+  const lAC = decodeChannel(lx, ly, lScale)
+  const pAC = decodeChannel(3, 3, pScale * 1.25)
+  const qAC = decodeChannel(3, 3, qScale * 1.25)
+  const aAC = hasAlpha ? decodeChannel(5, 5, aScale) : []
 
-  // Alpha DC
-  const aDC = hasAlpha ? readBits(6) / 63 : 1
-
-  // Luma AC  (DC is lDC; AC indices start at 1)
-  const lAC: number[] = []
-  const lCount = lx * ly
-  for (let i = 1; i < lCount; i++) lAC.push(readBits(6) / 31.5 - 1)
-
-  // Cb (p) AC
-  const pAC: number[] = []
-  const pCount = Math.ceil(lx / 2) * Math.ceil(ly / 2)
-  for (let i = 0; i < pCount; i++) pAC.push(readBits(6) / 31.5 - 1)
-
-  // Cr (q) AC
-  const qAC: number[] = []
-  for (let i = 0; i < pCount; i++) qAC.push(readBits(6) / 31.5 - 1)
-
-  // Alpha AC
-  let aScale = 1
-  const aAC: number[] = []
-  if (hasAlpha) {
-    aScale = readBits(4) / 15
-    const aCount = Math.ceil(lx / 2) * Math.ceil(ly / 2)
-    for (let i = 1; i < aCount; i++) aAC.push((readBits(4) / 7.5 - 1) * aScale)
-  }
-
-  // Render RGBA pixels
+  // Decode using the DCT into RGB
+  const ratio = thumbHashToApproximateAspectRatio(hash)
+  const w = round(ratio > 1 ? 32 : 32 * ratio)
+  const h = round(ratio > 1 ? 32 / ratio : 32)
   const rgba = new Uint8Array(w * h * 4)
+  const fx: number[] = []
+  const fy: number[] = []
 
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
+  for (let y = 0, i = 0; y < h; y++) {
+    for (let x = 0; x < w; x++, i += 4) {
       let l = lDC, p = pDC, q = qDC, a = aDC
 
-      // Luma: full lx×ly grid, skip DC (cx=0,cy=0)
-      let li = 0
-      for (let cy = 0; cy < ly; cy++) {
-        const fyL = Math.cos((Math.PI / h) * (y + 0.5) * cy)
-        for (let cx = cy > 0 ? 0 : 1; cx < lx; cx++) {
-          l += lScale * lAC[li++]! * Math.cos((Math.PI / w) * (x + 0.5) * cx) * fyL
+      // Precompute the cosine coefficients
+      for (let cx = 0, n = max(lx, hasAlpha ? 5 : 3); cx < n; cx++)
+        fx[cx] = cos((PI / w) * (x + 0.5) * cx)
+      for (let cy = 0, n = max(ly, hasAlpha ? 5 : 3); cy < n; cy++)
+        fy[cy] = cos((PI / h) * (y + 0.5) * cy)
+
+      // Decode L
+      for (let cy = 0, j = 0; cy < ly; cy++)
+        for (let cx = cy ? 0 : 1, fy2 = fy[cy]! * 2; cx * ly < lx * (ly - cy); cx++, j++)
+          l += lAC[j]! * fx[cx]! * fy2
+
+      // Decode P and Q
+      for (let cy = 0, j = 0; cy < 3; cy++)
+        for (let cx = cy ? 0 : 1, fy2 = fy[cy]! * 2; cx < 3 - cy; cx++, j++) {
+          const f = fx[cx]! * fy2
+          p += pAC[j]! * f
+          q += qAC[j]! * f
         }
-      }
 
-      // Chroma: ceil(lx/2) × ceil(ly/2) grid
-      const cx2 = Math.ceil(lx / 2)
-      const cy2 = Math.ceil(ly / 2)
-      let pi = 0, qi = 0, ai = 0
+      // Decode A
+      if (hasAlpha)
+        for (let cy = 0, j = 0; cy < 5; cy++)
+          for (let cx = cy ? 0 : 1, fy2 = fy[cy]! * 2; cx < 5 - cy; cx++, j++)
+            a += aAC[j]! * fx[cx]! * fy2
 
-      for (let cy = 0; cy < cy2; cy++) {
-        const fyC = Math.cos((Math.PI / h) * (y + 0.5) * cy)
-        for (let cx = 0; cx < cx2; cx++) {
-          const fxC = Math.cos((Math.PI / w) * (x + 0.5) * cx)
-          p += pScale * pAC[pi++]! * fxC * fyC
-          q += qScale * qAC[qi++]! * fxC * fyC
-        }
-      }
-
-      // Alpha
-      if (hasAlpha) {
-        for (let cy = 0; cy < cy2; cy++) {
-          const fyA = Math.cos((Math.PI / h) * (y + 0.5) * cy)
-          for (let cx = cy > 0 ? 0 : 1; cx < cx2; cx++) {
-            a += aAC[ai++]! * Math.cos((Math.PI / w) * (x + 0.5) * cx) * fyA
-          }
-        }
-      }
-
-      // YCbCr → RGB  (reference: github.com/evanw/thumbhash)
-      const bMid = l - 2 / 3 * p
-      const rr   = Math.max(0, bMid + q)
-      const gg   = Math.max(0, bMid - q)
-      const bb   = Math.max(0, bMid)
-
-      const idx = (y * w + x) * 4
-      rgba[idx]     = Math.min(255, Math.round(rr * 255))
-      rgba[idx + 1] = Math.min(255, Math.round(gg * 255))
-      rgba[idx + 2] = Math.min(255, Math.round(bb * 255))
-      rgba[idx + 3] = Math.min(255, Math.round(Math.max(0, a) * 255))
+      // Convert to RGB
+      const b = l - (2 / 3) * p
+      const r = (3 * l - b + q) / 2
+      const g = r - q
+      rgba[i]     = max(0, 255 * min(1, r))
+      rgba[i + 1] = max(0, 255 * min(1, g))
+      rgba[i + 2] = max(0, 255 * min(1, b))
+      rgba[i + 3] = max(0, 255 * min(1, a))
     }
   }
 
@@ -198,15 +184,58 @@ function rgbaToPng(w: number, h: number, rgba: Uint8Array): string {
  * const dataUrl = decodeThumbHash('3OcRJYB4d3h/iIeHeEh3eIhw+j5n')
  * // → 'data:image/png;base64,...'
  */
+function hashToBytes(hash: string | Uint8Array): Uint8Array {
+  if (typeof hash !== 'string') return hash
+  const bin = atob(hash)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return bytes
+}
+
 export function decodeThumbHash(hash: string | Uint8Array): string {
-  let bytes: Uint8Array
-  if (typeof hash === 'string') {
-    const bin = atob(hash)
-    bytes = new Uint8Array(bin.length)
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-  } else {
-    bytes = hash
-  }
+  const bytes = hashToBytes(hash)
   const { w, h, rgba } = thumbHashToRGBA(bytes)
   return rgbaToPng(w, h, rgba)
+}
+
+/**
+ * Extracts the average (DC) color of a ThumbHash straight from its header — no
+ * pixel decode, no canvas. Channels are returned as 0–1 floats. Faithful port of
+ * the reference `thumbHashToAverageRGBA` (github.com/evanw/thumbhash).
+ *
+ * Ideal as an ultra-cheap solid-color placeholder.
+ *
+ * @example
+ * const { r, g, b, a } = thumbHashToAverageRGBA('3OcRJYB4d3h/iIeHeEh3eIhw+j5n')
+ */
+export function thumbHashToAverageRGBA(
+  hash: string | Uint8Array,
+): { r: number; g: number; b: number; a: number } {
+  const { min, max } = Math
+  const bytes = hashToBytes(hash)
+  const header = (bytes[0] ?? 0) | ((bytes[1] ?? 0) << 8) | ((bytes[2] ?? 0) << 16)
+  const l = (header & 63) / 63
+  const p = ((header >> 6) & 63) / 31.5 - 1
+  const q = ((header >> 12) & 63) / 31.5 - 1
+  const hasAlpha = header >> 23
+  const a = hasAlpha ? ((bytes[5] ?? 0) & 15) / 15 : 1
+  const b = l - (2 / 3) * p
+  const r = (3 * l - b + q) / 2
+  const g = r - q
+  return {
+    r: max(0, min(1, r)),
+    g: max(0, min(1, g)),
+    b: max(0, min(1, b)),
+    a,
+  }
+}
+
+/**
+ * Convenience wrapper around {@link thumbHashToAverageRGBA} that returns a CSS
+ * `rgba(...)` string suitable for a `background-color` placeholder.
+ */
+export function thumbHashToAverageColor(hash: string | Uint8Array): string {
+  const { r, g, b, a } = thumbHashToAverageRGBA(hash)
+  const to255 = (n: number) => Math.round(n * 255)
+  return `rgba(${to255(r)}, ${to255(g)}, ${to255(b)}, ${a.toFixed(3)})`
 }

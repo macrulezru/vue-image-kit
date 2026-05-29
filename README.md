@@ -11,7 +11,7 @@
 
 A complete image optimization toolkit for Vue 3. One `<VImage>` component handles lazy loading, WebP/AVIF format switching, responsive art direction, Blurhash and LQIP placeholders, automatic `srcset` generation, error retry with exponential backoff, and smooth CSS transitions — with **zero external runtime dependencies** and **~6.8 kB gzip**.
 
-Everything you need beyond the component is included: a **CLI** that processes images at build time (resize, convert, generate LQIP and BlurHash, write a TypeScript manifest), **CDN URL builders** for 7 providers (Cloudinary, imgix, Bunny, Sanity, Storyblok, Contentful, Vercel), a **Nuxt 3 module** with auto-imports, a **Vite plugin**, and **headless composables** for fully custom markup.
+Everything you need beyond the component is included: a **CLI** that processes images at build time (resize, convert, generate LQIP and BlurHash, write a TypeScript manifest), **CDN URL builders** for 12 providers (Cloudinary, imgix, Bunny, Sanity, Storyblok, Contentful, Vercel, Cloudflare, ImageKit, TwicPics, Netlify, Gumlet), a **Nuxt 3 module** with auto-imports, a **Vite plugin**, and **headless composables** for fully custom markup.
 
 Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe — renders a native `<img loading="lazy">` on the server, activates IntersectionObserver and canvas after hydration.
 
@@ -58,9 +58,14 @@ Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe —
 - **Blurhash placeholder** — custom in-house decoder (no external packages); renders to `<canvas>` in `onMounted`; SSR renders a sized `<div>` preserving aspect-ratio
 - **ThumbHash placeholder** — `thumbhash` prop on VImage auto-decodes to PNG data URL; supports alpha channel; better quality than BlurHash; `--thumbhash` flag in CLI generates hashes at build time
 - **LQIP blur-up** — `data:image/…;base64,…` string as `placeholder`; blurred preview with `filter: blur()`; cross-fades via CSS `opacity` transition
+- **Average-color placeholder** — `placeholderMode="color"` derives a solid background color from the ThumbHash header (0 bytes, no canvas); or set `placeholderColor` directly
+- **Shimmer placeholder** — `placeholderMode="shimmer"` shows an animated CSS skeleton (no hash needed); respects `prefers-reduced-motion`
+- **Client-side encoders** — `encodeThumbHash()` / `encodeBlurhash()` produce a hash from a `File`/`Canvas`/`ImageData` in the browser, for instant UGC previews; dependency-free
 
 **Component — VImage**
 - **srcset autogeneration** — pass `widths: [400, 800, 1200]`; `srcset` string built automatically; `sizes` prop passed through
+- **Density descriptors** — `densities: [1, 2, 3]` (reuse `src`) or `{ 1: …, 2: … }` (distinct files per density) for `1x`/`2x`/`3x` srcset on fixed-size images
+- **Focal point** — `focal: { x, y }` maps to `object-position` so the subject stays in frame when `fit="cover"` crops
 - **WebP / AVIF switching** — `src` as `{ avif?, webp?, fallback }` renders `<picture>` with typed `<source>` elements
 - **Responsive art direction** — named breakpoints map to `<source media="...">` elements; `max-width` and `min-width` queries sorted correctly
 - **`fetchpriority` prop** — `high` for LCP images, `low` for below-the-fold; maps to the native HTML attribute
@@ -72,6 +77,7 @@ Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe —
 - **IntersectionObserver lazy loading** — IO instead of `loading="lazy"` for precise control; configurable `rootMargin` and `threshold`; SSR-safe
 - **IO pooling** — components sharing the same `rootMargin`+`threshold` config share one `IntersectionObserver` instance; no overhead at 50+ images
 - **Background-image directive** — `v-lazy-img` sets `background-image` on any element after viewport entry; LQIP placeholder; configurable `transition`; `onLoad`/`onError` callbacks
+- **`useBackgroundImage()`** — composable for lazy **+ responsive** (`image-set()`) backgrounds with blur-up; the `srcset` capability `v-lazy-img` lacks
 
 **Composables & utilities**
 - **`useImage()`** — headless state machine (`idle → loading → loaded | error`) + computed `imgAttrs`; works with any markup
@@ -80,7 +86,7 @@ Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe —
 - **`generatePreloadLink()`** — generates `<link rel="preload" as="image">` HTML for SSR/Nuxt `useHead`
 
 **CDN adapters — `vue-image-kit/cdn`**
-- Zero-dependency URL builders for **Cloudinary**, **imgix**, **Bunny CDN**, **Sanity**, **Storyblok**, **Contentful**, **Vercel**
+- Zero-dependency URL builders for **Cloudinary**, **imgix**, **Bunny CDN**, **Sanity**, **Storyblok**, **Contentful**, **Vercel**, **Cloudflare Images**, **ImageKit.io**, **TwicPics**, **Netlify Image CDN**, **Gumlet**
 - Unified `.url(path, options)` / `.srcset(path, widths)` interface across all providers
 
 **CLI — `npx vue-image-kit generate`**
@@ -91,7 +97,7 @@ Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe —
 
 **Ecosystem**
 - **Nuxt module** — `vue-image-kit/nuxt`; auto-registers `<VImage>` and `v-lazy-img`; auto-imports all composables and utilities; breakpoints via `runtimeConfig`
-- **Vite plugin** — `vue-image-kit/vite`; runs the CLI processor on `buildStart`; re-runs in `handleHotUpdate` during dev
+- **Vite plugin** — `vue-image-kit/vite`; runs the CLI processor on `buildStart`; re-runs in `handleHotUpdate` during dev; **build-time imports** via `?vik` / `?thumbhash` query suffixes
 - **Vue plugin** — `app.use(VImageKitPlugin, { breakpoints })` registers component and directive globally
 - **Zero external runtime dependencies** — only Vue 3 as peer dep; full ESM + CJS, tree-shakeable, `sideEffects: false`; ~3.8 kB gzip
 
@@ -231,14 +237,18 @@ The main component. Combines lazy loading, placeholder, format switching, and tr
 | `blurhash` | `string` | — | BlurHash string; decoded to canvas in `onMounted` |
 | `thumbhash` | `string` | — | ThumbHash string; decoded to PNG data URL, used as blur-up placeholder |
 | `placeholder` | `string` | — | Base64 LQIP or ThumbHash data URL; overrides `thumbhash` if both provided |
-| `widths` | `number[]` | — | Pixel widths for automatic `srcset` generation |
-| `sizes` | `string` | — | `sizes` attribute passed to `<img>` |
+| `placeholderMode` | `'blur' \| 'color' \| 'shimmer'` | `'blur'` | `'color'` shows a solid average color (from `thumbhash`); `'shimmer'` shows an animated skeleton (no hash needed) |
+| `placeholderColor` | `string` | — | Explicit solid CSS color placeholder; takes precedence and needs no decode |
+| `widths` | `number[]` | — | Pixel widths for automatic width-based (`w`) `srcset` generation |
+| `densities` | `number[] \| Record<number, string>` | — | Density descriptors (`1x`/`2x`/`3x`) for fixed-size images. List reuses `src`; map gives a distinct file per density. Takes precedence over `widths`, ignores `sizes` |
+| `sizes` | `string` | — | `sizes` attribute passed to `<img>` (width-based srcset only) |
 | `breakpoints` | `BreakpointMap` | — | Local breakpoints (merged with global plugin breakpoints) |
 | `sources` | `ResponsiveSrc` | — | Breakpoint-key → URL map for art direction |
 | `lazy` | `boolean` | `true` | Enable IntersectionObserver lazy loading |
 | `rootMargin` | `string` | `"200px"` | IO `rootMargin` — how far before the viewport loading starts |
 | `threshold` | `number` | `0` | IO `threshold` — intersection ratio required to trigger |
 | `fit` | `ObjectFit` | `"cover"` | CSS `object-fit` value on the `<img>` |
+| `focal` | `FocalPoint` | — | Focal point `{ x, y }` (fractions 0–1) → `object-position`; keeps the subject in frame when `fit="cover"` crops |
 | `maxRetries` | `number` | `0` | Max retry attempts on load failure |
 | `retryDelay` | `number` | `1000` | Initial delay in ms; doubles each retry (exponential backoff) |
 | `fetchpriority` | `'high' \| 'low' \| 'auto'` | — | Browser fetch priority hint |
@@ -295,6 +305,45 @@ The main component. Combines lazy loading, placeholder, format switching, and tr
 
 ```vue
 <VImage src="/hero.jpg" alt="Hero" :lazy="false" />
+```
+
+**Focal point — keep the subject in frame when cropping:**
+
+```vue
+<!-- With fit="cover" the image is cropped to the box; focal decides which
+     part survives. { x: 0.5, y: 0.3 } favours the upper-middle (e.g. a face). -->
+<VImage
+  src="/portrait.jpg"
+  alt="Team member"
+  :width="400"
+  :height="400"
+  fit="cover"
+  :focal="{ x: 0.5, y: 0.3 }"
+/>
+```
+
+**Cheapest placeholder — a solid average color (no canvas, 0 bytes):**
+
+```vue
+<!-- 'color' mode pulls the average RGBA straight from the ThumbHash header. -->
+<VImage
+  src="/photo.jpg"
+  alt="Gallery item"
+  :width="600"
+  :height="400"
+  thumbhash="3OcRJYB4d3h/iIeHeEh3eIhw+j5n"
+  placeholder-mode="color"
+/>
+
+<!-- Or an explicit color you already know — needs no ThumbHash at all. -->
+<VImage src="/photo.jpg" alt="Banner" placeholder-color="#1e3a8a" />
+```
+
+**Animated skeleton — when you have no hash at all:**
+
+```vue
+<!-- A CSS shimmer sweep until the image loads. Respects prefers-reduced-motion. -->
+<VImage src="/photo.jpg" alt="Card" :width="400" :height="300" placeholder-mode="shimmer" />
 ```
 
 **Custom error slot:**
@@ -355,8 +404,9 @@ const {
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `src` | `string \| SrcSet` | — | Image URL or format object |
-| `widths` | `number[]` | `[]` | Widths for `srcset` generation |
-| `sizes` | `string` | — | `sizes` attribute value |
+| `widths` | `number[]` | `[]` | Widths for width-based (`w`) `srcset` generation |
+| `densities` | `number[] \| Record<number, string>` | — | Density descriptors (`1x`/`2x`/`3x`); list reuses `src`, map gives distinct files; takes precedence over `widths`, ignores `sizes` |
+| `sizes` | `string` | — | `sizes` attribute value (width-based srcset only) |
 | `lazy` | `boolean` | `true` | Enable IntersectionObserver |
 | `rootMargin` | `string` | `"200px"` | IO `rootMargin` |
 | `threshold` | `number` | `0` | IO `threshold` |
@@ -531,6 +581,50 @@ const cards = [
 
 ---
 
+## useBackgroundImage
+
+The `v-lazy-img` directive lazy-loads a background but can't do `srcset`. `useBackgroundImage` is the composable counterpart: **lazy loading + responsive `image-set()`** (the CSS-native equivalent of `srcset`) + blur-up — returned as a reactive `:style` you bind yourself.
+
+```vue
+<script setup lang="ts">
+import { useBackgroundImage } from 'vue-image-kit'
+
+const { target, style, isLoaded } = useBackgroundImage('/hero.jpg', {
+  placeholder: 'data:image/jpeg;base64,/9j/...',
+  densities: [1, 2],          // → image-set(url("/hero.jpg") 1x, url("/hero.jpg") 2x)
+  rootMargin: '300px',
+})
+</script>
+
+<template>
+  <section ref="target" :style="style" class="hero">
+    <h1 v-show="isLoaded">Welcome</h1>
+  </section>
+</template>
+
+<style scoped>
+.hero { width: 100%; height: 60vh; }
+</style>
+```
+
+**Options**
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `placeholder` | `string` | — | URL/data URL shown (blurred) until the full image loads |
+| `densities` | `number[]` | — | Builds a responsive `image-set()` with `1x`/`2x`/… entries |
+| `type` | `string` | — | MIME hint for `image-set()` entries (e.g. `'image/webp'`) |
+| `lazy` | `boolean` | `true` | Gate loading behind IntersectionObserver |
+| `rootMargin` | `string` | `'200px'` | IO root margin |
+| `threshold` | `number` | `0` | IO threshold |
+| `transition` | `string` | `'0.4s ease'` | Blur-up transition |
+| `backgroundSize` | `string` | `'cover'` | `background-size` |
+| `backgroundPosition` | `string` | `'center'` | `background-position` |
+
+**Returns** `{ target, style, status, isLoaded, isLoading, load }`. Attach `target` via a template ref and bind `style`; call `load()` to trigger manually when `lazy: false`. SSR-safe (loading is deferred to the client).
+
+---
+
 ## ThumbHash placeholder
 
 ThumbHash is a modern alternative to BlurHash with **alpha channel support**, better visual quality on photos, and a shorter hash string. It decodes to a PNG data URL.
@@ -555,6 +649,20 @@ import { decodeThumbHash } from 'vue-image-kit'
 const dataUrl = decodeThumbHash('3OcRJYB4d3h/iIeHeEh3eIhw+j5n')
 // → 'data:image/png;base64,...'
 ```
+
+**Average color — the cheapest placeholder of all** (decoded from the header, no pixels):
+
+```ts
+import { thumbHashToAverageRGBA, thumbHashToAverageColor } from 'vue-image-kit'
+
+thumbHashToAverageRGBA('3OcRJYB4d3h/iIeHeEh3eIhw+j5n')
+// → { r, g, b, a }  (each channel 0–1)
+
+thumbHashToAverageColor('3OcRJYB4d3h/iIeHeEh3eIhw+j5n')
+// → 'rgba(150, 146, 104, 1.000)'  — drop straight into background-color
+```
+
+Or let VImage do it via `placeholder-mode="color"` (see [Props](#props)).
 
 **`placeholder` prop** — equivalent when you already have the data URL:
 
@@ -678,6 +786,49 @@ const lqip = `data:image/jpeg;base64,${buffer.toString('base64')}`
 
 ---
 
+## Client-side encoding (user-generated content)
+
+When a user uploads a photo, encode a placeholder **in the browser** so you can show a blur-up preview instantly — before the full image is uploaded or processed. Both encoders are dependency-free (the ThumbHash encoder is a faithful port of the reference, byte-identical to the `thumbhash` package) and accept a `File`/`Blob`, `HTMLImageElement`, `HTMLCanvasElement`, `ImageBitmap`, or `ImageData`.
+
+```ts
+import { encodeThumbHash, encodeBlurhash, decodeThumbHash } from 'vue-image-kit'
+
+async function onFileSelected(file: File) {
+  const thumbhash = await encodeThumbHash(file)
+  // → base64 string; feed straight into <VImage :thumbhash="thumbhash">
+  //   or decodeThumbHash(thumbhash) for a data URL preview.
+
+  const blurhash = await encodeBlurhash(file, { componentX: 4, componentY: 3 })
+}
+```
+
+| Function | Returns | Options |
+|---|---|---|
+| `encodeThumbHash(source, options?)` | `Promise<string>` (base64) | `maxSize` (default/max `100`) |
+| `encodeBlurhash(source, options?)` | `Promise<string>` | `componentX` (1–9, default `4`), `componentY` (1–9, default `3`), `maxSize` (default `64`) |
+
+The source is downscaled to `maxSize` on its longest edge before encoding (a ThumbHash must fit within 100×100). These require a browser/DOM — they throw in SSR.
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+import { encodeThumbHash } from 'vue-image-kit'
+
+const hash = ref('')
+async function handleUpload(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (file) hash.value = await encodeThumbHash(file)
+}
+</script>
+
+<template>
+  <input type="file" accept="image/*" @change="handleUpload" />
+  <VImage v-if="hash" :src="previewUrl" alt="Preview" :thumbhash="hash" />
+</template>
+```
+
+---
+
 ## srcset + sizes
 
 Pass `widths` to auto-generate the `srcset` attribute:
@@ -705,10 +856,33 @@ Renders:
 When `widths` is not provided, `srcset` is not added — the plain `src` is used.
 When `widths` is provided but `sizes` is not, `sizes` defaults to `"100vw"`.
 
+### Density descriptors (`1x` / `2x` / `3x`)
+
+For fixed-size images — icons, avatars, logos — use `densities` instead of `widths`. The browser picks the candidate matching the device pixel ratio; no `sizes` is needed. `densities` takes precedence over `widths` (the two descriptor types can't be mixed in one `srcset`).
+
+`:densities` accepts two forms:
+
+```vue
+<!-- 1. Per-density URL map — distinct files (recommended for static assets). -->
+<VImage
+  src="/avatar.png"
+  alt="Avatar"
+  :width="48"
+  :height="48"
+  :densities="{ 1: '/avatar.png', 2: '/avatar@2x.png', 3: '/avatar@3x.png' }"
+/>
+<!-- → srcset="/avatar.png 1x, /avatar@2x.png 2x, /avatar@3x.png 3x" -->
+
+<!-- 2. Density list — reuses the single `src` for every density. Only useful
+     when the URL itself is resolution-aware (a CDN/DPR endpoint). -->
+<VImage src="https://cdn.example.com/avatar?dpr=auto" alt="Avatar" :densities="[1, 2, 3]" />
+<!-- → srcset="…?dpr=auto 1x, …?dpr=auto 2x, …?dpr=auto 3x" -->
+```
+
 **Using the utilities directly:**
 
 ```ts
-import { generateSrcset, generateSizes } from 'vue-image-kit'
+import { generateSrcset, generateSizes, generateDensitySrcset } from 'vue-image-kit'
 
 generateSrcset('/photo.jpg', [400, 800, 1200])
 // → '/photo.jpg 400w, /photo.jpg 800w, /photo.jpg 1200w'
@@ -718,6 +892,13 @@ generateSizes('(max-width: 768px) 100vw, 50vw')
 
 generateSizes()
 // → '100vw'
+
+generateDensitySrcset('/logo.png', [1, 2, 3])
+// → '/logo.png 1x, /logo.png 2x, /logo.png 3x'
+
+// Distinct files per density via a URL map:
+generateDensitySrcset({ 1: '/a.png', 2: '/a@2x.png' }, [1, 2])
+// → '/a.png 1x, /a@2x.png 2x'
 ```
 
 ---
@@ -1239,7 +1420,10 @@ export default {
 `vue-image-kit/cdn` provides URL builders for popular image CDNs — no dependencies, pure functions.
 
 ```ts
-import { cloudinary, imgix, bunny, sanity, storyblok, contentful, vercel } from 'vue-image-kit/cdn'
+import {
+  cloudinary, imgix, bunny, sanity, storyblok, contentful, vercel,
+  cloudflare, imagekit, twicpics, netlify, gumlet,
+} from 'vue-image-kit/cdn'
 ```
 
 All adapters share the same interface:
@@ -1306,6 +1490,46 @@ cdn.url('https://images.ctfassets.net/space/token/photo.jpg', { width: 800 })
 const cdn = vercel({ origin: 'https://myapp.vercel.app' })
 cdn.url('/photo.jpg', { width: 800, quality: 75 })
 // → https://myapp.vercel.app/_vercel/image?url=%2Fphoto.jpg&w=800&q=75
+```
+
+**Cloudflare Images:**
+
+```ts
+const cdn = cloudflare('https://example.com')
+cdn.url('/photo.jpg', { width: 800, format: 'webp' })
+// → https://example.com/cdn-cgi/image/width=800,format=webp/photo.jpg
+```
+
+**ImageKit.io:**
+
+```ts
+const cdn = imagekit('https://ik.imagekit.io/your_id')
+cdn.url('photo.jpg', { width: 800, format: 'webp' })
+// → https://ik.imagekit.io/your_id/photo.jpg?tr=w-800,f-webp
+```
+
+**TwicPics:**
+
+```ts
+const cdn = twicpics('https://demo.twic.pics')
+cdn.url('photo.jpg', { width: 800, format: 'webp' })
+// → https://demo.twic.pics/photo.jpg?twic=v1/resize=800/output=webp
+```
+
+**Netlify Image CDN:**
+
+```ts
+const cdn = netlify({ origin: 'https://myapp.netlify.app' })
+cdn.url('/photo.jpg', { width: 800, format: 'webp', quality: 75 })
+// → https://myapp.netlify.app/.netlify/images?url=%2Fphoto.jpg&w=800&fm=webp&q=75
+```
+
+**Gumlet:**
+
+```ts
+const cdn = gumlet('https://demo.gumlet.io')
+cdn.url('photo.jpg', { width: 800, format: 'webp' })
+// → https://demo.gumlet.io/photo.jpg?w=800&format=webp
 ```
 
 **Use with VImage:**
@@ -1493,6 +1717,48 @@ export default defineConfig({
 
 All CLI options are supported. `sharp` must be installed as a dev dependency.
 
+### Build-time imports
+
+The plugin also resolves **query-suffixed imports**, so you never wire props by hand — the metadata comes straight into your JS at build time:
+
+```ts
+import meta from './photo.jpg?vik'
+// → { src, srcset, webp, avif, width, height, placeholder, blurhash, thumbhash, name, src400, ... }
+
+import hash from './photo.jpg?thumbhash'
+// → 'base64string'
+```
+
+Spread the metadata straight onto `<VImage>`:
+
+```vue
+<script setup lang="ts">
+import meta from './hero.jpg?vik'
+</script>
+
+<template>
+  <VImage
+    :src="meta.src"
+    :srcset="meta.srcset"
+    :width="meta.width"
+    :height="meta.height"
+    :thumbhash="meta.thumbhash"
+    alt="Hero"
+  />
+</template>
+```
+
+- **`?vik`** resizes/encodes the image into `output` and returns the full manifest entry (URLs use `publicPath`, exactly like the generated manifest). The ThumbHash is always included.
+- **`?thumbhash`** computes *only* the hash string and writes no files.
+
+Both re-run when the source image changes in dev. `sharp` is required; `thumbhash` is required for hash output.
+
+**TypeScript** — enable typed `?vik` / `?thumbhash` imports by referencing the bundled declarations once (e.g. in `env.d.ts`):
+
+```ts
+/// <reference types="vue-image-kit/vite/client" />
+```
+
 ---
 
 ## Demo
@@ -1511,14 +1777,20 @@ The dev server starts at `http://localhost:5173`. No extra setup required — th
 |---|---|
 | **Basic** | `<VImage>` props playground — live controls for all options, all loading states |
 | **Blurhash & LQIP** | Side-by-side blurhash canvas vs base64 blur-up; live blurhash string input |
+| **Color & Shimmer** | `placeholderMode` comparison — blur vs ThumbHash vs solid average color vs animated shimmer |
 | **AVIF / WebP** | Format switching via `<picture>`, browser format detection, file size comparison |
 | **srcset** | Three previews at 400 / 800 / 1200 px — `currentSrc` changes with `sizes`; live `sizes` editor |
+| **Density 1x/2x/3x** | Density descriptors for fixed-size images; live `generateDensitySrcset` output and device DPR |
 | **Responsive sources** | Art direction with named breakpoints — `<source media="...">` switching |
+| **Focal point** | `:focal="{ x, y }"` → `object-position` with a draggable marker over a cropped frame |
 | **Lazy Load** | 20+ images with per-item status badges; configurable `rootMargin` and `threshold` |
 | **v-lazy-img** | 36-card grid with background-image lazy loading; LQIP toggle; event log |
+| **Background image** | `useBackgroundImage()` — lazy + responsive `image-set()` background with blur-up |
+| **Encode (upload)** | Client-side `encodeThumbHash` / `encodeBlurhash` from an uploaded file, with decoded preview |
 | **Error State** | Default SVG fallback vs custom `#error` slot; `@error` event log; `maxRetries` exponential backoff demo |
 | **Headless** | `useImage()` composable with fully custom markup and reactive state display |
-| **CDN adapters** | Live URL / srcset builder for Cloudinary, imgix, Bunny, Sanity, Storyblok, Contentful, Vercel |
+| **CDN adapters** | Live URL / srcset builder for all 12 providers (Cloudinary, imgix, Bunny, Sanity, Storyblok, Contentful, Vercel, Cloudflare, ImageKit, TwicPics, Netlify, Gumlet) |
+| **Build-time imports** | The `?vik` / `?thumbhash` workflow explained, with the resolved metadata shape |
 
 ---
 
@@ -1526,9 +1798,9 @@ The dev server starts at `http://localhost:5173`. No extra setup required — th
 
 | Entry point | Raw | Gzip | Peer deps |
 |---|---|---|---|
-| `vue-image-kit` ESM | 20.6 kB | **6.8 kB** | `vue ^3.0` |
-| `vue-image-kit` CJS | 15.3 kB | **5.9 kB** | `vue ^3.0` |
-| `vue-image-kit/cdn` ESM | 5.0 kB | 1.4 kB | — |
+| `vue-image-kit` ESM | 30.7 kB | **9.8 kB** | `vue ^3.0` |
+| `vue-image-kit` CJS | 22.9 kB | **8.6 kB** | `vue ^3.0` |
+| `vue-image-kit/cdn` ESM | 9.0 kB | **1.9 kB** | — |
 
 Ships as tree-shakeable **ESM** (`vue-image-kit.js`) and **CommonJS** (`vue-image-kit.cjs`).
 `"sideEffects": false` in `package.json` — unused exports are eliminated by the bundler. If you only import `vLazyImg` or a single composable, the bundler will exclude everything else (VImage, blurhash decoder, etc.).

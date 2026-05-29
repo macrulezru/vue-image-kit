@@ -188,6 +188,44 @@ describe('useImage', () => {
     expect(wrapper.vm.imgAttrs.srcset).toBeUndefined()
   })
 
+  it('imgAttrs builds a density srcset and omits sizes when densities provided', () => {
+    const wrapper = mount(defineComponent({
+      setup() {
+        const { imgAttrs } = useImage({ src: '/logo.png', densities: [1, 2, 3] })
+        return { imgAttrs }
+      },
+      template: '<div />',
+    }))
+    expect(wrapper.vm.imgAttrs.srcset).toBe('/logo.png 1x, /logo.png 2x, /logo.png 3x')
+    expect(wrapper.vm.imgAttrs.sizes).toBeUndefined()
+  })
+
+  it('imgAttrs builds a density srcset from a per-density URL map (distinct files)', () => {
+    const wrapper = mount(defineComponent({
+      setup() {
+        const { imgAttrs } = useImage({
+          src: '/a.png',
+          densities: { 1: '/a.png', 2: '/a@2x.png', 3: '/a@3x.png' },
+        })
+        return { imgAttrs }
+      },
+      template: '<div />',
+    }))
+    expect(wrapper.vm.imgAttrs.srcset).toBe('/a.png 1x, /a@2x.png 2x, /a@3x.png 3x')
+    expect(wrapper.vm.imgAttrs.sizes).toBeUndefined()
+  })
+
+  it('imgAttrs prefers density over width descriptors when both are set', () => {
+    const wrapper = mount(defineComponent({
+      setup() {
+        const { imgAttrs } = useImage({ src: '/logo.png', widths: [400, 800], densities: [1, 2] })
+        return { imgAttrs }
+      },
+      template: '<div />',
+    }))
+    expect(wrapper.vm.imgAttrs.srcset).toBe('/logo.png 1x, /logo.png 2x')
+  })
+
   it('uses fallback src from SrcSet object', () => {
     const wrapper = mount(defineComponent({
       setup() {

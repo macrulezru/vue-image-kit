@@ -7,6 +7,10 @@ export default defineConfig({
     dts({
       include: ['src/nuxt/**/*.ts', 'src/nuxt/**/*.d.ts'],
       outDir: 'dist/nuxt',
+      // Pin the root so declarations land flat in dist/nuxt to match the
+      // package "./nuxt" types export (the module imports 'vue-image-kit',
+      // which would otherwise push the inferred root up a level).
+      entryRoot: 'src/nuxt',
       tsconfigPath: './tsconfig.nuxt.json',
     }),
   ],

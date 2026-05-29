@@ -1,8 +1,33 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { cloudinary, imgix, bunny, sanity, storyblok, contentful, vercel } from 'vue-image-kit/cdn'
+import {
+  cloudinary,
+  imgix,
+  bunny,
+  sanity,
+  storyblok,
+  contentful,
+  vercel,
+  cloudflare,
+  imagekit,
+  twicpics,
+  netlify,
+  gumlet,
+} from 'vue-image-kit/cdn'
 
-type CdnId = 'cloudinary' | 'imgix' | 'bunny' | 'sanity' | 'storyblok' | 'contentful' | 'vercel'
+type CdnId =
+  | 'cloudinary'
+  | 'imgix'
+  | 'bunny'
+  | 'sanity'
+  | 'storyblok'
+  | 'contentful'
+  | 'vercel'
+  | 'cloudflare'
+  | 'imagekit'
+  | 'twicpics'
+  | 'netlify'
+  | 'gumlet'
 
 const selectedCdn = ref<CdnId>('cloudinary')
 const path = ref('/photos/hero.jpg')
@@ -17,6 +42,11 @@ const sanityDataset = ref('production')
 const storyblokUrl = ref('https://a.storyblok.com/f/12345/hero.jpg')
 const contentfulUrl = ref('https://images.ctfassets.net/space/token/hero.jpg')
 const vercelOrigin = ref('https://myapp.vercel.app')
+const cloudflareBase = ref('https://example.com')
+const imagekitBase = ref('https://ik.imagekit.io/demo')
+const twicpicsBase = ref('https://demo.twic.pics')
+const netlifyOrigin = ref('https://myapp.netlify.app')
+const gumletBase = ref('https://demo.gumlet.io')
 
 const cdns = [
   { id: 'cloudinary', label: 'Cloudinary', docs: 'res.cloudinary.com' },
@@ -26,6 +56,11 @@ const cdns = [
   { id: 'storyblok', label: 'Storyblok', docs: 'img2.storyblok.com' },
   { id: 'contentful', label: 'Contentful', docs: 'images.ctfassets.net' },
   { id: 'vercel', label: 'Vercel', docs: '/_vercel/image' },
+  { id: 'cloudflare', label: 'Cloudflare', docs: '/cdn-cgi/image' },
+  { id: 'imagekit', label: 'ImageKit', docs: 'ik.imagekit.io' },
+  { id: 'twicpics', label: 'TwicPics', docs: 'twic.pics' },
+  { id: 'netlify', label: 'Netlify', docs: '/.netlify/images' },
+  { id: 'gumlet', label: 'Gumlet', docs: 'gumlet.io' },
 ] as const
 
 const widths = computed(() =>
@@ -52,6 +87,16 @@ function getAdapter() {
       return contentful()
     case 'vercel':
       return vercel({ origin: vercelOrigin.value })
+    case 'cloudflare':
+      return cloudflare(cloudflareBase.value)
+    case 'imagekit':
+      return imagekit(imagekitBase.value)
+    case 'twicpics':
+      return twicpics(twicpicsBase.value)
+    case 'netlify':
+      return netlify({ origin: netlifyOrigin.value })
+    case 'gumlet':
+      return gumlet(gumletBase.value)
   }
 }
 
@@ -108,6 +153,16 @@ const usageSnippet = computed(() => {
       return `const cdn = contentful()\n\ncdn.url('${contentfulUrl.value}', { width: ${w[0] ?? 800} })\ncdn.srcset('${contentfulUrl.value}', [${w.join(', ')}])`
     case 'vercel':
       return `const cdn = vercel({ origin: '${vercelOrigin.value}' })\n\ncdn.url('/photo.jpg', { width: ${w[0] ?? 800}, quality: ${quality.value} })\ncdn.srcset('/photo.jpg', [${w.join(', ')}])`
+    case 'cloudflare':
+      return `const cdn = cloudflare('${cloudflareBase.value}')\n\ncdn.url('${p}', { width: ${w[0] ?? 800}, format: '${format.value}' })\ncdn.srcset('${p}', [${w.join(', ')}])`
+    case 'imagekit':
+      return `const cdn = imagekit('${imagekitBase.value}')\n\ncdn.url('${p}', { width: ${w[0] ?? 800}, format: '${format.value}' })\ncdn.srcset('${p}', [${w.join(', ')}])`
+    case 'twicpics':
+      return `const cdn = twicpics('${twicpicsBase.value}')\n\ncdn.url('${p}', { width: ${w[0] ?? 800}, format: '${format.value}' })\ncdn.srcset('${p}', [${w.join(', ')}])`
+    case 'netlify':
+      return `const cdn = netlify({ origin: '${netlifyOrigin.value}' })\n\ncdn.url('/photo.jpg', { width: ${w[0] ?? 800}, format: '${format.value}', quality: ${quality.value} })\ncdn.srcset('/photo.jpg', [${w.join(', ')}])`
+    case 'gumlet':
+      return `const cdn = gumlet('${gumletBase.value}')\n\ncdn.url('${p}', { width: ${w[0] ?? 800}, format: '${format.value}' })\ncdn.srcset('${p}', [${w.join(', ')}])`
   }
 })
 </script>
@@ -213,6 +268,61 @@ const usageSnippet = computed(() => {
           <div class="control-row">
             <span class="control-label">origin</span>
             <input class="control-input" style="flex: 1" v-model="vercelOrigin" />
+          </div>
+          <div class="control-row">
+            <span class="control-label">path</span>
+            <input class="control-input" style="flex: 1" v-model="path" />
+          </div>
+        </template>
+
+        <template v-else-if="selectedCdn === 'cloudflare'">
+          <div class="control-row">
+            <span class="control-label">origin</span>
+            <input class="control-input" style="flex: 1" v-model="cloudflareBase" />
+          </div>
+          <div class="control-row">
+            <span class="control-label">path</span>
+            <input class="control-input" style="flex: 1" v-model="path" />
+          </div>
+        </template>
+
+        <template v-else-if="selectedCdn === 'imagekit'">
+          <div class="control-row">
+            <span class="control-label">URL endpoint</span>
+            <input class="control-input" style="flex: 1" v-model="imagekitBase" />
+          </div>
+          <div class="control-row">
+            <span class="control-label">path</span>
+            <input class="control-input" style="flex: 1" v-model="path" />
+          </div>
+        </template>
+
+        <template v-else-if="selectedCdn === 'twicpics'">
+          <div class="control-row">
+            <span class="control-label">domain</span>
+            <input class="control-input" style="flex: 1" v-model="twicpicsBase" />
+          </div>
+          <div class="control-row">
+            <span class="control-label">path</span>
+            <input class="control-input" style="flex: 1" v-model="path" />
+          </div>
+        </template>
+
+        <template v-else-if="selectedCdn === 'netlify'">
+          <div class="control-row">
+            <span class="control-label">origin</span>
+            <input class="control-input" style="flex: 1" v-model="netlifyOrigin" />
+          </div>
+          <div class="control-row">
+            <span class="control-label">path</span>
+            <input class="control-input" style="flex: 1" v-model="path" />
+          </div>
+        </template>
+
+        <template v-else-if="selectedCdn === 'gumlet'">
+          <div class="control-row">
+            <span class="control-label">base URL</span>
+            <input class="control-input" style="flex: 1" v-model="gumletBase" />
           </div>
           <div class="control-row">
             <span class="control-label">path</span>

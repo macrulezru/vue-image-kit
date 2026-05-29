@@ -13,6 +13,9 @@ import { generateManifestContent } from './manifest.js'
 
 const SUPPORTED_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.tiff', '.tif'])
 
+type SharpFactory = Awaited<ReturnType<typeof getSharp>>
+type SharpImage = ReturnType<SharpFactory>
+
 // Lazy-load sharp to give a clear error when not installed
 async function getSharp() {
   try {
@@ -26,6 +29,38 @@ async function getSharp() {
     )
     process.exit(1)
   }
+}
+
+// Lazy-load thumbhash with the same clear-error contract as sharp.
+async function getRgbaToThumbHash(): Promise<(w: number, h: number, rgba: Uint8Array) => Uint8Array> {
+  try {
+    return (await import('thumbhash')).rgbaToThumbHash
+  } catch {
+    console.error(
+      '\n[vue-image-kit] thumbhash is not installed.\n' +
+        'Install it as a dev dependency:\n\n' +
+        '  npm install thumbhash --save-dev\n',
+    )
+    process.exit(1)
+  }
+}
+
+// Encode a ThumbHash (base64) from a sharp image — resized to a 100px RGBA thumbnail.
+async function thumbhashFromImage(image: SharpImage): Promise<string> {
+  const rgbaToThumbHash = await getRgbaToThumbHash()
+  const { data, info } = await image
+    .clone()
+    .resize(100, null, { withoutEnlargement: true })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
+
+  const hash = rgbaToThumbHash(
+    info.width,
+    info.height,
+    new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
+  )
+  return Buffer.from(hash).toString('base64')
 }
 
 function findImages(inputDir: string): string[] {
@@ -164,29 +199,7 @@ async function processOne(
   // ThumbHash — RGBA thumbnail (alpha preserved)
   let thumbhashStr = ''
   if (config.thumbhash && !config.dryRun) {
-    let rgbaToThumbHash: (w: number, h: number, rgba: Uint8Array) => Uint8Array
-    try {
-      const mod = await import('thumbhash')
-      rgbaToThumbHash = mod.rgbaToThumbHash
-    } catch {
-      console.error(
-        '\n[vue-image-kit] thumbhash is not installed.\n' +
-          'Install it as a dev dependency:\n\n' +
-          '  npm install thumbhash --save-dev\n',
-      )
-      process.exit(1)
-    }
-
-    const thumbSize = 100
-    const { data, info: tInfo } = await image
-      .clone()
-      .resize(thumbSize, null, { withoutEnlargement: true })
-      .ensureAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true })
-
-    const hash = rgbaToThumbHash(tInfo.width, tInfo.height, new Uint8Array(data.buffer, data.byteOffset, data.byteLength))
-    thumbhashStr = Buffer.from(hash).toString('base64')
+    thumbhashStr = await thumbhashFromImage(image)
   }
 
   return { name, srcAbsPath: srcPath, originalWidth, originalHeight, variants, placeholder, blurhash: blurhashStr, thumbhash: thumbhashStr }
@@ -238,6 +251,25 @@ export async function generate(config: CliConfig): Promise<void> {
   } else if (config.manifest && config.dryRun) {
     console.log(`[vue-image-kit] (dry-run) Would write manifest to ${config.manifest}`)
   }
+}
+
+/**
+ * Process a single source image (resize, formats, placeholders) and return its
+ * metadata. Used by the Vite plugin for build-time `?vik` imports — bypasses the
+ * directory scan and manifest, writing variants straight into `config.output`.
+ */
+export async function processImage(srcPath: string, config: CliConfig): Promise<ProcessedImage> {
+  const sharp = await getSharp()
+  return processOne(srcPath, config, sharp)
+}
+
+/**
+ * Compute only the ThumbHash (base64) for a single image — no variant files are
+ * written. Used by the Vite plugin for `?thumbhash` imports.
+ */
+export async function computeThumbhash(srcPath: string): Promise<string> {
+  const sharp = await getSharp()
+  return thumbhashFromImage(sharp(srcPath))
 }
 
 export async function watch(config: CliConfig): Promise<void> {
