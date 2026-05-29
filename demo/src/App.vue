@@ -4,40 +4,58 @@ import { ref, defineAsyncComponent } from 'vue'
 const tabs = [
   { id: 'basic', label: 'Basic', icon: '🖼' },
   { id: 'blurhash', label: 'Blurhash & LQIP', icon: '🎨' },
+  { id: 'placeholders', label: 'Color & Shimmer', icon: '🌈' },
   { id: 'formats', label: 'AVIF / WebP', icon: '⚡' },
   { id: 'srcset', label: 'srcset', icon: '📐' },
+  { id: 'density', label: 'Density 1x/2x/3x', icon: '🔬' },
   { id: 'responsive', label: 'Responsive sources', icon: '📱' },
+  { id: 'focal', label: 'Focal point', icon: '🎯' },
   { id: 'lazyload', label: 'Lazy Load', icon: '👁' },
   { id: 'directive', label: 'v-lazy-img', icon: '🪄' },
+  { id: 'background', label: 'Background image', icon: '🖌' },
+  { id: 'encode', label: 'Encode (upload)', icon: '📤' },
   { id: 'error', label: 'Error State', icon: '❌' },
   { id: 'headless', label: 'Headless', icon: '🔧' },
   { id: 'cdn', label: 'CDN adapters', icon: '🌐' },
+  { id: 'buildtime', label: 'Build-time imports', icon: '🏗' },
 ]
 
 const active = ref('basic')
 
 const TabBasic = defineAsyncComponent(() => import('./tabs/TabBasic.vue'))
 const TabBlurhash = defineAsyncComponent(() => import('./tabs/TabBlurhash.vue'))
+const TabPlaceholders = defineAsyncComponent(() => import('./tabs/TabPlaceholders.vue'))
 const TabFormats = defineAsyncComponent(() => import('./tabs/TabFormats.vue'))
 const TabSrcset = defineAsyncComponent(() => import('./tabs/TabSrcset.vue'))
+const TabDensity = defineAsyncComponent(() => import('./tabs/TabDensity.vue'))
 const TabResponsive = defineAsyncComponent(() => import('./tabs/TabResponsive.vue'))
+const TabFocal = defineAsyncComponent(() => import('./tabs/TabFocal.vue'))
 const TabLazyLoad = defineAsyncComponent(() => import('./tabs/TabLazyLoad.vue'))
 const TabDirective = defineAsyncComponent(() => import('./tabs/TabDirective.vue'))
+const TabBackground = defineAsyncComponent(() => import('./tabs/TabBackground.vue'))
+const TabEncode = defineAsyncComponent(() => import('./tabs/TabEncode.vue'))
 const TabError = defineAsyncComponent(() => import('./tabs/TabError.vue'))
 const TabHeadless = defineAsyncComponent(() => import('./tabs/TabHeadless.vue'))
 const TabCdn = defineAsyncComponent(() => import('./tabs/TabCdn.vue'))
+const TabBuildtime = defineAsyncComponent(() => import('./tabs/TabBuildtime.vue'))
 
 const components: Record<string, ReturnType<typeof defineAsyncComponent>> = {
   basic: TabBasic,
   blurhash: TabBlurhash,
+  placeholders: TabPlaceholders,
   formats: TabFormats,
   srcset: TabSrcset,
+  density: TabDensity,
   responsive: TabResponsive,
+  focal: TabFocal,
   lazyload: TabLazyLoad,
   directive: TabDirective,
+  background: TabBackground,
+  encode: TabEncode,
   error: TabError,
   headless: TabHeadless,
   cdn: TabCdn,
+  buildtime: TabBuildtime,
 }
 </script>
 

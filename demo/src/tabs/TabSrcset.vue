@@ -24,9 +24,22 @@ const candidates = computed(() => [
   { width: '1200w', src: img.value.src1200, size: '~165 KB' },
 ])
 
+// Each preview gets its own cache-busted srcset URLs. Without this, once the
+// browser has the largest candidate (1200w) cached it reuses it for the smaller
+// `sizes` too — so after a reload every preview would show the same file.
+function previewSrcset(key: string): string {
+  const v = `${reloadKey.value}-${key}`
+  return `${img.value.src400}?v=${v} 400w, ${img.value.src800}?v=${v} 800w, ${img.value.src1200}?v=${v} 1200w`
+}
+
+function previewFallback(key: string): string {
+  return `${img.value.src1200}?v=${reloadKey.value}-${key}`
+}
+
 function onLoad(key: string, e: Event) {
   const src = (e.target as HTMLImageElement).currentSrc
-  currentSrcs.value[key] = src ? src.split('/').pop() ?? '—' : '—'
+  const file = src ? (src.split('/').pop() ?? '—').split('?')[0] : '—'
+  currentSrcs.value[key] = file
 }
 
 function reload() {
@@ -62,9 +75,9 @@ function reload() {
         <div style="aspect-ratio:3/2;border-radius:6px;overflow:hidden;background:#0d1117;margin-bottom:10px">
           <img
             :key="`${reloadKey}-${p.key}`"
-            :srcset="img.srcset"
+            :srcset="previewSrcset(p.key)"
             :sizes="p.sizes"
-            :src="img.src1200"
+            :src="previewFallback(p.key)"
             :alt="p.label"
             style="width:100%;height:100%;object-fit:cover;display:block"
             @load="onLoad(p.key, $event)"

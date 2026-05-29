@@ -1,5 +1,18 @@
 import { describe, it, expect } from 'vitest'
-import { cloudinary, imgix, bunny, sanity, storyblok, contentful, vercel } from '../../src/cdn/index'
+import {
+  cloudinary,
+  imgix,
+  bunny,
+  sanity,
+  storyblok,
+  contentful,
+  vercel,
+  cloudflare,
+  imagekit,
+  twicpics,
+  netlify,
+  gumlet,
+} from '../../src/cdn/index'
 
 // ─── Cloudinary ───────────────────────────────────────────────────────────────
 
@@ -267,6 +280,168 @@ describe('vercel', () => {
   it('generates srcset', () => {
     const srcset = cdn.srcset('/photo.jpg', [400, 800])
     expect(srcset).toContain('400w')
+    expect(srcset).toContain('800w')
+  })
+})
+
+// ─── Cloudflare Images ──────────────────────────────────────────────────────
+
+describe('cloudflare', () => {
+  const cdn = cloudflare('https://example.com')
+
+  it('uses the /cdn-cgi/image/ endpoint with format=auto by default', () => {
+    expect(cdn.url('/photo.jpg')).toBe('https://example.com/cdn-cgi/image/format=auto/photo.jpg')
+  })
+
+  it('includes width, quality and format options', () => {
+    const url = cdn.url('photo.jpg', { width: 800, quality: 75, format: 'webp' })
+    expect(url).toContain('width=800')
+    expect(url).toContain('quality=75')
+    expect(url).toContain('format=webp')
+    expect(url).toContain('/photo.jpg')
+  })
+
+  it('maps fit=fill to crop', () => {
+    expect(cdn.url('photo.jpg', { fit: 'fill' })).toContain('fit=crop')
+  })
+
+  it('omits dpr=1 but includes dpr=2', () => {
+    expect(cdn.url('photo.jpg', { dpr: 1 })).not.toContain('dpr')
+    expect(cdn.url('photo.jpg', { dpr: 2 })).toContain('dpr=2')
+  })
+
+  it('generates srcset', () => {
+    const srcset = cdn.srcset('photo.jpg', [400, 800])
+    expect(srcset).toContain('width=400')
+    expect(srcset).toContain('400w')
+    expect(srcset).toContain('800w')
+  })
+})
+
+// ─── ImageKit ───────────────────────────────────────────────────────────────
+
+describe('imagekit', () => {
+  const cdn = imagekit('https://ik.imagekit.io/demo')
+
+  it('puts transforms in the tr query param with f-auto default', () => {
+    expect(cdn.url('photo.jpg')).toBe('https://ik.imagekit.io/demo/photo.jpg?tr=f-auto')
+  })
+
+  it('includes width, height, quality and format', () => {
+    const url = cdn.url('photo.jpg', { width: 800, height: 600, quality: 80, format: 'webp' })
+    expect(url).toContain('w-800')
+    expect(url).toContain('h-600')
+    expect(url).toContain('q-80')
+    expect(url).toContain('f-webp')
+  })
+
+  it('maps fit=cover to c-maintain_ratio', () => {
+    expect(cdn.url('photo.jpg', { fit: 'cover' })).toContain('c-maintain_ratio')
+  })
+
+  it('includes dpr', () => {
+    expect(cdn.url('photo.jpg', { dpr: 2 })).toContain('dpr-2')
+  })
+
+  it('generates srcset (split on comma+space)', () => {
+    const srcset = cdn.srcset('photo.jpg', [400, 800, 1200])
+    expect(srcset.split(', ').length).toBe(3)
+    expect(srcset).toContain('w-400')
+    expect(srcset).toContain('1200w')
+  })
+})
+
+// ─── TwicPics ─────────────────────────────────────────────────────────────
+
+describe('twicpics', () => {
+  const cdn = twicpics('https://demo.twic.pics')
+
+  it('emits a v1 twic param with no ops by default', () => {
+    expect(cdn.url('photo.jpg')).toBe('https://demo.twic.pics/photo.jpg?twic=v1')
+  })
+
+  it('resizes by width', () => {
+    expect(cdn.url('photo.jpg', { width: 800 })).toContain('twic=v1/resize=800')
+  })
+
+  it('uses cover=WxH when fit=cover with both dimensions', () => {
+    expect(cdn.url('photo.jpg', { width: 800, height: 600, fit: 'cover' })).toContain('cover=800x600')
+  })
+
+  it('adds output and quality', () => {
+    const url = cdn.url('photo.jpg', { width: 400, format: 'webp', quality: 70 })
+    expect(url).toContain('output=webp')
+    expect(url).toContain('quality=70')
+  })
+
+  it('generates srcset', () => {
+    const srcset = cdn.srcset('photo.jpg', [400, 800])
+    expect(srcset).toContain('resize=400')
+    expect(srcset).toContain('800w')
+  })
+})
+
+// ─── Netlify Image CDN ──────────────────────────────────────────────────────
+
+describe('netlify', () => {
+  const cdn = netlify({ origin: 'https://app.netlify.app' })
+
+  it('uses the /.netlify/images endpoint with the url param', () => {
+    const url = cdn.url('/photo.jpg', { width: 800 })
+    expect(url.startsWith('https://app.netlify.app/.netlify/images?')).toBe(true)
+    expect(url).toContain('url=%2Fphoto.jpg')
+    expect(url).toContain('w=800')
+  })
+
+  it('maps format to fm and includes quality', () => {
+    const url = cdn.url('/photo.jpg', { format: 'webp', quality: 75 })
+    expect(url).toContain('fm=webp')
+    expect(url).toContain('q=75')
+  })
+
+  it('maps fit=cover to cover', () => {
+    expect(cdn.url('/photo.jpg', { fit: 'cover' })).toContain('fit=cover')
+  })
+
+  it('works without origin (relative URL)', () => {
+    expect(netlify().url('/photo.jpg', { width: 400 }).startsWith('/.netlify/images')).toBe(true)
+  })
+
+  it('generates srcset', () => {
+    const srcset = cdn.srcset('/photo.jpg', [400, 800])
+    expect(srcset).toContain('400w')
+    expect(srcset).toContain('800w')
+  })
+})
+
+// ─── Gumlet ───────────────────────────────────────────────────────────────
+
+describe('gumlet', () => {
+  const cdn = gumlet('https://demo.gumlet.io')
+
+  it('defaults format=auto', () => {
+    expect(cdn.url('photo.jpg')).toBe('https://demo.gumlet.io/photo.jpg?format=auto')
+  })
+
+  it('includes width, quality and format', () => {
+    const url = cdn.url('photo.jpg', { width: 800, quality: 75, format: 'webp' })
+    expect(url).toContain('w=800')
+    expect(url).toContain('q=75')
+    expect(url).toContain('format=webp')
+  })
+
+  it('maps fit=cover to crop', () => {
+    expect(cdn.url('photo.jpg', { fit: 'cover' })).toContain('fit=crop')
+  })
+
+  it('includes dpr=2 but not dpr=1', () => {
+    expect(cdn.url('photo.jpg', { dpr: 2 })).toContain('dpr=2')
+    expect(cdn.url('photo.jpg', { dpr: 1 })).not.toContain('dpr')
+  })
+
+  it('generates srcset', () => {
+    const srcset = cdn.srcset('photo.jpg', [400, 800])
+    expect(srcset).toContain('w=400')
     expect(srcset).toContain('800w')
   })
 })

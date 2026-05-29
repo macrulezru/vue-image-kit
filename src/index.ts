@@ -11,9 +11,13 @@ export { useBlurhash } from './composables/useBlurhash'
 export { useLazyLoad } from './composables/useLazyLoad'
 export { useBreakpoints, BREAKPOINTS_KEY } from './composables/useBreakpoints'
 export { useImagePreloader } from './composables/useImagePreloader'
+export { useBackgroundImage } from './composables/useBackgroundImage'
+export type { UseBackgroundImageOptions, UseBackgroundImageReturn } from './composables/useBackgroundImage'
 export { decodeBlurhash } from './utils/blurhash-decode'
-export { decodeThumbHash } from './utils/thumbhash-decode'
-export { generateSrcset, generateSizes, buildSizes, generatePreloadLink } from './utils/srcset'
+export { decodeThumbHash, thumbHashToAverageRGBA, thumbHashToAverageColor } from './utils/thumbhash-decode'
+export { encodeBlurhash, encodeThumbHash } from './utils/encode'
+export type { EncodeSource, EncodeBlurhashOptions, EncodeThumbHashOptions } from './utils/encode'
+export { generateSrcset, generateSizes, generateDensitySrcset, buildSizes, generatePreloadLink } from './utils/srcset'
 export type {
   ImageStatus,
   SrcSet,
@@ -22,6 +26,8 @@ export type {
   VImageKitOptions,
   LazyImgOptions,
   ObjectFit,
+  FocalPoint,
+  Densities,
 } from './types'
 
 export const VImageKitPlugin = {

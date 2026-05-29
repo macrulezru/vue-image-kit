@@ -1,12 +1,13 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import type { Ref, ComputedRef } from 'vue'
 import { useLazyLoad } from './useLazyLoad'
-import { generateSrcset, generateSizes } from '../utils/srcset'
-import type { ImageStatus, SrcSet, ObjectFit } from '../types'
+import { generateSrcset, generateSizes, generateDensitySrcset } from '../utils/srcset'
+import type { ImageStatus, SrcSet, ObjectFit, Densities } from '../types'
 
 interface UseImageOptions {
   src: string | SrcSet
   widths?: number[]
+  densities?: Densities
   sizes?: string
   lazy?: boolean
   rootMargin?: string
@@ -37,6 +38,7 @@ export function useImage(options: UseImageOptions): UseImageReturn {
   const {
     src,
     widths = [],
+    densities,
     sizes,
     lazy = true,
     rootMargin = '200px',
@@ -54,8 +56,23 @@ export function useImage(options: UseImageOptions): UseImageReturn {
   const fallbackSrc = typeof src === 'string' ? src : src.fallback
 
   const imgAttrs = computed<ImgAttrs>(() => {
-    const srcset = widths.length > 0 ? generateSrcset(fallbackSrc, widths) : undefined
-    const sizesAttr = srcset ? generateSizes(sizes) : undefined
+    // Density (x) descriptors take precedence over width (w) — they can't be
+    // mixed, and `sizes` only applies to width-based candidates. `densities` is
+    // either a list (reusing `src`) or a map of density → distinct URL.
+    let srcset: string | undefined
+    let sizesAttr: string | undefined
+    const densityList = Array.isArray(densities)
+      ? densities
+      : densities
+        ? Object.keys(densities).map(Number)
+        : []
+    if (densityList.length > 0) {
+      const densitySrc = Array.isArray(densities) ? fallbackSrc : densities!
+      srcset = generateDensitySrcset(densitySrc, densityList) || undefined
+    } else if (widths.length > 0) {
+      srcset = generateSrcset(fallbackSrc, widths) || undefined
+      sizesAttr = srcset ? generateSizes(sizes) : undefined
+    }
     return {
       src: fallbackSrc,
       ...(srcset !== undefined ? { srcset } : {}),

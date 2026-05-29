@@ -1,6 +1,6 @@
 {
   "name": "@macrulez/vue-image-kit",
-  "version": "1.0.3",
+  "version": "1.0.5",
   "description": "Vue 3 image optimization: lazy loading, blurhash, LQIP, srcset, WebP/AVIF, CDN adapters, CLI",
   "type": "module",
   "main": "./dist/vue-image-kit.cjs",
@@ -32,6 +32,9 @@
       "import": "./dist/vite/plugin.js",
       "require": "./dist/vite/plugin.cjs",
       "types": "./dist/vite/plugin.d.ts"
+    },
+    "./vite/client": {
+      "types": "./dist/vite/client.d.ts"
     }
   },
   "sideEffects": false,
@@ -42,10 +45,11 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vite build && npm run build:cdn && npm run build:nuxt && npm run build:cli",
+    "build": "vite build && npm run build:cdn && npm run build:nuxt && npm run build:cli && npm run build:vite",
     "build:cdn": "vite build --config vite.cdn.config.ts",
     "build:nuxt": "vite build --config vite.nuxt.config.ts",
     "build:cli": "tsc -p tsconfig.cli.json && node scripts/fix-cli-shebang.cjs",
+    "build:vite": "vite build --config vite.plugin.config.ts",
     "demo": "cd demo && npm install && npm run dev",
     "demo:dev": "cd demo && npm run dev",
     "demo:build": "cd demo && npm run build",

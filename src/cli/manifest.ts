@@ -7,7 +7,7 @@ function buildSrcset(image: ProcessedImage): string {
   return jpgVariants.map((v) => `${v.url} ${v.width}w`).join(', ')
 }
 
-function buildEntry(image: ProcessedImage, widths: number[]): ManifestEntry {
+export function buildEntry(image: ProcessedImage, widths: number[]): ManifestEntry {
   const jpgByWidth = new Map(
     image.variants.filter((v) => v.format === 'jpg').map((v) => [v.width, v.url]),
   )

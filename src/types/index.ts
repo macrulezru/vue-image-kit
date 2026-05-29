@@ -28,3 +28,23 @@ export interface LazyImgOptions {
 }
 
 export type ObjectFit = 'cover' | 'contain' | 'fill' | 'none' | 'scale-down'
+
+/**
+ * Density descriptors for `srcset`. Either a list of densities that reuse the
+ * single `src` (for resolution-aware/CDN URLs), or a map of density → distinct
+ * URL (a real 2×/3× asset per density).
+ *
+ * @example [1, 2, 3]
+ * @example { 1: '/a.png', 2: '/a@2x.png', 3: '/a@3x.png' }
+ */
+export type Densities = number[] | Record<number, string>
+
+/**
+ * Focal point for cropping, as fractions of width/height in the range 0–1.
+ * `{ x: 0.5, y: 0.5 }` is the center (the browser default). With `fit="cover"`
+ * this maps to CSS `object-position`, keeping the point of interest in frame.
+ */
+export interface FocalPoint {
+  x: number
+  y: number
+}

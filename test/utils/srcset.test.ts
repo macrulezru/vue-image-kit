@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generateSrcset, generateSizes, buildSizes, generatePreloadLink } from '../../src/utils/srcset'
+import { generateSrcset, generateSizes, generateDensitySrcset, buildSizes, generatePreloadLink } from '../../src/utils/srcset'
 
 describe('generateSrcset', () => {
   it('generates srcset string from widths array', () => {
@@ -20,6 +20,38 @@ describe('generateSrcset', () => {
     expect(generateSrcset('https://cdn.example.com/img.webp', [320])).toBe(
       'https://cdn.example.com/img.webp 320w',
     )
+  })
+})
+
+describe('generateDensitySrcset', () => {
+  it('builds x-descriptors from a single URL', () => {
+    expect(generateDensitySrcset('/logo.png', [1, 2, 3])).toBe(
+      '/logo.png 1x, /logo.png 2x, /logo.png 3x',
+    )
+  })
+
+  it('returns empty string for empty densities', () => {
+    expect(generateDensitySrcset('/logo.png', [])).toBe('')
+  })
+
+  it('works with a single density', () => {
+    expect(generateDensitySrcset('/icon.svg', [2])).toBe('/icon.svg 2x')
+  })
+
+  it('uses a per-density URL map for distinct files', () => {
+    expect(generateDensitySrcset({ 1: '/a.png', 2: '/a@2x.png', 3: '/a@3x.png' }, [1, 2, 3])).toBe(
+      '/a.png 1x, /a@2x.png 2x, /a@3x.png 3x',
+    )
+  })
+
+  it('skips densities missing from the URL map', () => {
+    expect(generateDensitySrcset({ 1: '/a.png', 2: '/a@2x.png' }, [1, 2, 3])).toBe(
+      '/a.png 1x, /a@2x.png 2x',
+    )
+  })
+
+  it('supports non-integer densities', () => {
+    expect(generateDensitySrcset('/p.jpg', [1, 1.5])).toBe('/p.jpg 1x, /p.jpg 1.5x')
   })
 })
 
