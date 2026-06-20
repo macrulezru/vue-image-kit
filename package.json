@@ -1,7 +1,17 @@
 {
   "name": "@macrulez/vue-image-kit",
-  "version": "1.0.5",
-  "description": "Vue 3 image optimization: lazy loading, blurhash, LQIP, srcset, WebP/AVIF, CDN adapters, CLI",
+  "version": "1.0.6",
+  "description": "Vue 3 image optimization — lazy loading, WebP/AVIF, srcset, Blurhash/LQIP placeholders, CDN adapters and a CLI, with zero runtime dependencies.",
+  "author": "macrulez <macrulezru@gmail.com> (https://macrulez.ru/en)",
+  "license": "MIT",
+  "homepage": "https://github.com/macrulezru/vue-image-kit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/macrulezru/vue-image-kit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/macrulezru/vue-image-kit/issues"
+  },
   "type": "module",
   "main": "./dist/vue-image-kit.cjs",
   "module": "./dist/vue-image-kit.js",
@@ -11,27 +21,27 @@
   },
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/vue-image-kit.js",
-      "require": "./dist/vue-image-kit.cjs",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/vue-image-kit.cjs"
     },
     "./cdn": {
+      "types": "./dist/cdn/index.d.ts",
       "import": "./dist/cdn/index.js",
-      "require": "./dist/cdn/index.cjs",
-      "types": "./dist/cdn/index.d.ts"
+      "require": "./dist/cdn/index.cjs"
     },
     "./cli": {
-      "import": "./dist/cli/bin.js",
-      "types": "./dist/cli/bin.d.ts"
+      "types": "./dist/cli/bin.d.ts",
+      "import": "./dist/cli/bin.js"
     },
     "./nuxt": {
-      "import": "./dist/nuxt/module.js",
-      "types": "./dist/nuxt/module.d.ts"
+      "types": "./dist/nuxt/module.d.ts",
+      "import": "./dist/nuxt/module.js"
     },
     "./vite": {
+      "types": "./dist/vite/plugin.d.ts",
       "import": "./dist/vite/plugin.js",
-      "require": "./dist/vite/plugin.cjs",
-      "types": "./dist/vite/plugin.d.ts"
+      "require": "./dist/vite/plugin.cjs"
     },
     "./vite/client": {
       "types": "./dist/vite/client.d.ts"
@@ -39,8 +49,13 @@
   },
   "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
+  "engines": {
+    "node": ">=18"
+  },
   "publishConfig": {
     "access": "public"
   },
@@ -68,27 +83,14 @@
     "image",
     "lazy-loading",
     "blurhash",
-    "thumbhash",
-    "lqip",
     "webp",
     "avif",
     "srcset",
     "cdn",
-    "cloudinary",
-    "imgix",
+    "nuxt",
     "cli",
-    "vite-plugin"
+    "typescript"
   ],
-  "author": "",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/macrulezru/vue-image-kit.git"
-  },
-  "bugs": {
-    "url": "https://github.com/macrulezru/vue-image-kit/issues"
-  },
-  "homepage": "https://github.com/macrulezru/vue-image-kit#readme",
   "peerDependencies": {
     "sharp": ">=0.33.0",
     "thumbhash": ">=0.1.0",
