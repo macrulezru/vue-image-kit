@@ -9,6 +9,12 @@ interface UseImageOptions {
   widths?: number[]
   densities?: Densities
   sizes?: string
+  /**
+   * A pre-built `srcset` string (e.g. from a CLI/manifest `srcset` field) to
+   * use as-is instead of generating one from `widths`. Ignored when
+   * `densities` or `widths` is set — those take precedence.
+   */
+  rawSrcset?: string
   lazy?: boolean
   rootMargin?: string
   threshold?: number
@@ -40,6 +46,7 @@ export function useImage(options: UseImageOptions): UseImageReturn {
     widths = [],
     densities,
     sizes,
+    rawSrcset,
     lazy = true,
     rootMargin = '200px',
     threshold = 0,
@@ -72,6 +79,9 @@ export function useImage(options: UseImageOptions): UseImageReturn {
     } else if (widths.length > 0) {
       srcset = generateSrcset(fallbackSrc, widths) || undefined
       sizesAttr = srcset ? generateSizes(sizes) : undefined
+    } else if (rawSrcset) {
+      srcset = rawSrcset
+      sizesAttr = generateSizes(sizes)
     }
     return {
       src: fallbackSrc,

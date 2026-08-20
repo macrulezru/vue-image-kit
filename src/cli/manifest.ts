@@ -8,6 +8,42 @@ function buildSrcset(image: ProcessedImage): string {
 }
 
 export function buildEntry(image: ProcessedImage, widths: number[]): ManifestEntry {
+  // SVG passthrough — a single vector variant; no responsive/format variants apply.
+  const svgVariant = image.variants.find((v) => v.format === 'svg')
+  if (svgVariant) {
+    return {
+      name: image.name,
+      src: svgVariant.url,
+      srcset: '',
+      webp: '',
+      avif: '',
+      width: image.originalWidth,
+      height: image.originalHeight,
+      placeholder: '',
+      blurhash: '',
+      thumbhash: '',
+    }
+  }
+
+  // Animated GIF — original copied through as `src`, optional animated WebP
+  // re-encode as `webp`. No srcset/avif (see buildGifVariants for why).
+  const gifVariant = image.variants.find((v) => v.format === 'gif')
+  if (gifVariant) {
+    const webpVariant = image.variants.find((v) => v.format === 'webp')
+    return {
+      name: image.name,
+      src: gifVariant.url,
+      srcset: '',
+      webp: webpVariant?.url ?? '',
+      avif: '',
+      width: image.originalWidth,
+      height: image.originalHeight,
+      placeholder: image.placeholder,
+      blurhash: image.blurhash,
+      thumbhash: image.thumbhash,
+    }
+  }
+
   const jpgByWidth = new Map(
     image.variants.filter((v) => v.format === 'jpg').map((v) => [v.width, v.url]),
   )
@@ -49,7 +85,13 @@ function indent(obj: ManifestEntry): string {
 }
 
 function buildInterface(widths: number[]): string {
-  const widthFields = widths.map((w) => `  src${w}: string`).join('\n')
+  // Optional, not required: the SVG/GIF branches of buildEntry() return
+  // before this loop runs at all, and a raster image smaller than a given
+  // width never gets that width's variant (sharp's withoutEnlargement skips
+  // it) — either way, the generated object literal for that entry legally
+  // lacks the field, so a required `string` would make TypeScript reject the
+  // very manifest this function just wrote.
+  const widthFields = widths.map((w) => `  src${w}?: string`).join('\n')
   return [
     'export interface ImageData {',
     '  name: string',

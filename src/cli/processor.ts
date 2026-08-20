@@ -4,14 +4,35 @@ import {
   rmSync,
   readdirSync,
   writeFileSync,
+  copyFileSync,
+  statSync,
 } from 'node:fs'
 import { join, parse, resolve } from 'node:path'
 import type { CliConfig, ProcessedImage, ProcessedVariant } from './types.js'
 import { applyTemplate } from './config.js'
 import { encodeBlurhash } from './blurhash-encode.js'
 import { generateManifestContent } from './manifest.js'
+import { printImageReport, printBatchSummary } from './report.js'
+import {
+  computeConfigHash,
+  loadIncrementalState,
+  saveIncrementalState,
+  isUnchanged,
+  buildIncrementalEntry,
+} from './incremental.js'
+import type { IncrementalState } from './incremental.js'
 
-const SUPPORTED_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.tiff', '.tif'])
+function fileSize(path: string): number {
+  try {
+    return statSync(path).size
+  } catch {
+    return -1
+  }
+}
+
+// Exported so the Vite plugin (build-time `?vik`/`?thumbhash` imports) can't
+// drift out of sync with what the CLI directory scan actually processes.
+export const SUPPORTED_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.tiff', '.tif', '.gif', '.svg'])
 
 type SharpFactory = Awaited<ReturnType<typeof getSharp>>
 type SharpImage = ReturnType<SharpFactory>
@@ -95,23 +116,126 @@ function buildUrl(publicPath: string, filename: string): string {
   return `${base}/${filename}`
 }
 
-async function processOne(
+function copyThrough(srcPath: string, outPath: string, config: CliConfig): void {
+  if (config.dryRun) return
+  if (config.skipExisting && existsSync(outPath)) return
+  copyFileSync(srcPath, outPath)
+}
+
+// SVG is already resolution-independent — copy it through untouched instead
+// of rasterizing. `sharp` can still read width/height (via librsvg) for the
+// manifest without us re-encoding anything.
+async function processSvg(
   srcPath: string,
+  name: string,
+  outputDir: string,
   config: CliConfig,
   sharp: Awaited<ReturnType<typeof getSharp>>,
 ): Promise<ProcessedImage> {
-  const { name } = parse(srcPath)
-  const outputDir = resolve(config.output)
-  ensureDir(outputDir)
+  const filename = `${name}.svg`
+  const outPath = join(outputDir, filename)
+  const url = buildUrl(config.publicPath, filename)
+  const skipped = config.skipExisting && existsSync(outPath)
+  copyThrough(srcPath, outPath, config)
 
-  const image = sharp(srcPath)
-  const meta = await image.metadata()
-  const originalWidth = meta.width ?? 0
-  const originalHeight = meta.height ?? 0
+  let width = 0
+  let height = 0
+  try {
+    const meta = await sharp(srcPath).metadata()
+    width = meta.width ?? 0
+    height = meta.height ?? 0
+  } catch {
+    // Some minimal/malformed SVGs aren't readable by librsvg — dimensions
+    // just stay 0 rather than failing the whole batch over one icon.
+  }
 
-  // Determine actual widths: skip widths larger than the original
+  // Byte-identical copy — the source's own size is always the output size,
+  // dry-run or not.
+  const sizeBytes = fileSize(srcPath)
+
+  return {
+    name,
+    srcAbsPath: srcPath,
+    originalWidth: width,
+    originalHeight: height,
+    originalFormat: 'svg',
+    originalSizeBytes: sizeBytes,
+    variants: [{ absPath: outPath, url, width, height, format: 'svg', sizeBytes, skipped }],
+    placeholder: '',
+    blurhash: '',
+    thumbhash: '',
+  }
+}
+
+// Animated GIF: copy the original through as the guaranteed-compatible
+// fallback, and (when webp is in the requested formats) re-encode to
+// animated WebP, which is meaningfully smaller. AVIF is skipped — sharp's
+// (libavif) animated-AVIF support is too inconsistent across platforms to
+// promise here.
+async function buildGifVariants(
+  srcPath: string,
+  name: string,
+  originalWidth: number,
+  originalHeight: number,
+  outputDir: string,
+  config: CliConfig,
+  sharp: Awaited<ReturnType<typeof getSharp>>,
+): Promise<ProcessedVariant[]> {
+  const variants: ProcessedVariant[] = []
+
+  const gifFilename = `${name}.gif`
+  const gifOutPath = join(outputDir, gifFilename)
+  const gifSkipped = config.skipExisting && existsSync(gifOutPath)
+  copyThrough(srcPath, gifOutPath, config)
+  // Byte-identical copy — the source's own size is always the output size.
+  variants.push({
+    absPath: gifOutPath,
+    url: buildUrl(config.publicPath, gifFilename),
+    width: originalWidth,
+    height: originalHeight,
+    format: 'gif',
+    sizeBytes: fileSize(srcPath),
+    skipped: gifSkipped,
+  })
+
+  if (config.formats.includes('webp')) {
+    const webpFilename = `${name}.webp`
+    const webpOutPath = join(outputDir, webpFilename)
+    const webpSkipped = config.skipExisting && existsSync(webpOutPath)
+    let webpSizeBytes = -1
+
+    if (webpSkipped) {
+      webpSizeBytes = fileSize(webpOutPath)
+    } else if (!config.dryRun) {
+      const quality = config.quality.webp ?? 80
+      const info = await sharp(srcPath, { animated: true }).webp({ quality, loop: 0 }).toFile(webpOutPath)
+      webpSizeBytes = info.size
+    }
+
+    variants.push({
+      absPath: webpOutPath,
+      url: buildUrl(config.publicPath, webpFilename),
+      width: originalWidth,
+      height: originalHeight,
+      format: 'webp',
+      sizeBytes: webpSizeBytes,
+      skipped: webpSkipped,
+    })
+  }
+
+  return variants
+}
+
+async function buildRasterVariants(
+  image: SharpImage,
+  name: string,
+  originalWidth: number,
+  originalHeight: number,
+  outputDir: string,
+  config: CliConfig,
+): Promise<ProcessedVariant[]> {
+  // Skip widths larger than the original; always include the original size.
   const targetWidths = config.widths.filter((w) => w <= originalWidth)
-  // Always include the original size
   if (!targetWidths.includes(originalWidth)) {
     targetWidths.push(originalWidth)
   }
@@ -121,40 +245,77 @@ async function processOne(
 
   for (const width of targetWidths) {
     const isOriginal = width === originalWidth
+    // Aspect-ratio estimate — overwritten by sharp's real OutputInfo below
+    // whenever we actually encode (skip-existing/dry-run fall back to it).
+    const estimatedHeight = originalWidth > 0 ? Math.round((width * originalHeight) / originalWidth) : 0
 
     for (const format of config.formats) {
+      if (format !== 'jpg' && format !== 'webp' && format !== 'avif') continue
+
       const filename =
         isOriginal && format === 'jpg'
           ? `${name}.jpg`
-          : applyTemplate(config.template, name, width, format === 'jpg' ? 'jpg' : format)
+          : applyTemplate(config.template, name, width, format)
 
       const outPath = join(outputDir, filename)
       const url = buildUrl(config.publicPath, filename)
 
       if (config.skipExisting && existsSync(outPath)) {
-        variants.push({ absPath: outPath, url, width, format })
+        variants.push({
+          absPath: outPath, url, width, height: estimatedHeight, format,
+          sizeBytes: fileSize(outPath), skipped: true,
+        })
         continue
       }
 
+      let height = estimatedHeight
+      let sizeBytes = -1
+
       if (!config.dryRun) {
         const resized = image.clone().resize(width, null, { withoutEnlargement: true })
+        const quality = config.quality[format] ?? (format === 'jpg' ? 85 : format === 'webp' ? 80 : 65)
 
-        if (format === 'jpg' || format === 'webp' || format === 'avif') {
-          const quality = config.quality[format] ?? (format === 'jpg' ? 85 : format === 'webp' ? 80 : 65)
+        const info = format === 'jpg'
+          ? await resized.jpeg({ quality, mozjpeg: true }).toFile(outPath)
+          : format === 'webp'
+            ? await resized.webp({ quality }).toFile(outPath)
+            : await resized.avif({ quality }).toFile(outPath)
 
-          if (format === 'jpg') {
-            await resized.jpeg({ quality, mozjpeg: true }).toFile(outPath)
-          } else if (format === 'webp') {
-            await resized.webp({ quality }).toFile(outPath)
-          } else {
-            await resized.avif({ quality }).toFile(outPath)
-          }
-        }
+        height = info.height
+        sizeBytes = info.size
       }
 
-      variants.push({ absPath: outPath, url, width, format })
+      variants.push({ absPath: outPath, url, width, height, format, sizeBytes, skipped: false })
     }
   }
+
+  return variants
+}
+
+async function processOne(
+  srcPath: string,
+  config: CliConfig,
+  sharp: Awaited<ReturnType<typeof getSharp>>,
+): Promise<ProcessedImage> {
+  const { name, ext } = parse(srcPath)
+  const extLower = ext.toLowerCase()
+  const outputDir = resolve(config.output)
+  ensureDir(outputDir)
+
+  if (extLower === '.svg') {
+    return processSvg(srcPath, name, outputDir, config, sharp)
+  }
+
+  const image = sharp(srcPath)
+  const meta = await image.metadata()
+  const originalWidth = meta.width ?? 0
+  const originalHeight = meta.height ?? 0
+  const originalFormat = extLower.replace(/^\./, '').replace(/^jpeg$/, 'jpg')
+  const originalSizeBytes = fileSize(srcPath)
+
+  const variants = extLower === '.gif'
+    ? await buildGifVariants(srcPath, name, originalWidth, originalHeight, outputDir, config, sharp)
+    : await buildRasterVariants(image, name, originalWidth, originalHeight, outputDir, config)
 
   // LQIP — tiny 20px JPEG → base64 data URL
   let placeholder = ''
@@ -202,7 +363,10 @@ async function processOne(
     thumbhashStr = await thumbhashFromImage(image)
   }
 
-  return { name, srcAbsPath: srcPath, originalWidth, originalHeight, variants, placeholder, blurhash: blurhashStr, thumbhash: thumbhashStr }
+  return {
+    name, srcAbsPath: srcPath, originalWidth, originalHeight, originalFormat, originalSizeBytes,
+    variants, placeholder, blurhash: blurhashStr, thumbhash: thumbhashStr,
+  }
 }
 
 async function runBatch<T, R>(items: T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -230,19 +394,62 @@ export async function generate(config: CliConfig): Promise<void> {
     return
   }
 
+  // Disabled under --dry-run: nothing is actually written, so there's
+  // nothing valid to persist and no files to compare against next time.
+  let incrementalState: IncrementalState | null = null
+  if (config.incremental && !config.dryRun) {
+    const configHash = computeConfigHash(config)
+    const loaded = loadIncrementalState(config.output)
+    if (loaded && loaded.configHash !== configHash) {
+      console.log('[vue-image-kit] Config changed since last run — reprocessing everything.')
+    }
+    incrementalState = loaded && loaded.configHash === configHash ? loaded : { configHash, entries: {} }
+  }
+
   console.log(`[vue-image-kit] Processing ${srcFiles.length} image(s)…`)
   if (config.dryRun) console.log('[vue-image-kit] DRY RUN — no files will be written')
 
-  let done = 0
+  let skippedCount = 0
   const processed = await runBatch(srcFiles, config.concurrency, async (srcPath) => {
+    const absSrc = resolve(srcPath)
+
+    if (incrementalState) {
+      const entry = incrementalState.entries[absSrc]
+      // Trust the cached entry only if every output file it references is
+      // still actually on disk — the incremental state can't tell the
+      // difference between "source unchanged" and "source unchanged, but
+      // someone deleted a generated file out from under it" on its own.
+      if (isUnchanged(entry, absSrc) && entry!.image.variants.every((v) => existsSync(v.absPath))) {
+        skippedCount++
+        return entry!.image
+      }
+    }
+
     const result = await processOne(srcPath, config, sharp)
-    done++
-    process.stdout.write(`\r  ${done}/${srcFiles.length}  ${parse(srcPath).base}`)
+    printImageReport(result)
+
+    if (incrementalState) {
+      incrementalState.entries[absSrc] = buildIncrementalEntry(absSrc, result)
+    }
+
     return result
   })
 
-  process.stdout.write('\n')
-  console.log(`[vue-image-kit] Done. Generated ${processed.reduce((n, img) => n + img.variants.length, 0)} file(s).`)
+  if (incrementalState) {
+    // Drop entries for sources that no longer exist, so a manifest can't
+    // grow forever across renames/deletions.
+    const currentPaths = new Set(srcFiles.map((p) => resolve(p)))
+    for (const key of Object.keys(incrementalState.entries)) {
+      if (!currentPaths.has(key)) delete incrementalState.entries[key]
+    }
+    saveIncrementalState(config.output, incrementalState)
+  }
+
+  if (skippedCount > 0) {
+    console.log(`[vue-image-kit] ${skippedCount} image(s) unchanged, skipped.`)
+  }
+
+  printBatchSummary(processed)
 
   if (config.manifest && !config.dryRun) {
     const content = generateManifestContent(processed, config.widths)

@@ -9,9 +9,9 @@
   />
 </div>
 
-A complete image optimization toolkit for Vue 3. One `<VImage>` component handles lazy loading, WebP/AVIF format switching, responsive art direction, Blurhash and LQIP placeholders, automatic `srcset` generation, error retry with exponential backoff, and smooth CSS transitions — with **zero external runtime dependencies** and **~6.8 kB gzip**.
+A complete image optimization toolkit for Vue 3. One `<VImage>` component handles lazy loading, WebP/AVIF format switching, responsive art direction, Blurhash and LQIP placeholders, automatic `srcset` generation, error retry with exponential backoff, and smooth CSS transitions — with **zero external runtime dependencies** and a small, tree-shakeable footprint (see [Bundle size & peer dependencies](#bundle-size--peer-dependencies)).
 
-Everything you need beyond the component is included: a **CLI** that processes images at build time (resize, convert, generate LQIP and BlurHash, write a TypeScript manifest), **CDN URL builders** for 12 providers (Cloudinary, imgix, Bunny, Sanity, Storyblok, Contentful, Vercel, Cloudflare, ImageKit, TwicPics, Netlify, Gumlet), a **Nuxt 3 module** with auto-imports, a **Vite plugin**, and **headless composables** for fully custom markup.
+Everything you need beyond the component is included: a **CLI** that processes images at build time (resize, convert, generate LQIP and BlurHash, write a TypeScript manifest), **CDN URL builders** for 12 providers (Cloudinary, imgix, Bunny, Sanity, Storyblok, Contentful, Vercel, Cloudflare, ImageKit, TwicPics, Netlify, Gumlet) with hostname auto-detection, a **Nuxt 3 module** with auto-imports, a **Vite plugin** (including on-demand dev serving), a **self-hosted on-demand image server** for when there's no CDN, and **headless composables** for fully custom markup.
 
 Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe — renders a native `<img loading="lazy">` on the server, activates IntersectionObserver and canvas after hydration.
 
@@ -39,14 +39,18 @@ Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe —
 - [SSR compatibility](#ssr-compatibility)
 - [Architecture](#architecture)
 - [CLI — generate images](#cli--generate-images)
+- [Incremental generation](#incremental-generation)
 - [CDN adapters](#cdn-adapters)
 - [buildSizes helper](#buildsizes-helper)
 - [generatePreloadLink](#generatepreloadlink)
 - [useImagePreloader](#useimagepreloader)
 - [fetchpriority & decoding](#fetchpriority--decoding)
 - [Error retry](#error-retry)
+- [Network-aware loading](#network-aware-loading)
+- [Layout presets](#layout-presets)
 - [Nuxt module](#nuxt-module)
 - [Vite plugin](#vite-plugin)
+- [Self-hosted on-demand server](#self-hosted-on-demand-server)
 - [Demo](#demo)
 - [Bundle size & peer dependencies](#bundle-size--peer-dependencies)
 
@@ -88,6 +92,7 @@ Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe —
 **CDN adapters — `vue-image-kit/cdn`**
 - Zero-dependency URL builders for **Cloudinary**, **imgix**, **Bunny CDN**, **Sanity**, **Storyblok**, **Contentful**, **Vercel**, **Cloudflare Images**, **ImageKit.io**, **TwicPics**, **Netlify Image CDN**, **Gumlet**
 - Unified `.url(path, options)` / `.srcset(path, widths)` interface across all providers
+- **`autoLoader()`** — detects 8 of the 12 providers straight from a URL's hostname, no per-image adapter wiring; unrecognized hosts pass through unchanged
 
 **CLI — `npx vue-image-kit generate`**
 - Resize images to multiple widths, convert to WebP/AVIF, generate LQIP base64, encode BlurHash
@@ -99,7 +104,7 @@ Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe —
 - **Nuxt module** — `vue-image-kit/nuxt`; auto-registers `<VImage>` and `v-lazy-img`; auto-imports all composables and utilities; breakpoints via `runtimeConfig`
 - **Vite plugin** — `vue-image-kit/vite`; runs the CLI processor on `buildStart`; re-runs in `handleHotUpdate` during dev; **build-time imports** via `?vik` / `?thumbhash` query suffixes
 - **Vue plugin** — `app.use(VImageKitPlugin, { breakpoints })` registers component and directive globally
-- **Zero external runtime dependencies** — only Vue 3 as peer dep; full ESM + CJS, tree-shakeable, `sideEffects: false`; ~3.8 kB gzip
+- **Zero external runtime dependencies** — only Vue 3 as peer dep; full ESM + CJS, tree-shakeable, `sideEffects: false` (see [Bundle size & peer dependencies](#bundle-size--peer-dependencies))
 
 ---
 
@@ -230,8 +235,9 @@ The main component. Combines lazy loading, placeholder, format switching, and tr
 
 | Prop | Type | Default | Description |
 |---|---|---|---|
-| `src` | `string \| SrcSet` | — | URL or object with format variants |
-| `alt` | `string` | — | Required. `alt` attribute on the `<img>` |
+| `src` | `string \| SrcSet` | — | URL or object with format variants. Optional when `image` is given |
+| `image` | `ImageMeta` | — | Build-time metadata (a CLI manifest entry or `?vik` import) — seeds `src`/`width`/`height`/`blurhash`/`thumbhash`/`placeholder`/`sizes`. Any explicit prop above overrides the matching field |
+| `alt` | `string` | — | Required. `alt` attribute on the `<img>`. In dev builds, a suspicious value (missing, whitespace-only, or filename-shaped like `"photo.jpg"`) logs a `console.warn` — a deliberate `alt=""` for a decorative image never triggers it |
 | `width` | `number` | — | Intrinsic width; used to reserve aspect-ratio space |
 | `height` | `number` | — | Intrinsic height; used to reserve aspect-ratio space |
 | `blurhash` | `string` | — | BlurHash string; decoded to canvas in `onMounted` |
@@ -243,7 +249,7 @@ The main component. Combines lazy loading, placeholder, format switching, and tr
 | `densities` | `number[] \| Record<number, string>` | — | Density descriptors (`1x`/`2x`/`3x`) for fixed-size images. List reuses `src`; map gives a distinct file per density. Takes precedence over `widths`, ignores `sizes` |
 | `sizes` | `string` | — | `sizes` attribute passed to `<img>` (width-based srcset only) |
 | `breakpoints` | `BreakpointMap` | — | Local breakpoints (merged with global plugin breakpoints) |
-| `sources` | `ResponsiveSrc` | — | Breakpoint-key → URL map for art direction |
+| `sources` | `ResponsiveSrc` | — | Breakpoint-key → URL (or `{ avif?, webp?, fallback }`) map for art direction, optionally combined with format switching per breakpoint |
 | `lazy` | `boolean` | `true` | Enable IntersectionObserver lazy loading |
 | `rootMargin` | `string` | `"200px"` | IO `rootMargin` — how far before the viewport loading starts |
 | `threshold` | `number` | `0` | IO `threshold` — intersection ratio required to trigger |
@@ -253,6 +259,12 @@ The main component. Combines lazy loading, placeholder, format switching, and tr
 | `retryDelay` | `number` | `1000` | Initial delay in ms; doubles each retry (exponential backoff) |
 | `fetchpriority` | `'high' \| 'low' \| 'auto'` | — | Browser fetch priority hint |
 | `decoding` | `'async' \| 'sync' \| 'auto'` | `'async'` | Image decoding mode |
+| `priority` | `boolean` | `false` | Shorthand for the LCP/hero image — forces `lazy=false`, `fetchpriority='high'`, `decoding='sync'`. Not automatic LCP detection (that isn't reliable pre-paint); mark the one image that matters instead of setting three props by hand |
+| `respectSaveData` | `boolean` | `false` | On a save-data connection: neutralizes `priority` (stays lazy) and downgrades `src` to the smallest URL available from `densities`/`image.srcset`. See "Network-aware loading" |
+| `layout` | `'fixed' \| 'responsive' \| 'fill'` | — | Wrapper sizing preset. Unset keeps the current default (fills container width, aspect-ratio preserved). See "Layout presets" |
+| `cdn` | `boolean \| AutoLoaderConfig` | — | Opt-in: routes a string `src` through `autoLoader()` — detects the CDN from the URL and rewrites it, no manual adapter wiring. See "CDN adapters → Auto CDN detection with VImage" |
+| `loader` | `'server'` | — | Opt-in: routes a string `src` through the `vue-image-kit/server` on-demand handler via `buildImageUrl()`. See "Self-hosted on-demand server → Wiring VImage to it" |
+| `loaderRoute` | `string` | `/_vik/image` | Route override for `loader="server"` — takes precedence over the plugin/Nuxt-module `serverRoute` default |
 
 ### Events
 
@@ -305,6 +317,25 @@ The main component. Combines lazy loading, placeholder, format switching, and tr
 
 ```vue
 <VImage src="/hero.jpg" alt="Hero" :lazy="false" />
+```
+
+**LCP/hero image — `priority` instead of three separate props:**
+
+```vue
+<VImage src="/hero.jpg" alt="Hero" :width="1600" :height="900" priority />
+```
+
+**From CLI/manifest output — no manual prop wiring:**
+
+```vue
+<script setup lang="ts">
+import meta from './photo.jpg?vik' // or: import { images } from './assets/images'
+</script>
+
+<template>
+  <!-- src/width/height/blurhash/thumbhash/placeholder/sizes all come from meta -->
+  <VImage :image="meta" alt="Product photo" />
+</template>
 ```
 
 **Focal point — keep the subject in frame when cropping:**
@@ -1030,6 +1061,38 @@ Responsive sources (`sources`) and format sources (`src` as object) are independ
 </picture>
 ```
 
+That covers "one crop set + one format set, independent of each other." For a
+**different crop *and* different formats per breakpoint** — e.g. a portrait
+AVIF/WebP crop on mobile, a landscape AVIF/WebP crop on desktop — a breakpoint's
+value in `sources` can itself be a `{ avif?, webp?, fallback }` object instead
+of a plain URL:
+
+```vue
+<VImage
+  alt="Hero"
+  :sources="{
+    sm: { avif: '/hero-mobile.avif', webp: '/hero-mobile.webp', fallback: '/hero-mobile.jpg' },
+    md: { webp: '/hero-tablet.webp', fallback: '/hero-tablet.jpg' },
+  }"
+  src="/hero-desktop.jpg"
+/>
+```
+
+```html
+<picture>
+  <source media="(max-width: 640px)"  srcset="/hero-mobile.avif" type="image/avif" />
+  <source media="(max-width: 640px)"  srcset="/hero-mobile.webp" type="image/webp" />
+  <source media="(max-width: 640px)"  srcset="/hero-mobile.jpg" />
+  <source media="(max-width: 1024px)" srcset="/hero-tablet.webp" type="image/webp" />
+  <source media="(max-width: 1024px)" srcset="/hero-tablet.jpg" />
+  <img src="/hero-desktop.jpg" alt="Hero" />
+</picture>
+```
+
+Plain-URL and format-object breakpoints can be mixed freely in the same
+`sources` object. `avif`/`webp` are both optional per breakpoint — only the
+formats you actually have are emitted.
+
 ### BreakpointMap
 
 ```ts
@@ -1161,11 +1224,15 @@ All public types are exported from the package root:
 import type {
   ImageStatus,      // 'idle' | 'loading' | 'loaded' | 'error'
   SrcSet,           // { avif?: string; webp?: string; fallback: string }
-  ResponsiveSrc,    // Record<string, string> — breakpoint-key → URL
+  ResponsiveSrc,    // Record<string, string | SrcSet> — breakpoint-key → URL, or a format set for that breakpoint
   BreakpointMap,    // Record<string, string> — breakpoint-key → CSS media query
   VImageKitOptions, // { breakpoints?: BreakpointMap }
   LazyImgOptions,   // { src, placeholder?, rootMargin?, threshold?, onLoad?, onError? }
   ObjectFit,        // 'cover' | 'contain' | 'fill' | 'none' | 'scale-down'
+  FocalPoint,       // { x: number; y: number } — fractions 0–1
+  Densities,        // number[] | Record<number, string> — density descriptors
+  ImageMeta,        // CLI manifest entry / `?vik` import shape, for the `image` prop
+  Layout,           // 'fixed' | 'responsive' | 'fill' — the `layout` prop
 } from 'vue-image-kit'
 ```
 
@@ -1378,6 +1445,33 @@ npx vue-image-kit generate \
   --manifest ./src/assets/images.ts
 ```
 
+Prints a per-image report as it works — source path/format/dimensions/size,
+then every output variant with its own path/format/dimensions/size (`(existing)`
+for a file `--skip-existing` kept, `(dry-run — not written)` under `--dry-run`)
+— followed by a batch total: images/files processed, total input vs. output
+size, and how much the *smallest available format* saves vs. the original on
+average (deliberately not "total output vs. total input" — with several
+widths × formats generated per image, total output is naturally many times
+one original's size, which would misleadingly read as "this made it worse"):
+
+```
+[vue-image-kit] Processing 1 image(s)…
+[vue-image-kit] photo1
+  Input   ./src/images/photo1.jpg
+          jpg · 1200×800 · 245.3 KB
+  Output
+    ./public/images/photo1-400.jpg   jpg   400×267   52.1 KB
+    ./public/images/photo1-800.jpg   jpg   800×533  118.4 KB
+    ./public/images/photo1.jpg       jpg  1200×800  198.2 KB
+    ./public/images/photo1.webp      webp 1200×800  112.9 KB
+    ./public/images/photo1.avif      avif 1200×800   79.6 KB
+[vue-image-kit] Done. 1 image(s) → 5 file(s).
+  Input:  1 image(s), 245.3 KB total
+  Output: 5 file(s), 561.2 KB total
+  Smallest available format saves ~79% vs. original, on average
+[vue-image-kit] Manifest written to ./src/assets/images.ts
+```
+
 **All options:**
 
 | Flag | Default | Description |
@@ -1398,6 +1492,7 @@ npx vue-image-kit generate \
 | `--skip-existing` | — | Skip already-generated files |
 | `--concurrency <n>` | `4` | Parallel workers |
 | `--watch` | — | Watch input dir and regenerate on change |
+| `--incremental` / `--no-incremental` | auto | Skip reprocessing a source whose mtime (or, if that changed, content hash) matches the last run. Auto-enabled under `--watch` (and by the Vite plugin during `vite dev`) unless set explicitly either way — a one-shot `generate` stays off by default. See "Incremental generation" below |
 
 **Config file** — create `vue-image-kit.config.js` in your project root to avoid repeating flags:
 
@@ -1412,6 +1507,45 @@ export default {
   publicPath: '/images',
 }
 ```
+
+**SVG and animated GIF** are handled differently from raster formats — they're detected by input extension, not by `--formats`:
+
+- **SVG** is copied through untouched (no rasterizing — it's already resolution-independent). The manifest entry gets `src` pointing at the copy; `webp`/`avif`/`placeholder`/`blurhash`/`thumbhash` are empty strings.
+- **Animated GIF** is copied through as the guaranteed-compatible fallback (`src`), and — when `webp` is in `--formats` — re-encoded to animated WebP (`webp` field) for a real size win. AVIF is skipped: animated-AVIF support across `sharp`/libavif builds is too inconsistent to promise. LQIP/BlurHash/ThumbHash placeholders are still generated from the first frame.
+
+### Incremental generation
+
+`--watch` and the Vite plugin's `buildStart`/`handleHotUpdate` both call the
+same `generate()` the CLI does — by default, every single-file change means
+re-scanning and reprocessing **every** source image, not just the one that
+changed. `incremental` mode fixes that:
+
+```bash
+npx vue-image-kit generate --watch --incremental   # already the default under --watch
+```
+
+For each source, it checks a persisted record from the previous run:
+mtime unchanged → skip entirely, no read, no `sharp` call. Mtime changed
+(e.g. a git checkout touched every file) → falls back to a content hash
+before deciding — an unmodified file survives a checkout without triggering
+a needless reprocess. The record — a JSON manifest at
+`<output>/.vik-incremental.json` — also stores each skipped image's full
+metadata, so the batch report/`--manifest` output stays complete even for
+images that weren't touched this run.
+
+Changing `widths`/`formats`/`quality`/`template`/`publicPath`/`lqip`/
+`blurhash`/`thumbhash` between runs invalidates **everything** at once
+(logged as `Config changed since last run`) — not per-file diffing, since a
+config change can affect any or all outputs. `--clean` also invalidates
+everything, naturally: it deletes `output`, and the manifest lives inside
+it. No effect under `--dry-run` (nothing is written, so there's nothing
+valid to compare against next time).
+
+**Defaults**: off for a one-shot `generate` (a single run gains nothing from
+caching), on automatically under `--watch` and during `vite dev` (`vite
+build` stays off — a production artifact shouldn't risk a stale cache).
+An explicit `--incremental`/`--no-incremental` (CLI flag, config file, or
+Vite plugin option) always overrides the automatic default either way.
 
 ---
 
@@ -1550,6 +1684,93 @@ const cdn = cloudinary({ cloudName: 'my-cloud' })
 </template>
 ```
 
+### Auto CDN detection
+
+`autoLoader()` looks at a URL's hostname and picks the right adapter for you —
+no per-provider wiring when the asset is already served from a recognizable
+CDN host. It fingerprints 8 of the 12 adapters this way: Cloudinary, imgix,
+Bunny, ImageKit, Sanity, Storyblok, Contentful, Gumlet. Returns the URL
+**unchanged** when nothing matches, so it's safe to run over every `src`
+unconditionally — a local `/images/photo.jpg` just passes through.
+
+```ts
+import { autoLoader } from 'vue-image-kit/cdn'
+
+autoLoader('https://res.cloudinary.com/demo/image/upload/photo.jpg', { width: 800 })
+// → https://res.cloudinary.com/demo/w_800,q_auto,f_auto/image/upload/photo.jpg
+
+autoLoader('/local/photo.jpg', { width: 800 })
+// → '/local/photo.jpg' — no recognized CDN host, unchanged
+```
+
+The other 4 adapters (Netlify, Vercel, Cloudflare, TwicPics) run on **your
+own** domain rather than a distinctive one, so there's no hostname to
+fingerprint — pass them explicitly via `config.hosts`, keyed by your actual
+domain:
+
+```ts
+import { autoLoader, netlify } from 'vue-image-kit/cdn'
+
+autoLoader(src, { width: 800 }, {
+  hosts: { 'myapp.netlify.app': netlify({ origin: 'https://myapp.netlify.app' }) },
+})
+```
+
+`autoSrcset()` is the same detection, building a real per-width `srcset` (one
+distinct URL per width, via the adapter's own `.srcset()`) instead of a
+single URL — unlike `autoLoader`, it returns `undefined` rather than the
+input unchanged when nothing is detected, since there's no sensible
+"unchanged srcset" to fall back to:
+
+```ts
+import { autoSrcset } from 'vue-image-kit/cdn'
+
+autoSrcset('https://mysite.imgix.net/photo.jpg', [400, 800, 1200])
+// → 'https://mysite.imgix.net/photo.jpg?w=400&auto=format 400w, ...'
+```
+
+### Auto CDN detection with VImage
+
+`VImage`'s `cdn` prop wires `autoLoader()`/`autoSrcset()` straight into the
+component — no manual detection, no manual `src` rewriting:
+
+```vue
+<VImage src="https://res.cloudinary.com/demo/image/upload/photo.jpg" alt="Photo" cdn />
+```
+
+Combined with `widths`, each candidate gets a real CDN-transformed URL via
+the adapter's `.srcset()` instead of `widths`' usual "same URL, different `w`
+descriptor" behavior (`generateSrcset` — see "Network-aware loading" for why
+that limitation exists for the non-CDN case):
+
+```vue
+<VImage
+  src="https://mysite.imgix.net/photo.jpg"
+  alt="Photo"
+  cdn
+  :widths="[400, 800, 1200]"
+/>
+```
+
+Pass an `AutoLoaderConfig` object instead of `true` to cover the "your own
+domain" providers (Netlify/Vercel/Cloudflare/TwicPics) via `hosts`, same as
+`autoLoader()` itself:
+
+```vue
+<script setup lang="ts">
+import { netlify } from 'vue-image-kit/cdn'
+const cdnConfig = { hosts: { 'myapp.netlify.app': netlify({ origin: 'https://myapp.netlify.app' }) } }
+</script>
+
+<template>
+  <VImage src="https://myapp.netlify.app/photo.jpg" alt="Photo" :cdn="cdnConfig" />
+</template>
+```
+
+Has no effect on an unrecognized host (passthrough, same as `autoLoader`), or
+on an explicit `SrcSet` object / `densities` — those are already
+format/resolution choices you made by hand.
+
 ---
 
 ## buildSizes helper
@@ -1670,6 +1891,98 @@ Automatically retry failed image loads with exponential backoff:
 
 ---
 
+## Network-aware loading
+
+`useNetworkAware()` wraps the browser's Network Information API — `saveData` (the
+user opted into data savings) and `effectiveType` (`'slow-2g' | '2g' | '3g' | '4g'`).
+SSR-safe (`saveData` starts `false` on the server) and reactive to the connection's
+`change` event. Support is Chromium-only today (Firefox/Safari don't implement the
+API) — `saveData` just stays `false` there, so nothing breaks, it simply can't help.
+
+```ts
+import { useNetworkAware } from 'vue-image-kit'
+
+const { saveData, effectiveType } = useNetworkAware()
+```
+
+Two places already use it:
+
+- **`useImagePreloader()`** silently skips `preload()` calls while `saveData` is on
+  — preloading trades bandwidth for a smoother later transition, the wrong trade
+  once the user asked to save data.
+- **`VImage`'s `respectSaveData` prop** (opt-in, default `false`): while `saveData`
+  is on, it neutralizes `priority` (the image stays lazy instead of being forced
+  eager/high-priority) and downgrades `src` to the smallest URL it can actually
+  find one for — the lowest key in a `densities` map, or the smallest `w` candidate
+  in `image.srcset` (a manifest/`?vik` value). Plain `widths` has no distinct URL to
+  downgrade to (see `generateSrcset` — the browser negotiates via the `w`
+  descriptor against one URL, not a URL per width) so it's a no-op there.
+
+```vue
+<VImage
+  src="/photo.jpg"
+  alt="Photo"
+  priority
+  respect-save-data
+  :densities="{ 1: '/photo.jpg', 2: '/photo@2x.jpg' }"
+/>
+```
+
+For a direct check outside a component (e.g. before kicking off a batch preload
+yourself), `isSaveDataEnabled()` is the same check without the reactive wrapper:
+
+```ts
+import { isSaveDataEnabled } from 'vue-image-kit'
+
+if (!isSaveDataEnabled()) {
+  await preload(nextSlideUrls)
+}
+```
+
+---
+
+## Layout presets
+
+The `layout` prop switches how the wrapper is sized. Leaving it unset keeps the
+current default — fills the container width, aspect-ratio preserved from
+`width`/`height` — so nothing changes for existing usage.
+
+**`fixed`** — an exact `width`×`height` box, no responsive scaling (like a
+plain `<img width height>`):
+
+```vue
+<VImage src="/icon.jpg" alt="Icon" :width="64" :height="64" layout="fixed" />
+```
+
+**`responsive`** — same container-filling behavior as the default, plus an
+auto-generated `sizes` from `width` when `sizes` isn't given explicitly
+(`(min-width: {width}px) {width}px, 100vw` — "as wide as its intrinsic size,
+otherwise the full viewport width"):
+
+```vue
+<VImage
+  src="/photo.jpg"
+  alt="Photo"
+  :width="800"
+  :height="600"
+  :widths="[400, 800, 1200]"
+  layout="responsive"
+/>
+```
+
+**`fill`** — absolutely fills a positioned parent (`position: absolute; inset:
+0`); the parent needs `position: relative` (or similar) itself. `width`/`height`
+become optional — common for hero banners or cards where the container defines
+the box:
+
+```vue
+<div style="position: relative; aspect-ratio: 16 / 9;">
+  <VImage src="/hero.jpg" alt="Hero" layout="fill" fit="cover" priority />
+</div>
+```
+
+---
+
 ## Nuxt module
 
 ```ts
@@ -1689,6 +2002,47 @@ After setup:
 - `<VImage>` and `v-lazy-img` are available in all templates without imports
 - All composables (`useImage`, `useImagePreloader`, etc.) are auto-imported
 - All utilities (`generateSrcset`, `buildSizes`, `generatePreloadLink`, etc.) are auto-imported
+
+### `onDemandServer` — on-demand images as a Nitro route
+
+Set `onDemandServer` to register `vue-image-kit/server`'s handler as a real
+Nitro server route via `addServerHandler` — no manual `server/routes/...`
+file needed:
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  modules: ['vue-image-kit/nuxt'],
+  vueImageKit: {
+    onDemandServer: true, // root defaults to Nuxt's own `public/` dir
+  },
+})
+```
+
+```vue
+<VImage src="/photos/cat.jpg" alt="Photo" :widths="[400, 800]" loader="server" />
+```
+
+`onDemandServer: true` uses every default (root `public/`, route
+`/_vik/image`); pass an object to override any of them — same options as
+`createImageHandler` (`root`, `cacheDir`, `maxAge`, `allowedWidths`,
+`maxWidth`), plus `route`:
+
+```ts
+vueImageKit: {
+  onDemandServer: {
+    root: 'assets/uploads',
+    route: '/api/img',
+    maxWidth: 2000,
+  },
+},
+```
+
+The route also becomes `loader="server"`'s default automatically — no need
+to repeat it as `serverRoute` unless the handler lives somewhere this module
+didn't register (e.g. deployed separately). `root` is only ever put in
+**private** runtime config (`useRuntimeConfig().vueImageKitServer`, server
+side only) — never exposed to the client, unlike `breakpoints`.
 
 ---
 
@@ -1717,6 +2071,12 @@ export default defineConfig({
 
 All CLI options are supported. `sharp` must be installed as a dev dependency.
 
+`buildStart`/`handleHotUpdate` call the same `generate()` the CLI does, so
+[incremental generation](#incremental-generation) applies here too — and is
+auto-enabled during `vite dev` specifically (not `vite build`) unless you set
+`incremental` explicitly. A single source-file change in dev reprocesses just
+that file, not the whole batch.
+
 ### Build-time imports
 
 The plugin also resolves **query-suffixed imports**, so you never wire props by hand — the metadata comes straight into your JS at build time:
@@ -1729,7 +2089,7 @@ import hash from './photo.jpg?thumbhash'
 // → 'base64string'
 ```
 
-Spread the metadata straight onto `<VImage>`:
+Pass the metadata straight to `<VImage>`'s `image` prop — no manual field wiring:
 
 ```vue
 <script setup lang="ts">
@@ -1737,14 +2097,7 @@ import meta from './hero.jpg?vik'
 </script>
 
 <template>
-  <VImage
-    :src="meta.src"
-    :srcset="meta.srcset"
-    :width="meta.width"
-    :height="meta.height"
-    :thumbhash="meta.thumbhash"
-    alt="Hero"
-  />
+  <VImage :image="meta" alt="Hero" />
 </template>
 ```
 
@@ -1758,6 +2111,125 @@ Both re-run when the source image changes in dev. `sharp` is required; `thumbhas
 ```ts
 /// <reference types="vue-image-kit/vite/client" />
 ```
+
+### On-demand dev serving
+
+Both the CLI and the build-time imports above are **batch/ahead-of-time** —
+they process images before they're requested. If you'd rather not run a build
+step at all during development, set `dev.onDemand: true` and images resize
+**on request** instead, cached to disk after the first hit:
+
+```ts
+vueImageKit({
+  dev: { onDemand: true }, // mounts a handler at /_vik/image during `vite dev`
+})
+```
+
+```html
+<img src="/_vik/image?src=/photos/cat.jpg&w=800&format=webp" />
+```
+
+This is dev-only — `configureServer` (the Vite hook it uses) never runs during
+`vite build`. For production without a CDN, mount the same handler in your own
+server — see "Self-hosted on-demand server" below.
+
+---
+
+## Self-hosted on-demand server
+
+No CDN, don't want to pre-run the CLI, want images resized per-request in
+production too? `vue-image-kit/server` exports the same handler the Vite dev
+middleware above uses — a small, framework-agnostic Node request handler you
+mount yourself.
+
+```ts
+import { createImageHandler } from 'vue-image-kit/server'
+
+const handler = createImageHandler({ root: './public' })
+```
+
+**Plain Node `http`:**
+
+```ts
+import { createServer } from 'node:http'
+import { createImageHandler } from 'vue-image-kit/server'
+
+const imageHandler = createImageHandler({ root: './public' })
+
+createServer((req, res) => {
+  if (req.url?.startsWith('/_vik/image')) {
+    imageHandler(req, res)
+    return
+  }
+  // ...serve everything else
+}).listen(3000)
+```
+
+**Express:**
+
+```ts
+app.get('/_vik/image', createImageHandler({ root: './public' }))
+```
+
+**Request shape:** `GET {route}?src=/photos/cat.jpg&w=800&format=webp&q=80` —
+`src` is required (resolved strictly under `root`; anything that escapes it is
+rejected with `403`, a nonexistent file with `404`). `w`, `format`
+(`jpg`/`webp`/`avif`/`png`) and `q` are all optional. With neither `w` nor
+`format`, the original bytes are streamed through untouched — no `sharp`
+call, works for any file type. Otherwise the result is resized/re-encoded
+with `sharp` and cached to disk (`cacheDir`, default `<root>/.vik-cache`)
+keyed by every param that affects the output, so a repeat request is a cache
+hit, not a re-encode.
+
+```ts
+buildImageUrl('/photos/cat.jpg', { width: 800, format: 'webp' })
+// → '/_vik/image?src=%2Fphotos%2Fcat.jpg&w=800&format=webp'
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `root` | `string` | — | Required. Directory `src` is resolved (and confined) to. |
+| `cacheDir` | `string` | `<root>/.vik-cache` | Where transformed output is cached. |
+| `maxAge` | `number` | `31536000` (1 year) | `Cache-Control: public, max-age=..., must-revalidate`, plus a source-derived `ETag`. A cached response is still reused with zero request for the full `maxAge` — that's what `max-age` means, regardless of this header — this only affects what happens *after* it expires (or on an explicit revalidation, e.g. a hard refresh): a cheap ETag-backed 304 instead of a full re-download, and (unlike `immutable`) the browser is at least allowed to ask. If a source can change and that needs to be picked up sooner than a year, lower `maxAge`, use `no-cache`, or put a version in the URL — this option alone won't make that happen. |
+| `allowedWidths` | `number[]` | — | Restrict `w` to exactly these values (`400` on anything else). Unset: any positive integer, clamped to `maxWidth`. |
+| `maxWidth` | `number` | `4000` | Upper bound for `w` when `allowedWidths` isn't set. |
+
+**Scope**: this handles one transform per request for standard raster sources
+(jpg/png/webp/avif → jpg/webp/avif/png) — the realistic "give me this photo
+at width X" case. It does not replicate the CLI's GIF/SVG special-casing or
+multi-variant batch generation (`src/cli/processor.ts` is the place for
+that) — a `.gif`/`.svg` source always passes through untouched, byte-identical,
+regardless of `w`/`format` (sharp is never asked to resize a GIF here — that
+would silently drop its animation — or rasterize an SVG). Any other
+unrecognized source extension falls back to `jpg` when a transform is
+requested, or passes through untouched when neither `w` nor `format` is set.
+
+**Security note**: error responses include the underlying error message as
+plain text (e.g. "sharp is not installed") to make self-hosted setups easier
+to debug. If you don't want that detail reaching clients, put this behind
+your own error-handling middleware in production.
+
+### Wiring VImage to it — `loader="server"`
+
+`VImage`'s `loader` prop builds request URLs against the handler
+automatically — no manual `buildImageUrl()` calls:
+
+```vue
+<VImage src="/photos/cat.jpg" alt="Photo" :widths="[400, 800]" loader="server" />
+```
+
+Same shape as `cdn`: combined with `widths`, each candidate gets its own
+request URL instead of one shared URL. The route defaults to `/_vik/image`
+(matching the Vite dev middleware and the handler's own convention) —
+override it per-component with `loaderRoute`, or set it once for every
+`VImage` via the Vue plugin (`app.use(VImageKitPlugin, { serverRoute:
+'/api/img' })`) or the Nuxt module's `onDemandServer` option (see "Nuxt
+module" above, which also registers the actual Nitro route for you). If both
+`cdn` and `loader="server"` are set on the same image, `cdn` wins — an
+external CDN already resolves the image, the local on-demand server is the
+fallback for when there isn't one.
 
 ---
 
@@ -1783,6 +2255,7 @@ The dev server starts at `http://localhost:5173`. No extra setup required — th
 | **Density 1x/2x/3x** | Density descriptors for fixed-size images; live `generateDensitySrcset` output and device DPR |
 | **Responsive sources** | Art direction with named breakpoints — `<source media="...">` switching |
 | **Focal point** | `:focal="{ x, y }"` → `object-position` with a draggable marker over a cropped frame |
+| **Layout & priority** | `layout="fixed" \| "responsive" \| "fill"` side by side; `priority` (eager + `fetchpriority="high"`) |
 | **Lazy Load** | 20+ images with per-item status badges; configurable `rootMargin` and `threshold` |
 | **v-lazy-img** | 36-card grid with background-image lazy loading; LQIP toggle; event log |
 | **Background image** | `useBackgroundImage()` — lazy + responsive `image-set()` background with blur-up |
@@ -1792,15 +2265,33 @@ The dev server starts at `http://localhost:5173`. No extra setup required — th
 | **CDN adapters** | Live URL / srcset builder for all 12 providers (Cloudinary, imgix, Bunny, Sanity, Storyblok, Contentful, Vercel, Cloudflare, ImageKit, TwicPics, Netlify, Gumlet) |
 | **Build-time imports** | The `?vik` / `?thumbhash` workflow explained, with the resolved metadata shape |
 
+### Nuxt demo
+
+The Vite demo above covers the component/CLI/CDN/server features but nothing
+Nuxt-specific. `demo-nuxt/` is a separate, minimal Nuxt 3 app (same
+"import straight from `src/`" trick, via `nuxt.config.ts`'s `vite.resolve.alias`)
+that exercises exactly the parts the Vite demo can't: module registration +
+`breakpoints`, auto-imported composables/utilities with zero explicit
+imports, `onDemandServer` actually registering a working Nitro route, and
+server-rendered `<VImage>` output (`isSSR` branch) — verified against both
+`nuxt dev` and a real `nuxt build` output.
+
+```bash
+npm run demo:nuxt        # installs demo-nuxt's own deps + starts nuxt dev
+npm run demo:nuxt:build  # production build (.output/), no dev server
+```
+
 ---
 
 ## Bundle size & peer dependencies
 
 | Entry point | Raw | Gzip | Peer deps |
 |---|---|---|---|
-| `vue-image-kit` ESM | 30.7 kB | **9.8 kB** | `vue ^3.0` |
-| `vue-image-kit` CJS | 22.9 kB | **8.6 kB** | `vue ^3.0` |
-| `vue-image-kit/cdn` ESM | 9.0 kB | **1.9 kB** | — |
+| `vue-image-kit` ESM | 42.1 kB | **13.0 kB** | `vue ^3.0` |
+| `vue-image-kit` CJS | 31.9 kB | **11.3 kB** | `vue ^3.0` |
+| `vue-image-kit/cdn` ESM | 10.8 kB | **2.4 kB** | — |
+
+Measured from the actual build output (`npm run build`), not maintained by hand — CI fails if this drifts past the thresholds in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 Ships as tree-shakeable **ESM** (`vue-image-kit.js`) and **CommonJS** (`vue-image-kit.cjs`).
 `"sideEffects": false` in `package.json` — unused exports are eliminated by the bundler. If you only import `vLazyImg` or a single composable, the bundler will exclude everything else (VImage, blurhash decoder, etc.).

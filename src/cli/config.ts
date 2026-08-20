@@ -50,6 +50,7 @@ export const DEFAULTS: CliConfig = {
   concurrency: 4,
   watch: false,
   skipExisting: false,
+  incremental: false,
 }
 
 export function mergeConfig(

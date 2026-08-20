@@ -15,5 +15,5 @@
     "color-function-notation": "legacy",
     "declaration-block-no-redundant-longhand-properties": null
   },
-  "ignoreFiles": ["dist/**", "node_modules/**", "demo/**", "coverage/**"]
+  "ignoreFiles": ["dist/**", "node_modules/**", "demo/**", "demo-nuxt/**", "coverage/**"]
 }

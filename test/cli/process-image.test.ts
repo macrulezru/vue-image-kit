@@ -12,6 +12,18 @@ import type { CliConfig } from '../../src/cli/types'
 // Integration test: drives the real sharp + thumbhash pipeline used by the
 // Vite plugin's build-time `?vik` / `?thumbhash` imports.
 
+// On Windows, libvips/sharp can keep a native handle on the source file open
+// until the Sharp wrapper is GC'd, which races with an immediate rmSync and
+// throws EBUSY — unrelated to correctness. Best-effort cleanup only; the OS
+// reclaims the temp dir regardless.
+function cleanupDir(dir: string): void {
+  try {
+    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+  } catch {
+    // ignore — see above
+  }
+}
+
 let dir: string
 let outDir: string
 let srcPath: string
@@ -85,6 +97,85 @@ describe('processImage (build-time ?vik pipeline)', () => {
     expect(meta.thumbhash.length).toBeGreaterThan(0)
     // Per-width shortcut keys
     expect(meta.src16).toBe('/images/photo-16.jpg')
+  })
+})
+
+describe('SVG passthrough', () => {
+  it('copies the file through untouched and reports it as a single svg variant', async () => {
+    const svgDir = mkdtempSync(join(tmpdir(), 'vik-svg-'))
+    const svgSrc = join(svgDir, 'icon.svg')
+    const svgOut = join(svgDir, 'out')
+    const { writeFileSync, readFileSync } = await import('node:fs')
+    const svgContent = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect width="24" height="24"/></svg>'
+    writeFileSync(svgSrc, svgContent, 'utf8')
+
+    const svgConfig: CliConfig = { ...config, output: svgOut }
+    const image = await processImage(svgSrc, svgConfig)
+
+    expect(image.variants).toHaveLength(1)
+    expect(image.variants[0]!.format).toBe('svg')
+    expect(readFileSync(image.variants[0]!.absPath, 'utf8')).toBe(svgContent)
+
+    const meta = buildEntry(image, svgConfig.widths)
+    expect(meta.src).toBe('/images/icon.svg')
+    expect(meta.webp).toBe('')
+    expect(meta.avif).toBe('')
+    expect(meta.blurhash).toBe('')
+
+    cleanupDir(svgDir)
+  })
+})
+
+describe('animated GIF handling', () => {
+  it('copies the original gif through and emits an animated webp variant', async () => {
+    const gifDir = mkdtempSync(join(tmpdir(), 'vik-gif-'))
+    const gifSrc = join(gifDir, 'anim.gif')
+    const gifOut = join(gifDir, 'out')
+    await sharp({
+      create: { width: 20, height: 20, channels: 3, background: { r: 10, g: 200, b: 60 } },
+    })
+      .gif()
+      .toFile(gifSrc)
+
+    const gifConfig: CliConfig = { ...config, output: gifOut, formats: ['jpg', 'webp', 'avif'] }
+    const image = await processImage(gifSrc, gifConfig)
+
+    const gifVariant = image.variants.find((v) => v.format === 'gif')
+    const webpVariant = image.variants.find((v) => v.format === 'webp')
+    expect(gifVariant).toBeDefined()
+    expect(webpVariant).toBeDefined()
+    expect(image.variants.some((v) => v.format === 'avif')).toBe(false)
+    expect(existsSync(gifVariant!.absPath)).toBe(true)
+    expect(existsSync(webpVariant!.absPath)).toBe(true)
+
+    // Placeholders still derive from a static (first-frame) read.
+    expect(image.blurhash.length).toBeGreaterThan(0)
+
+    const meta = buildEntry(image, gifConfig.widths)
+    expect(meta.src).toMatch(/\.gif$/)
+    expect(meta.webp).toMatch(/\.webp$/)
+    expect(meta.avif).toBe('')
+
+    cleanupDir(gifDir)
+  })
+
+  it('skips the webp re-encode when webp is not in the requested formats', async () => {
+    const gifDir = mkdtempSync(join(tmpdir(), 'vik-gif-nowebp-'))
+    const gifSrc = join(gifDir, 'anim.gif')
+    const gifOut = join(gifDir, 'out')
+    await sharp({
+      create: { width: 20, height: 20, channels: 3, background: { r: 10, g: 200, b: 60 } },
+    })
+      .gif()
+      .toFile(gifSrc)
+
+    const gifConfig: CliConfig = { ...config, output: gifOut, formats: ['jpg'] }
+    const image = await processImage(gifSrc, gifConfig)
+
+    expect(image.variants.some((v) => v.format === 'gif')).toBe(true)
+    expect(image.variants.some((v) => v.format === 'webp')).toBe(false)
+
+    cleanupDir(gifDir)
   })
 })
 

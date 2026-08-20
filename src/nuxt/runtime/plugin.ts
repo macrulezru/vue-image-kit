@@ -4,7 +4,11 @@ import type { BreakpointMap } from 'vue-image-kit'
 
 export default defineNuxtPlugin((nuxtApp) => {
   const config = useRuntimeConfig()
-  const breakpoints = (config.public.vueImageKit?.breakpoints ?? {}) as BreakpointMap
+  const vueImageKit = config.public.vueImageKit as { breakpoints?: BreakpointMap; serverRoute?: string } | undefined
+  const breakpoints = vueImageKit?.breakpoints ?? {}
 
-  nuxtApp.vueApp.use(VImageKitPlugin, { breakpoints })
+  nuxtApp.vueApp.use(VImageKitPlugin, {
+    breakpoints,
+    ...(vueImageKit?.serverRoute !== undefined ? { serverRoute: vueImageKit.serverRoute } : {}),
+  })
 })

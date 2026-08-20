@@ -81,4 +81,19 @@ describe('useImagePreloader', () => {
     expect(progress.value).toBeGreaterThanOrEqual(0)
     expect(progress.value).toBeLessThanOrEqual(100)
   })
+
+  it('skips preloading entirely on a save-data connection', async () => {
+    Object.defineProperty(navigator, 'connection', {
+      value: { saveData: true },
+      configurable: true,
+    })
+
+    const { preload, total, loaded } = useImagePreloader()
+    await preload(['/a.jpg', '/b.jpg'])
+
+    expect(total.value).toBe(0)
+    expect(loaded.value).toBe(0)
+
+    Object.defineProperty(navigator, 'connection', { value: undefined, configurable: true })
+  })
 })

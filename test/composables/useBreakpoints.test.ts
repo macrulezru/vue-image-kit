@@ -113,4 +113,52 @@ describe('useBreakpoints', () => {
       expect(w.vm.resolveMediaSources({})).toEqual([])
     })
   })
+
+  describe('resolveMediaSources — art direction + format switching combined', () => {
+    it('expands a SrcSet-valued breakpoint into avif/webp/fallback sources under the same media query', () => {
+      const w = mountWithBreakpoints({ sm: '(max-width: 640px)' })
+      const result = w.vm.resolveMediaSources({
+        sm: { avif: '/sm.avif', webp: '/sm.webp', fallback: '/sm.jpg' },
+      })
+      expect(result).toEqual([
+        { media: '(max-width: 640px)', src: '/sm.avif', type: 'image/avif' },
+        { media: '(max-width: 640px)', src: '/sm.webp', type: 'image/webp' },
+        { media: '(max-width: 640px)', src: '/sm.jpg' },
+      ])
+    })
+
+    it('omits missing avif/webp fields instead of emitting empty sources', () => {
+      const w = mountWithBreakpoints({ sm: '(max-width: 640px)' })
+      const result = w.vm.resolveMediaSources({ sm: { webp: '/sm.webp', fallback: '/sm.jpg' } })
+      expect(result).toEqual([
+        { media: '(max-width: 640px)', src: '/sm.webp', type: 'image/webp' },
+        { media: '(max-width: 640px)', src: '/sm.jpg' },
+      ])
+    })
+
+    it('keeps each breakpoint group intact and in avif→webp→fallback order across multiple breakpoints', () => {
+      const global = { sm: '(max-width: 640px)', md: '(max-width: 1024px)' }
+      const w = mountWithBreakpoints(global)
+      const result = w.vm.resolveMediaSources({
+        md: { avif: '/md.avif', fallback: '/md.jpg' },
+        sm: { avif: '/sm.avif', webp: '/sm.webp', fallback: '/sm.jpg' },
+      })
+      // sm sorts before md (max-width ascending), each group stays together and ordered.
+      expect(result.map((s) => s.src)).toEqual(['/sm.avif', '/sm.webp', '/sm.jpg', '/md.avif', '/md.jpg'])
+    })
+
+    it('mixes plain-URL and SrcSet breakpoints in the same sources object', () => {
+      const global = { sm: '(max-width: 640px)', wide: '(min-width: 1440px)' }
+      const w = mountWithBreakpoints(global)
+      const result = w.vm.resolveMediaSources({
+        sm: '/sm.jpg',
+        wide: { webp: '/wide.webp', fallback: '/wide.jpg' },
+      })
+      expect(result).toEqual([
+        { media: '(max-width: 640px)', src: '/sm.jpg' },
+        { media: '(min-width: 1440px)', src: '/wide.webp', type: 'image/webp' },
+        { media: '(min-width: 1440px)', src: '/wide.jpg' },
+      ])
+    })
+  })
 })

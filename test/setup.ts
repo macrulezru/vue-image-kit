@@ -7,4 +7,4 @@ const mockCtx = {
   drawImage: vi.fn(),
 }
 
-HTMLCanvasElement.prototype.getContext = vi.fn(() => mockCtx) as any
+HTMLCanvasElement.prototype.getContext = vi.fn(() => mockCtx) as unknown as typeof HTMLCanvasElement.prototype.getContext

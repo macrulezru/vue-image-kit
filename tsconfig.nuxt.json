@@ -7,7 +7,11 @@
     "strict": true,
     "jsx": "preserve",
     "skipLibCheck": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "paths": {
+      "vue-image-kit": ["./src/index.ts"],
+      "vue-image-kit/cdn": ["./src/cdn/index.ts"]
+    }
   },
-  "include": ["src/nuxt/**/*.ts", "src/nuxt/**/*.d.ts"]
+  "include": ["src/nuxt/**/*.ts", "src/nuxt/**/*.d.ts", "src/env.d.ts"]
 }

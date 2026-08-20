@@ -5,6 +5,8 @@ demo/node_modules/
 # Build output
 dist/
 demo/dist/
+demo-nuxt/.nuxt/
+demo-nuxt/.output/
 
 # Coverage
 coverage/
@@ -45,3 +47,11 @@ desktop.ini
 
 # Vitest
 .vitest-results/
+
+# Playwright
+/playwright-report/
+/test-results/
+/blob-report/
+
+# Develops
+todo.md

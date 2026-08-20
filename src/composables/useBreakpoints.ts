@@ -1,6 +1,6 @@
 import { inject, computed } from 'vue'
 import type { ComputedRef } from 'vue'
-import type { BreakpointMap } from '../types'
+import type { BreakpointMap, ResponsiveSrc } from '../types'
 
 export const BREAKPOINTS_KEY: InjectionKey<BreakpointMap> = Symbol('vImageKitBreakpoints')
 
@@ -9,6 +9,8 @@ import type { InjectionKey } from 'vue'
 interface MediaSource {
   media: string
   src: string
+  /** MIME type for a format-qualified <source> (art direction + format switching combined). */
+  type?: string
 }
 
 // <picture> берёт первый подходящий source сверху вниз.
@@ -44,7 +46,7 @@ function sortSources(sources: MediaSource[]): MediaSource[] {
 
 interface UseBreakpointsReturn {
   merged: ComputedRef<BreakpointMap>
-  resolveMediaSources: (sources: Record<string, string> | undefined) => MediaSource[]
+  resolveMediaSources: (sources: ResponsiveSrc | undefined) => MediaSource[]
 }
 
 export function useBreakpoints(localBreakpoints?: BreakpointMap): UseBreakpointsReturn {
@@ -55,15 +57,25 @@ export function useBreakpoints(localBreakpoints?: BreakpointMap): UseBreakpoints
     ...(localBreakpoints ?? {}),
   }))
 
-  function resolveMediaSources(sources: Record<string, string> | undefined): MediaSource[] {
+  function resolveMediaSources(sources: ResponsiveSrc | undefined): MediaSource[] {
     if (!sources) return []
 
+    // A breakpoint's value is either a plain URL, or a { avif?, webp?,
+    // fallback } object — art direction and format switching combined. All
+    // entries for one breakpoint share its media query; sortSources' stable
+    // sort keeps them adjacent and in this push order (avif → webp → fallback).
     const result: MediaSource[] = []
-    for (const [key, src] of Object.entries(sources)) {
+    for (const [key, value] of Object.entries(sources)) {
       const media = merged.value[key]
-      if (media) {
-        result.push({ media, src })
+      if (!media) continue
+
+      if (typeof value === 'string') {
+        result.push({ media, src: value })
+        continue
       }
+      if (value.avif) result.push({ media, src: value.avif, type: 'image/avif' })
+      if (value.webp) result.push({ media, src: value.webp, type: 'image/webp' })
+      result.push({ media, src: value.fallback })
     }
 
     return sortSources(result)

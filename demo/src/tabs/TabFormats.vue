@@ -106,7 +106,7 @@ function onPictureLoad(e: Event) {
           </div>
           <div style="margin-top:10px;font-size:0.78rem;color:#8b949e">
             Browser selected:
-            <span style="color:#3fb950">{{ pictureSrc.split('/').pop() || '—' }}</span>
+            <span data-testid="picture-format-result" style="color:#3fb950">{{ pictureSrc.split('/').pop() || '—' }}</span>
           </div>
         </div>
         <div class="code-block">{{ `&lt;VImage

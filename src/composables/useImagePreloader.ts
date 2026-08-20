@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import type { Ref, ComputedRef } from 'vue'
+import { isSaveDataEnabled } from './useNetworkAware'
 
 interface UseImagePreloaderReturn {
   loaded: Ref<number>
@@ -33,6 +34,9 @@ export function useImagePreloader(): UseImagePreloaderReturn {
 
   function preload(urls: string[]): Promise<void> {
     if (urls.length === 0) return Promise.resolve()
+    // Preloading is a bandwidth trade for a smoother later transition — the
+    // wrong trade to make once the user has asked their browser/OS to save data.
+    if (isSaveDataEnabled()) return Promise.resolve()
 
     loaded.value = 0
     totalCount.value = urls.length
