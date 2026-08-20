@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { mkdtempSync, rmSync, readdirSync, readFileSync, writeFileSync, symlinkSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, rmSync, readdirSync, readFileSync, writeFileSync, symlinkSync, mkdirSync, utimesSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -211,8 +211,12 @@ describe('createImageHandler', () => {
     // Overwrite the source under the same path/name — same cache-key inputs
     // as before except the source itself, so this only proves the fix if the
     // key actually incorporates the source's own version.
-    await new Promise((r) => setTimeout(r, 5)) // ensure a later touch produces a distinct mtime
     await writeJpegWithRetry(isolatedSrc, { r: 250, g: 250, b: 250 })
+    // Force a deliberately distinct mtime instead of trusting a real-clock
+    // sleep to outlast the filesystem's mtime resolution (coarser than 1ms
+    // on some filesystems/CI runners) — deterministic regardless of timing.
+    const bumped = new Date(statSync(isolatedSrc).mtime.getTime() + 60_000)
+    utimesSync(isolatedSrc, bumped, bumped)
 
     const second = mockRes()
     await handler(mockReq('/img?src=/photo.jpg&w=100&format=webp'), second.res)

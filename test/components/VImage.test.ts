@@ -635,6 +635,7 @@ describe('VImage', () => {
           lazy: false,
           respectSaveData: true,
           densities: { 1: '/small.jpg', 2: '/large@2x.jpg', 3: '/huge@3x.jpg' },
+          widths: [400, 800],
         },
       })
       await nextTick()
@@ -642,10 +643,20 @@ describe('VImage', () => {
       await nextTick()
       await nextTick()
 
+      // useImage()'s own precedence is density > widths > rawSrcset — with
+      // `widths` also set, `densities` would otherwise still win and leak the
+      // large URLs unless it's actually dropped from the options passed in,
+      // not just coincidentally absent because nothing else was set either.
       const img = wrapper.find('img:not([aria-hidden])')
-      expect(img.attributes('srcset')).toBeUndefined()
+      expect(img.attributes('src')).toBe('/small.jpg')
       expect(img.attributes('src')).not.toContain('@2x')
       expect(img.attributes('src')).not.toContain('@3x')
+      expect(img.attributes('srcset')).not.toContain('@2x')
+      expect(img.attributes('srcset')).not.toContain('@3x')
+      // `widths` itself is left alone by design (see the `respectSaveData`
+      // prop's own comment) — harmless here since it just repeats the
+      // already-downgraded small URL for every width candidate.
+      expect(img.attributes('srcset')).toBe('/small.jpg 400w, /small.jpg 800w')
     })
   })
 

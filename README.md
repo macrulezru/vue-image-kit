@@ -2192,7 +2192,7 @@ buildImageUrl('/photos/cat.jpg', { width: 800, format: 'webp' })
 |---|---|---|---|
 | `root` | `string` | — | Required. Directory `src` is resolved (and confined) to. |
 | `cacheDir` | `string` | `<root>/.vik-cache` | Where transformed output is cached. |
-| `maxAge` | `number` | `31536000` (1 year) | `Cache-Control: public, max-age=..., must-revalidate`, plus a source-derived `ETag`. The response URL doesn't encode a content version, so a source file changing at the same `src` still needs to invalidate a client's cache — `must-revalidate` + `ETag` makes that a cheap conditional (304) request instead of serving stale bytes for the full `maxAge`. |
+| `maxAge` | `number` | `31536000` (1 year) | `Cache-Control: public, max-age=..., must-revalidate`, plus a source-derived `ETag`. A cached response is still reused with zero request for the full `maxAge` — that's what `max-age` means, regardless of this header — this only affects what happens *after* it expires (or on an explicit revalidation, e.g. a hard refresh): a cheap ETag-backed 304 instead of a full re-download, and (unlike `immutable`) the browser is at least allowed to ask. If a source can change and that needs to be picked up sooner than a year, lower `maxAge`, use `no-cache`, or put a version in the URL — this option alone won't make that happen. |
 | `allowedWidths` | `number[]` | — | Restrict `w` to exactly these values (`400` on anything else). Unset: any positive integer, clamped to `maxWidth`. |
 | `maxWidth` | `number` | `4000` | Upper bound for `w` when `allowedWidths` isn't set. |
 

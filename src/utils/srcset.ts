@@ -7,19 +7,31 @@ export function generateSizes(sizes?: string): string {
   return sizes ?? '100vw'
 }
 
+// Matches one `<url> <width>w` candidate, with an optional leading
+// separator comma (with or without trailing whitespace — a candidate
+// boundary can be written either way). The url group is plain `\S+`, so a
+// bare comma *inside* a URL with no surrounding whitespace (e.g.
+// Cloudinary's `w_400,q_auto,f_auto` path segment) is never mistaken for a
+// candidate separator — only a comma the descriptor-aware scan actually
+// lands *between* two candidates is consumed as one. The lookahead after
+// `w` requires the descriptor to end at a comma/whitespace/end-of-string
+// boundary, so it can't misfire on stray trailing characters, while still
+// accepting a separator comma glued directly onto the descriptor with no
+// space (`400w,` as much as `400w, `).
+const SRCSET_WIDTH_CANDIDATE_RE = /(?:,\s*)?(\S+)\s+(\d+)w(?=,|\s|$)/g
+
 /**
  * Picks the URL with the smallest `w` descriptor out of a `srcset` string —
  * used to downgrade to the lightest available candidate on save-data
  * connections. Returns `undefined` for an empty/unparseable string or one
  * with no width (`w`) descriptors (e.g. a density-only `1x`/`2x` srcset).
  *
- * Candidates are split on a comma followed by whitespace, not on every bare
- * comma — a CDN transform URL can itself contain commas with no trailing
- * space (e.g. Cloudinary's `w_400,q_auto,f_auto` path segment), which a
- * naive `split(',')` would tear apart mid-URL. Every candidate this package
- * itself generates (`generateSrcset`, every CDN adapter's `.srcset()`) is
- * joined with `', '`, so this matches real input without needing the full
- * HTML `srcset` parsing algorithm.
+ * Scans for `<url> <width>w` pairs directly rather than pre-splitting on
+ * commas — a naive `split(',')` would tear a CDN transform URL apart
+ * mid-string (Cloudinary's `w_400,q_auto,f_auto` has no whitespace around
+ * its commas), and a naive `split(/,\s+/)` would miss a candidate separator
+ * comma with no trailing space (`400w,/a-800.jpg`). This matches real input
+ * either way without needing the full HTML `srcset` parsing algorithm.
  *
  * @example
  * pickSmallestSrcsetUrl('/a-400.jpg 400w, /a-800.jpg 800w, /a-1200.jpg 1200w')
@@ -37,11 +49,9 @@ export function pickSmallestSrcsetUrl(srcset: string): string | undefined {
   let smallestUrl: string | undefined
   let smallestWidth = Infinity
 
-  for (const entry of srcset.split(/,\s+/)) {
-    const [url, descriptor] = entry.trim().split(/\s+/)
-    if (!url || !descriptor?.endsWith('w')) continue
-    const width = parseInt(descriptor, 10)
-    if (isNaN(width) || width >= smallestWidth) continue
+  for (const [, url, widthStr] of srcset.matchAll(SRCSET_WIDTH_CANDIDATE_RE)) {
+    const width = parseInt(widthStr!, 10)
+    if (width >= smallestWidth) continue
     smallestWidth = width
     smallestUrl = url
   }

@@ -169,4 +169,8 @@ describe('pickSmallestSrcsetUrl', () => {
       'https://res.cloudinary.com/demo/w_400,q_auto,f_auto/photo.jpg',
     )
   })
+
+  it('still splits candidates when the separator comma has no trailing whitespace', () => {
+    expect(pickSmallestSrcsetUrl('/a-400.jpg 400w,/a-800.jpg 800w')).toBe('/a-400.jpg')
+  })
 })

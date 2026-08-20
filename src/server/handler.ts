@@ -66,7 +66,7 @@ export interface ImageHandlerOptions {
   root: string
   /** Directory for cached transformed output. Default: `<root>/.vik-cache`. */
   cacheDir?: string
-  /** `Cache-Control: public, max-age=<maxAge>, must-revalidate` on responses, plus a content-derived `ETag`. Default: 1 year. The response URL (`src`/`w`/`format`/`q`) carries no content version, so a source file changing at the same `src` must still be able to invalidate a client's cached copy — `must-revalidate` plus the ETag makes that a cheap conditional (304) request instead of either stale-forever caching or none at all. */
+  /** `Cache-Control: public, max-age=<maxAge>, must-revalidate` on responses, plus a content-derived `ETag`. Default: 1 year. A client can (and will) reuse a fresh response with zero request for the full `maxAge` regardless — this only controls what happens once that window ends: an ETag-backed 304 instead of either a full re-download or (the alternative, `immutable`) never being allowed to ask at all. If content needs to be picked up sooner than `maxAge`, lower `maxAge` itself, or version the URL — this can't do that on its own. */
   maxAge?: number
   /** Restrict `w` to exactly these values (400 on anything else). Unset: any positive integer, clamped to `maxWidth`. */
   allowedWidths?: number[]
@@ -100,10 +100,17 @@ function sendImage(res: ServerResponse, buf: Buffer, mime: string, maxAge: numbe
   res.setHeader('Content-Type', mime)
   // Not `immutable`: the request URL doesn't encode a content version, so a
   // changed source at the same `src` has to be able to invalidate a
-  // previously cached response. `must-revalidate` + a source-derived ETag
-  // lets a client's revalidation request come back as a cheap 304 when the
-  // source hasn't actually changed, instead of blindly trusting a year-long
-  // cache that has no way to know otherwise.
+  // previously cached response. `must-revalidate` doesn't do that *within*
+  // `maxAge` — a client is fully entitled to reuse a fresh response with zero
+  // request for the whole window, same as before. What it fixes is what
+  // happens once that window ends (or a client explicitly revalidates,
+  // e.g. a hard refresh, which `immutable` would have told it never to
+  // bother doing): the source-derived ETag lets that request come back as a
+  // cheap 304 when the source hasn't actually changed, instead of either
+  // re-downloading the full image or (the previous behavior) never being
+  // allowed to ask at all. For content that must be picked up sooner than
+  // `maxAge`, a shorter `maxAge`, `no-cache`, or a URL that changes with the
+  // content is what actually controls that — this header can't.
   res.setHeader('Cache-Control', `public, max-age=${maxAge}, must-revalidate`)
   res.setHeader('ETag', etag)
   res.end(buf)
