@@ -415,7 +415,11 @@ export async function generate(config: CliConfig): Promise<void> {
 
     if (incrementalState) {
       const entry = incrementalState.entries[absSrc]
-      if (isUnchanged(entry, absSrc)) {
+      // Trust the cached entry only if every output file it references is
+      // still actually on disk — the incremental state can't tell the
+      // difference between "source unchanged" and "source unchanged, but
+      // someone deleted a generated file out from under it" on its own.
+      if (isUnchanged(entry, absSrc) && entry!.image.variants.every((v) => existsSync(v.absPath))) {
         skippedCount++
         return entry!.image
       }

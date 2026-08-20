@@ -2192,7 +2192,7 @@ buildImageUrl('/photos/cat.jpg', { width: 800, format: 'webp' })
 |---|---|---|---|
 | `root` | `string` | — | Required. Directory `src` is resolved (and confined) to. |
 | `cacheDir` | `string` | `<root>/.vik-cache` | Where transformed output is cached. |
-| `maxAge` | `number` | `31536000` (1 year) | `Cache-Control: public, max-age=..., immutable`. The cache key already encodes every transform param, so a hit is safe to treat as permanent. |
+| `maxAge` | `number` | `31536000` (1 year) | `Cache-Control: public, max-age=..., must-revalidate`, plus a source-derived `ETag`. The response URL doesn't encode a content version, so a source file changing at the same `src` still needs to invalidate a client's cache — `must-revalidate` + `ETag` makes that a cheap conditional (304) request instead of serving stale bytes for the full `maxAge`. |
 | `allowedWidths` | `number[]` | — | Restrict `w` to exactly these values (`400` on anything else). Unset: any positive integer, clamped to `maxWidth`. |
 | `maxWidth` | `number` | `4000` | Upper bound for `w` when `allowedWidths` isn't set. |
 
@@ -2200,7 +2200,10 @@ buildImageUrl('/photos/cat.jpg', { width: 800, format: 'webp' })
 (jpg/png/webp/avif → jpg/webp/avif/png) — the realistic "give me this photo
 at width X" case. It does not replicate the CLI's GIF/SVG special-casing or
 multi-variant batch generation (`src/cli/processor.ts` is the place for
-that) — an unrecognized source format falls back to `jpg` when a transform is
+that) — a `.gif`/`.svg` source always passes through untouched, byte-identical,
+regardless of `w`/`format` (sharp is never asked to resize a GIF here — that
+would silently drop its animation — or rasterize an SVG). Any other
+unrecognized source extension falls back to `jpg` when a transform is
 requested, or passes through untouched when neither `w` nor `format` is set.
 
 **Security note**: error responses include the underlying error message as

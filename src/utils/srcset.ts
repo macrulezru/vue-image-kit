@@ -13,15 +13,31 @@ export function generateSizes(sizes?: string): string {
  * connections. Returns `undefined` for an empty/unparseable string or one
  * with no width (`w`) descriptors (e.g. a density-only `1x`/`2x` srcset).
  *
+ * Candidates are split on a comma followed by whitespace, not on every bare
+ * comma — a CDN transform URL can itself contain commas with no trailing
+ * space (e.g. Cloudinary's `w_400,q_auto,f_auto` path segment), which a
+ * naive `split(',')` would tear apart mid-URL. Every candidate this package
+ * itself generates (`generateSrcset`, every CDN adapter's `.srcset()`) is
+ * joined with `', '`, so this matches real input without needing the full
+ * HTML `srcset` parsing algorithm.
+ *
  * @example
  * pickSmallestSrcsetUrl('/a-400.jpg 400w, /a-800.jpg 800w, /a-1200.jpg 1200w')
  * // → '/a-400.jpg'
+ *
+ * @example
+ * // Commas inside a Cloudinary transform survive intact
+ * pickSmallestSrcsetUrl(
+ *   'https://res.cloudinary.com/demo/w_400,q_auto,f_auto/photo.jpg 400w, ' +
+ *   'https://res.cloudinary.com/demo/w_800,q_auto,f_auto/photo.jpg 800w',
+ * )
+ * // → 'https://res.cloudinary.com/demo/w_400,q_auto,f_auto/photo.jpg'
  */
 export function pickSmallestSrcsetUrl(srcset: string): string | undefined {
   let smallestUrl: string | undefined
   let smallestWidth = Infinity
 
-  for (const entry of srcset.split(',')) {
+  for (const entry of srcset.split(/,\s+/)) {
     const [url, descriptor] = entry.trim().split(/\s+/)
     if (!url || !descriptor?.endsWith('w')) continue
     const width = parseInt(descriptor, 10)

@@ -43,7 +43,7 @@ interface Props {
   decoding?: 'async' | 'sync' | 'auto'
   /** Shorthand for the LCP/hero image: forces lazy=false, fetchpriority='high', decoding='sync'. Not automatic detection — mark the one image that matters. */
   priority?: boolean
-  /** Opt-in: on a save-data connection, neutralize `priority` (stays lazy) and downgrade `src` to the smallest URL available from `densities`/`image.srcset`. No effect otherwise. */
+  /** Opt-in: on a save-data connection, neutralize `priority` (stays lazy), downgrade `src` to the smallest URL available from `densities`/`image.srcset`, and drop any `densities`/CDN/server/manifest `srcset` from the rendered `<img>` entirely — a browser picks from `srcset` over plain `src` whenever one is present, so leaving it in place would undo the downgrade. No effect otherwise. */
   respectSaveData?: boolean
   /** Wrapper sizing preset: 'fixed' (exact box), 'responsive' (fills container, auto `sizes`), 'fill' (absolutely fills a positioned parent). Unset keeps the current default (fills container width, no auto `sizes`). */
   layout?: Layout
@@ -173,7 +173,15 @@ const effectiveLazy = computed(() => (effectivePriority.value ? false : props.la
 const effectiveFetchpriority = computed(() => (effectivePriority.value ? 'high' : props.fetchpriority))
 const effectiveDecoding = computed(() => (effectivePriority.value ? 'sync' : props.decoding))
 
+// On a save-data connection, `densities`/`rawSrcset` (CDN, server, or
+// manifest srcset) must not reach useImage() at all: a browser that sees a
+// valid `srcset`/density-descriptor set picks from *that*, ignoring plain
+// `src` entirely — so leaving them in place would silently undo the
+// downgrade `saveDataSrc` just computed (worst case: the exact densities-map
+// case that downgrade exists for, since that's the one real per-file `2x`/
+// `3x` candidate this component can offer).
 const effectiveRawSrcset = computed(() => {
+  if (isSavingData.value) return undefined
   if (cdnSrcset.value !== undefined) return cdnSrcset.value
   if (serverSrcset.value !== undefined) return serverSrcset.value
   if (props.widths === undefined && props.image?.srcset) return props.image.srcset
@@ -183,7 +191,7 @@ const effectiveRawSrcset = computed(() => {
 const { status, isLoaded, isError, imgAttrs, observe, onImgLoad, onImgError } = useImage({
   src: cdnSrc.value ?? serverSrc.value ?? mergedSrc.value,
   ...(effectiveRawSrcset.value === undefined && props.widths !== undefined ? { widths: props.widths } : {}),
-  ...(props.densities !== undefined ? { densities: props.densities } : {}),
+  ...(props.densities !== undefined && !isSavingData.value ? { densities: props.densities } : {}),
   ...(mergedSizes.value !== undefined ? { sizes: mergedSizes.value } : {}),
   ...(effectiveRawSrcset.value !== undefined ? { rawSrcset: effectiveRawSrcset.value } : {}),
   lazy: effectiveLazy.value,

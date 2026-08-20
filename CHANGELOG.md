@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `pickSmallestSrcsetUrl` (`respectSaveData`'s downgrade path) split candidates on every bare comma, tearing apart CDN transform URLs that contain one with no trailing space (e.g. Cloudinary's `w_400,q_auto,f_auto`). Now splits on comma-followed-by-whitespace, matching how every srcset this package itself generates is actually joined.
+- `VImage`'s `respectSaveData` downgraded `src` to the smallest available URL but still passed the full `densities`/`rawSrcset` (CDN, server, or manifest srcset) into `useImage()` — a browser picks from a valid `srcset`/density set over plain `src` regardless, so the downgrade could be silently overridden on a high-DPR save-data connection. Both are now dropped from the `<img>` entirely while save-data is active.
+- The CLI/Vite-plugin manifest's generated `ImageData` interface declared every `src{width}` shortcut as required, but SVG/GIF entries never generate any of them and an undersized raster only generates its own original width's — the manifest `.ts` this package writes could fail to type-check in a consumer's own project. Fields are now optional.
+- `vue-image-kit/server`'s on-demand handler cached transformed output keyed only by `(path, width, format, quality)` — a source file replaced at the same path (e.g. a re-uploaded photo) kept serving the old bytes forever under a `Cache-Control: immutable, max-age=1y` response. The cache key now incorporates the source's mtime/size, and responses carry a source-derived `ETag` with a revalidating (not `immutable`) `Cache-Control` instead, so a changed source is picked up and a client's conditional re-request gets a cheap 304 when it hasn't.
+- The same handler's top-of-file comment promised GIF/SVG sources always pass through untouched, but the actual code only skipped the sharp pipeline when neither `w` nor `format` was requested — a GIF requested with `&w=` silently lost its animation, re-encoded as a static frame. GIF/SVG now always pass through byte-identical regardless of `w`/`format`.
+- The handler's cache write wrote directly to the final cache path; two concurrent requests for the same not-yet-cached transform could race, and a reader could observe a partially-written file. Now writes to a unique temp file and renames into place (with a fallback for Windows rejecting a rename onto a destination another concurrent request just claimed).
+- The handler resolved `src` under `root` lexically (catching `../` traversal) but never checked whether the resolved path was itself a symlink pointing outside `root` — added a `realpath`-based check as defense-in-depth.
+- `vue-image-kit/cdn`'s `autoLoader`/`autoSrcset` detectors that rebuild a URL from `pathname` alone (Cloudinary, imgix, Bunny, ImageKit, Sanity, Gumlet) silently dropped any existing query string on the source URL — meaningful for e.g. an ImageKit private/signed URL's auth token. Those detectors now leave a query-bearing URL unchanged instead of rewriting it and losing the query. Also fixed `storyblok()`'s adapter dropping the query string entirely when building its transformed URL.
+- The CLI's `--incremental` cache trusted a "source unchanged" entry without checking whether the output files it referenced were still actually on disk — a manually deleted generated file (without touching the source or the whole output directory) would stay silently missing forever. Now verified against disk before a source is skipped.
+
 ## [1.1.0] - 2026-08-20
 
 ### Added

@@ -596,7 +596,12 @@ describe('VImage', () => {
       await nextTick()
       await nextTick()
 
-      expect(wrapper.find('img:not([aria-hidden])').attributes('src')).toBe('/small.jpg')
+      const img = wrapper.find('img:not([aria-hidden])')
+      expect(img.attributes('src')).toBe('/small.jpg')
+      // The whole point of the downgrade: no srcset/density descriptors left
+      // for the browser to override `src` with — it would otherwise still
+      // fetch /large@2x.jpg on a high-DPR device regardless of `src`.
+      expect(img.attributes('srcset')).toBeUndefined()
     })
 
     it('downgrades to the smallest image.srcset URL when saveData is on', async () => {
@@ -615,7 +620,32 @@ describe('VImage', () => {
       await nextTick()
       await nextTick()
 
-      expect(wrapper.find('img:not([aria-hidden])').attributes('src')).toBe('/small-400.jpg')
+      const img = wrapper.find('img:not([aria-hidden])')
+      expect(img.attributes('src')).toBe('/small-400.jpg')
+      expect(img.attributes('srcset')).toBeUndefined()
+    })
+
+    it('does not leave densities on the rendered img when saveData is on, even with widths also set', async () => {
+      Object.defineProperty(navigator, 'connection', { value: { saveData: true }, configurable: true })
+
+      const wrapper = mount(VImage, {
+        props: {
+          src: '/full.jpg',
+          alt: 'Downgraded',
+          lazy: false,
+          respectSaveData: true,
+          densities: { 1: '/small.jpg', 2: '/large@2x.jpg', 3: '/huge@3x.jpg' },
+        },
+      })
+      await nextTick()
+      triggerIntersect()
+      await nextTick()
+      await nextTick()
+
+      const img = wrapper.find('img:not([aria-hidden])')
+      expect(img.attributes('srcset')).toBeUndefined()
+      expect(img.attributes('src')).not.toContain('@2x')
+      expect(img.attributes('src')).not.toContain('@3x')
     })
   })
 

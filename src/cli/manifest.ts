@@ -85,7 +85,13 @@ function indent(obj: ManifestEntry): string {
 }
 
 function buildInterface(widths: number[]): string {
-  const widthFields = widths.map((w) => `  src${w}: string`).join('\n')
+  // Optional, not required: the SVG/GIF branches of buildEntry() return
+  // before this loop runs at all, and a raster image smaller than a given
+  // width never gets that width's variant (sharp's withoutEnlargement skips
+  // it) — either way, the generated object literal for that entry legally
+  // lacks the field, so a required `string` would make TypeScript reject the
+  // very manifest this function just wrote.
+  const widthFields = widths.map((w) => `  src${w}?: string`).join('\n')
   return [
     'export interface ImageData {',
     '  name: string',

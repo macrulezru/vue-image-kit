@@ -156,4 +156,17 @@ describe('pickSmallestSrcsetUrl', () => {
   it('ignores malformed entries and still finds the smallest valid one', () => {
     expect(pickSmallestSrcsetUrl('garbage, /a-400.jpg 400w')).toBe('/a-400.jpg')
   })
+
+  it('ignores an entry with a non-numeric width descriptor', () => {
+    expect(pickSmallestSrcsetUrl('/a-abcw.jpg abcw, /a-400.jpg 400w')).toBe('/a-400.jpg')
+  })
+
+  it('does not split a comma-containing CDN transform URL apart', () => {
+    const srcset =
+      'https://res.cloudinary.com/demo/w_400,q_auto,f_auto/photo.jpg 400w, ' +
+      'https://res.cloudinary.com/demo/w_800,q_auto,f_auto/photo.jpg 800w'
+    expect(pickSmallestSrcsetUrl(srcset)).toBe(
+      'https://res.cloudinary.com/demo/w_400,q_auto,f_auto/photo.jpg',
+    )
+  })
 })

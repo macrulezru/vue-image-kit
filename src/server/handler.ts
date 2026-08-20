@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync } from 'node:fs'
-import { readFile, writeFile } from 'node:fs/promises'
+import { createHash, randomUUID } from 'node:crypto'
+import { existsSync, mkdirSync, statSync } from 'node:fs'
+import { readFile, writeFile, rename, realpath, unlink } from 'node:fs/promises'
 import { extname, join, resolve, sep } from 'node:path'
 
 // Framework-agnostic on-demand image resize handler — for self-hosted setups
@@ -20,6 +20,12 @@ import { extname, join, resolve, sep } from 'node:path'
 
 const TRANSFORM_FORMATS = ['jpg', 'webp', 'avif', 'png'] as const
 type TransformFormat = (typeof TRANSFORM_FORMATS)[number]
+
+// Extensions sharp is never asked to touch here, regardless of `w`/`format`
+// — animated GIFs would silently lose their animation (re-encoded as a
+// single frame), and SVGs are already resolution-independent. See
+// src/cli/processor.ts for the batch pipeline's actual GIF/SVG handling.
+const UNTRANSFORMABLE_EXTS = new Set(['gif', 'svg'])
 
 const MIME: Record<string, string> = {
   jpg: 'image/jpeg',
@@ -60,7 +66,7 @@ export interface ImageHandlerOptions {
   root: string
   /** Directory for cached transformed output. Default: `<root>/.vik-cache`. */
   cacheDir?: string
-  /** `Cache-Control: public, max-age=<maxAge>, immutable` on responses. Default: 1 year — the cache key already encodes every transform param, so a hit is safe to treat as permanent. */
+  /** `Cache-Control: public, max-age=<maxAge>, must-revalidate` on responses, plus a content-derived `ETag`. Default: 1 year. The response URL (`src`/`w`/`format`/`q`) carries no content version, so a source file changing at the same `src` must still be able to invalidate a client's cached copy — `must-revalidate` plus the ETag makes that a cheap conditional (304) request instead of either stale-forever caching or none at all. */
   maxAge?: number
   /** Restrict `w` to exactly these values (400 on anything else). Unset: any positive integer, clamped to `maxWidth`. */
   allowedWidths?: number[]
@@ -76,11 +82,35 @@ function sendText(res: ServerResponse, status: number, message: string): void {
   res.end(message)
 }
 
-function sendImage(res: ServerResponse, buf: Buffer, mime: string, maxAge: number): void {
+function ifNoneMatch(req: IncomingMessage, etag: string): boolean {
+  const header = req.headers?.['if-none-match']
+  if (!header) return false
+  return header.split(',').some((v) => v.trim() === etag)
+}
+
+function sendNotModified(res: ServerResponse, etag: string, maxAge: number): void {
+  res.statusCode = 304
+  res.setHeader('Cache-Control', `public, max-age=${maxAge}, must-revalidate`)
+  res.setHeader('ETag', etag)
+  res.end()
+}
+
+function sendImage(res: ServerResponse, buf: Buffer, mime: string, maxAge: number, etag: string): void {
   res.statusCode = 200
   res.setHeader('Content-Type', mime)
-  res.setHeader('Cache-Control', `public, max-age=${maxAge}, immutable`)
+  // Not `immutable`: the request URL doesn't encode a content version, so a
+  // changed source at the same `src` has to be able to invalidate a
+  // previously cached response. `must-revalidate` + a source-derived ETag
+  // lets a client's revalidation request come back as a cheap 304 when the
+  // source hasn't actually changed, instead of blindly trusting a year-long
+  // cache that has no way to know otherwise.
+  res.setHeader('Cache-Control', `public, max-age=${maxAge}, must-revalidate`)
+  res.setHeader('ETag', etag)
   res.end(buf)
+}
+
+function sourceEtag(...parts: (string | number)[]): string {
+  return `"${createHash('sha256').update(parts.join(':')).digest('hex')}"`
 }
 
 /**
@@ -127,6 +157,23 @@ export function createImageHandler(options: ImageHandlerOptions): ImageHandler {
         return
       }
 
+      // Defense-in-depth against a symlink living inside `root` that points
+      // outside it — the lexical check above only catches traversal encoded
+      // in the `src` string itself; a symlink's real target isn't visible
+      // until resolved. All file access below uses this resolved path.
+      let realSrc: string
+      let realRoot: string
+      try {
+        ;[realSrc, realRoot] = await Promise.all([realpath(absSrc), realpath(root)])
+      } catch {
+        sendText(res, 404, 'Not found')
+        return
+      }
+      if (realSrc !== realRoot && !realSrc.startsWith(realRoot + sep)) {
+        sendText(res, 403, 'Forbidden')
+        return
+      }
+
       const widthParam = url.searchParams.get('w')
       let width: number | undefined
       if (widthParam !== null) {
@@ -161,29 +208,49 @@ export function createImageHandler(options: ImageHandlerOptions): ImageHandler {
         }
       }
 
-      // Pure passthrough — no transform requested. Stream the original bytes
-      // untouched: faster, byte-identical, and works for any file type
-      // (including gif/svg) without needing sharp installed at all.
-      if (!width && !formatParam) {
-        const buf = await readFile(absSrc)
-        sendImage(res, buf, mimeFor(extname(absSrc)), maxAge)
+      const srcExt = extname(realSrc).replace(/^\./, '').toLowerCase()
+
+      // Pure passthrough — no transform requested, or the source is one sharp
+      // shouldn't touch here at all (gif/svg — see UNTRANSFORMABLE_EXTS).
+      // Stream the original bytes untouched: faster, byte-identical, and
+      // works without needing sharp installed at all.
+      if ((!width && !formatParam) || UNTRANSFORMABLE_EXTS.has(srcExt)) {
+        const srcStat = statSync(realSrc)
+        const etag = sourceEtag(realSrc, srcStat.mtimeMs, srcStat.size)
+        if (ifNoneMatch(req, etag)) {
+          sendNotModified(res, etag, maxAge)
+          return
+        }
+        const buf = await readFile(realSrc)
+        sendImage(res, buf, mimeFor(srcExt), maxAge, etag)
         return
       }
 
-      const format = (formatParam as TransformFormat | null) ?? inferFormat(extname(absSrc)) ?? 'jpg'
+      const format = (formatParam as TransformFormat | null) ?? inferFormat(srcExt) ?? 'jpg'
 
+      // Source's mtime+size feed the cache key so a changed file at the same
+      // path (someone re-uploads a photo under the same name) produces a new
+      // key instead of silently serving the old transform forever.
+      const srcStat = statSync(realSrc)
+      const sourceVersion = `${srcStat.mtimeMs}:${srcStat.size}`
       const cacheKey = createHash('sha256')
-        .update(JSON.stringify({ absSrc, width, format, quality }))
+        .update(JSON.stringify({ realSrc, sourceVersion, width, format, quality }))
         .digest('hex')
       const cachePath = join(cacheDir, `${cacheKey}.${format}`)
+      const etag = `"${cacheKey}"`
+
+      if (ifNoneMatch(req, etag)) {
+        sendNotModified(res, etag, maxAge)
+        return
+      }
 
       if (existsSync(cachePath)) {
-        sendImage(res, await readFile(cachePath), mimeFor(format), maxAge)
+        sendImage(res, await readFile(cachePath), mimeFor(format), maxAge, etag)
         return
       }
 
       const sharp = await getSharp()
-      let pipeline = sharp(absSrc)
+      let pipeline = sharp(realSrc)
       if (width) pipeline = pipeline.resize(width, null, { withoutEnlargement: true })
 
       if (format === 'jpg') pipeline = pipeline.jpeg({ quality: quality ?? 85, mozjpeg: true })
@@ -193,10 +260,29 @@ export function createImageHandler(options: ImageHandlerOptions): ImageHandler {
 
       const outBuf = await pipeline.toBuffer()
 
+      // Write to a unique temp file first, then rename into place — rename
+      // within the same directory is atomic, so a concurrent request reading
+      // `cachePath` (existsSync + readFile above) can never observe a
+      // partially-written file, unlike writing `cachePath` directly.
       mkdirSync(cacheDir, { recursive: true })
-      await writeFile(cachePath, outBuf)
+      const tmpPath = join(cacheDir, `.tmp-${cacheKey}-${randomUUID()}`)
+      await writeFile(tmpPath, outBuf)
+      try {
+        await rename(tmpPath, cachePath)
+      } catch (renameErr) {
+        // Two concurrent requests for the same not-yet-cached transform can
+        // both reach this point and race to rename onto the same
+        // `cachePath` — harmless on POSIX (the loser's rename just silently
+        // wins-or-no-ops), but Windows can reject a rename onto a
+        // destination another handle already has open with EPERM. If the
+        // other request's write actually landed, that's not a real failure
+        // — just drop our own now-redundant temp file and serve the (content
+        // -identical, same inputs) buffer we already computed.
+        await unlink(tmpPath).catch(() => {})
+        if (!existsSync(cachePath)) throw renameErr
+      }
 
-      sendImage(res, outBuf, mimeFor(format), maxAge)
+      sendImage(res, outBuf, mimeFor(format), maxAge, etag)
     } catch (err) {
       sendText(res, 500, err instanceof Error ? err.message : 'Internal error')
     }

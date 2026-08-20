@@ -35,7 +35,9 @@ export function storyblok(): CdnAdapter {
     const filterStr = filters.length > 0 ? `/filters:${filters.join(':')}` : ''
     const transformPath = `${beforeFile.join('/')}/${size}${filterStr}/${filename}`
 
-    return `${url.origin}${transformPath}`
+    // Preserve any existing query string (e.g. a cache-busting `?v=`) —
+    // transforms themselves live in the path, not the query, for Storyblok.
+    return `${url.origin}${transformPath}${url.search}`
   }
 
   return {

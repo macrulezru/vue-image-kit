@@ -42,6 +42,40 @@ describe('autoLoader', () => {
     expect(url).toBe('https://demo.gumlet.io/photo.jpg?w=800&format=webp')
   })
 
+  it('leaves a query-bearing imgix URL unchanged instead of dropping the query', () => {
+    // detectImgix builds a fresh URL from `url.pathname` alone via the
+    // adapter's own `.url()` — it has no way to merge an existing query
+    // string (e.g. a signed-URL token) into imgix's own param scheme, so it
+    // must bail out rather than silently drop it.
+    const url = 'https://mysite.imgix.net/photo.jpg?s=abc123token'
+    expect(autoLoader(url, { width: 800 })).toBe(url)
+  })
+
+  it('leaves a query-bearing ImageKit URL unchanged (private/signed URLs use query tokens)', () => {
+    const url = 'https://ik.imagekit.io/your_id/photo.jpg?ik-t=signed-token'
+    expect(autoLoader(url, { width: 800 })).toBe(url)
+  })
+
+  it('leaves a query-bearing Bunny/Sanity/Gumlet/Cloudinary URL unchanged', () => {
+    expect(autoLoader('https://myzone.b-cdn.net/photo.jpg?v=2', { width: 800 }))
+      .toBe('https://myzone.b-cdn.net/photo.jpg?v=2')
+    expect(autoLoader('https://cdn.sanity.io/images/abc123/production/photo.jpg?v=2', { width: 400 }))
+      .toBe('https://cdn.sanity.io/images/abc123/production/photo.jpg?v=2')
+    expect(autoLoader('https://demo.gumlet.io/photo.jpg?v=2', { width: 800 }))
+      .toBe('https://demo.gumlet.io/photo.jpg?v=2')
+    expect(autoLoader('https://res.cloudinary.com/demo/image/upload/photo.jpg?v=2', { width: 800 }))
+      .toBe('https://res.cloudinary.com/demo/image/upload/photo.jpg?v=2')
+  })
+
+  it('still rewrites Storyblok/Contentful URLs that carry a query string — those adapters parse the full URL themselves', () => {
+    const storyblokUrl = autoLoader('https://a.storyblok.com/f/12345/photo.jpg?v=2', { width: 800 })
+    expect(storyblokUrl).toBe('https://a.storyblok.com/f/12345/800x0/filters:format(webp)/photo.jpg?v=2')
+
+    const contentfulUrl = autoLoader('https://images.ctfassets.net/space/token/photo.jpg?v=2', { width: 800 })
+    expect(contentfulUrl).toContain('v=2')
+    expect(contentfulUrl).toContain('w=800')
+  })
+
   it('returns the URL unchanged for an unrecognized host', () => {
     const url = 'https://example.com/photo.jpg'
     expect(autoLoader(url, { width: 800 })).toBe(url)

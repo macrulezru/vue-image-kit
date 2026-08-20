@@ -20,8 +20,19 @@ type Detector = (url: URL) => Detection | null
 // Netlify/Vercel/Cloudflare/TwicPics run on *your* domain, not a distinctive
 // one, so they can't be guessed this way (see AutoLoaderConfig.hosts).
 
+// These detectors rebuild a fresh URL from `url.pathname` alone via their
+// adapter's `.url()` — any existing query string on the source URL (a
+// signed/token'd private-asset URL, an existing transform, a cache-buster)
+// would be silently discarded, not merged, since none of these adapters know
+// how to combine "existing arbitrary query params" with "opts-derived
+// params" for their own URL scheme. Bailing out (leaving the URL exactly as
+// given) is the safe choice here — same as an unrecognized host.
+function hasQuery(url: URL): boolean {
+  return url.search.length > 0
+}
+
 function detectCloudinary(url: URL): Detection | null {
-  if (url.hostname !== 'res.cloudinary.com') return null
+  if (url.hostname !== 'res.cloudinary.com' || hasQuery(url)) return null
   // /{cloudName}/{image|video|raw}/upload/{assetPath} — the shape of a raw,
   // not-yet-transformed asset URL. A URL with transformations already baked
   // in (extra segments before the resource type) won't match.
@@ -32,17 +43,17 @@ function detectCloudinary(url: URL): Detection | null {
 }
 
 function detectImgix(url: URL): Detection | null {
-  if (!url.hostname.endsWith('.imgix.net')) return null
+  if (!url.hostname.endsWith('.imgix.net') || hasQuery(url)) return null
   return { adapter: imgix(`${url.protocol}//${url.hostname}`), assetPath: url.pathname }
 }
 
 function detectBunny(url: URL): Detection | null {
-  if (!url.hostname.endsWith('.b-cdn.net')) return null
+  if (!url.hostname.endsWith('.b-cdn.net') || hasQuery(url)) return null
   return { adapter: bunny(`${url.protocol}//${url.hostname}`), assetPath: url.pathname }
 }
 
 function detectImageKit(url: URL): Detection | null {
-  if (url.hostname !== 'ik.imagekit.io') return null
+  if (url.hostname !== 'ik.imagekit.io' || hasQuery(url)) return null
   // First path segment is the ImageKit account ID — baked into the adapter's
   // base URL, same as constructing it by hand.
   const segments = url.pathname.split('/').filter(Boolean)
@@ -55,7 +66,7 @@ function detectImageKit(url: URL): Detection | null {
 }
 
 function detectSanity(url: URL): Detection | null {
-  if (url.hostname !== 'cdn.sanity.io') return null
+  if (url.hostname !== 'cdn.sanity.io' || hasQuery(url)) return null
   // /images/{projectId}/{dataset}/{assetPath}
   const segments = url.pathname.split('/').filter(Boolean)
   if (segments.length < 4 || segments[0] !== 'images') return null
@@ -76,7 +87,7 @@ function detectContentful(url: URL): Detection | null {
 }
 
 function detectGumlet(url: URL): Detection | null {
-  if (!url.hostname.endsWith('.gumlet.io')) return null
+  if (!url.hostname.endsWith('.gumlet.io') || hasQuery(url)) return null
   return { adapter: gumlet(`${url.protocol}//${url.hostname}`), assetPath: url.pathname }
 }
 

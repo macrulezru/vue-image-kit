@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { mkdtempSync, mkdirSync, rmSync, existsSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, existsSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
@@ -135,6 +135,31 @@ describe('generate() — incremental mode', () => {
     log.restore()
 
     expect(existsSync(join(config.output, '.vik-incremental.json'))).toBe(true)
+
+    cleanupDir(dir)
+  })
+
+  it('reprocesses a source when one of its cached output files was deleted from disk', async () => {
+    const { dir, output, config } = await setup()
+    await generate(config)
+
+    const outputFiles = readdirSync(output).filter((f) => f.endsWith('.jpg'))
+    expect(outputFiles.length).toBeGreaterThan(0)
+    const deletedFile = join(output, outputFiles[0]!)
+    rmSync(deletedFile, { force: true })
+    expect(existsSync(deletedFile)).toBe(false)
+
+    const log = captureLog()
+    await generate(config)
+    // Not trusted as "unchanged" — the .vik-incremental.json entry still
+    // matches the source's mtime/hash, but one of the output files it
+    // promised no longer exists, so it must be regenerated instead of
+    // silently skipped.
+    expect(log.text()).toContain('[vue-image-kit] photo')
+    expect(log.text()).not.toContain('unchanged, skipped')
+    log.restore()
+
+    expect(existsSync(deletedFile)).toBe(true)
 
     cleanupDir(dir)
   })
