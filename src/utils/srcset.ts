@@ -8,6 +8,32 @@ export function generateSizes(sizes?: string): string {
 }
 
 /**
+ * Picks the URL with the smallest `w` descriptor out of a `srcset` string —
+ * used to downgrade to the lightest available candidate on save-data
+ * connections. Returns `undefined` for an empty/unparseable string or one
+ * with no width (`w`) descriptors (e.g. a density-only `1x`/`2x` srcset).
+ *
+ * @example
+ * pickSmallestSrcsetUrl('/a-400.jpg 400w, /a-800.jpg 800w, /a-1200.jpg 1200w')
+ * // → '/a-400.jpg'
+ */
+export function pickSmallestSrcsetUrl(srcset: string): string | undefined {
+  let smallestUrl: string | undefined
+  let smallestWidth = Infinity
+
+  for (const entry of srcset.split(',')) {
+    const [url, descriptor] = entry.trim().split(/\s+/)
+    if (!url || !descriptor?.endsWith('w')) continue
+    const width = parseInt(descriptor, 10)
+    if (isNaN(width) || width >= smallestWidth) continue
+    smallestWidth = width
+    smallestUrl = url
+  }
+
+  return smallestUrl
+}
+
+/**
  * Builds a density-descriptor srcset (`1x`, `2x`, …) for fixed-size images —
  * icons, avatars, logos — where width-based candidates don't apply.
  *

@@ -29,19 +29,31 @@
  *
  * For typed `?vik` / `?thumbhash` imports add to a `.d.ts` in your project:
  *   /// <reference types="vue-image-kit/vite/client" />
+ *
+ * 3. **On-demand dev serving** (opt-in via `dev.onDemand`) — mounts the
+ *    `vue-image-kit/server` handler as dev-server middleware, so images
+ *    resize on request during `vite dev` without a batch `generate()` run.
+ *    Never active during `vite build` (`configureServer` is a dev-only hook).
  */
 import type { Plugin } from 'vite'
 import type { CliConfig, ManifestEntry } from '../cli/types.js'
 import { mergeConfig, DEFAULTS, loadConfig } from '../cli/config.js'
-import { generate, processImage, computeThumbhash } from '../cli/processor.js'
+import { generate, processImage, computeThumbhash, SUPPORTED_EXTS } from '../cli/processor.js'
 import { buildEntry } from '../cli/manifest.js'
+import { createImageHandler } from '../server/handler.js'
+import type { ImageHandlerOptions } from '../server/handler.js'
 
-export type VitePluginOptions = Partial<CliConfig>
+export interface OnDemandDevOptions extends Pick<ImageHandlerOptions, 'cacheDir' | 'maxAge' | 'allowedWidths' | 'maxWidth'> {
+  /** Mount the on-demand resize handler during `vite dev`. Default: false. */
+  onDemand?: boolean
+  /** Route to mount it at. Default: '/_vik/image'. */
+  route?: string
+}
+
+export type VitePluginOptions = Partial<CliConfig> & { dev?: OnDemandDevOptions }
 
 /** Metadata returned by a `?vik` import. */
 export type VikImageMeta = ManifestEntry
-
-const SUPPORTED_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.tiff', '.tif'])
 
 export type ImageRequestType = 'vik' | 'thumbhash'
 
@@ -76,11 +88,22 @@ export function parseImageRequest(id: string): ImageRequest | null {
 
 export function vueImageKit(options: VitePluginOptions = {}): Plugin {
   let resolved: CliConfig | null = null
+  let isDev = false
 
   async function ensureConfig(): Promise<CliConfig> {
     if (!resolved) {
       const fileConfig = await loadConfig()
       resolved = mergeConfig(DEFAULTS, fileConfig, options)
+
+      // `vite dev` re-runs generate() on every buildStart/handleHotUpdate —
+      // incremental pays for itself there even if the user never asked for
+      // it. A one-shot `vite build` stays non-incremental by default (safer
+      // for a deploy artifact — no risk of a stale cache landing in it)
+      // unless requested. An explicit `incremental` (plugin options or
+      // config file) always wins either way.
+      if (isDev && options.incremental === undefined && fileConfig.incremental === undefined) {
+        resolved.incremental = true
+      }
     }
     return resolved
   }
@@ -89,8 +112,29 @@ export function vueImageKit(options: VitePluginOptions = {}): Plugin {
     name: 'vue-image-kit',
     enforce: 'pre',
 
+    configResolved(config) {
+      isDev = config.command === 'serve'
+    },
+
     async buildStart() {
       await generate(await ensureConfig())
+    },
+
+    configureServer(server) {
+      if (!options.dev?.onDemand) return
+
+      const route = options.dev.route ?? '/_vik/image'
+      const handler = createImageHandler({
+        root: server.config.root,
+        ...(options.dev.cacheDir !== undefined ? { cacheDir: options.dev.cacheDir } : {}),
+        ...(options.dev.maxAge !== undefined ? { maxAge: options.dev.maxAge } : {}),
+        ...(options.dev.allowedWidths !== undefined ? { allowedWidths: options.dev.allowedWidths } : {}),
+        ...(options.dev.maxWidth !== undefined ? { maxWidth: options.dev.maxWidth } : {}),
+      })
+
+      server.middlewares.use(route, (req, res, next) => {
+        handler(req, res).catch(next)
+      })
     },
 
     async resolveId(id, importer) {

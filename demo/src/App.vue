@@ -10,6 +10,7 @@ const tabs = [
   { id: 'density', label: 'Density 1x/2x/3x', icon: '🔬' },
   { id: 'responsive', label: 'Responsive sources', icon: '📱' },
   { id: 'focal', label: 'Focal point', icon: '🎯' },
+  { id: 'layout', label: 'Layout & priority', icon: '📦' },
   { id: 'lazyload', label: 'Lazy Load', icon: '👁' },
   { id: 'directive', label: 'v-lazy-img', icon: '🪄' },
   { id: 'background', label: 'Background image', icon: '🖌' },
@@ -30,6 +31,7 @@ const TabSrcset = defineAsyncComponent(() => import('./tabs/TabSrcset.vue'))
 const TabDensity = defineAsyncComponent(() => import('./tabs/TabDensity.vue'))
 const TabResponsive = defineAsyncComponent(() => import('./tabs/TabResponsive.vue'))
 const TabFocal = defineAsyncComponent(() => import('./tabs/TabFocal.vue'))
+const TabLayout = defineAsyncComponent(() => import('./tabs/TabLayout.vue'))
 const TabLazyLoad = defineAsyncComponent(() => import('./tabs/TabLazyLoad.vue'))
 const TabDirective = defineAsyncComponent(() => import('./tabs/TabDirective.vue'))
 const TabBackground = defineAsyncComponent(() => import('./tabs/TabBackground.vue'))
@@ -48,6 +50,7 @@ const components: Record<string, ReturnType<typeof defineAsyncComponent>> = {
   density: TabDensity,
   responsive: TabResponsive,
   focal: TabFocal,
+  layout: TabLayout,
   lazyload: TabLazyLoad,
   directive: TabDirective,
   background: TabBackground,

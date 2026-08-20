@@ -13,7 +13,7 @@ beforeEach(() => {
   observerInstance = null
   clearObserverPool()
 
-  const MockIO = vi.fn((callback: IOCallback, _options?: IntersectionObserverInit) => {
+  const MockIO = vi.fn((callback: IOCallback) => {
     const instance: IOInstance = {
       observe: vi.fn(),
       disconnect: vi.fn(),

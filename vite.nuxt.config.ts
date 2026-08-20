@@ -19,13 +19,17 @@ export default defineConfig({
       entry: {
         module: resolve(__dirname, 'src/nuxt/module.ts'),
         'runtime/plugin': resolve(__dirname, 'src/nuxt/runtime/plugin.ts'),
+        'runtime/server-handler': resolve(__dirname, 'src/nuxt/runtime/server-handler.ts'),
       },
       formats: ['es'],
     },
     outDir: 'dist/nuxt',
     emptyOutDir: true,
     rollupOptions: {
-      external: ['@nuxt/kit', '#app', 'vue', 'vue-image-kit'],
+      // module.ts and runtime/server-handler.ts are Node-only (module setup
+      // runs during Nuxt's own build; the server handler runs in Nitro) —
+      // node builtins must stay external, not get browser-externalized.
+      external: ['@nuxt/kit', '#app', '#imports', 'vue', 'vue-image-kit', 'sharp', /^node:/],
       output: { exports: 'named' },
     },
     minify: false,

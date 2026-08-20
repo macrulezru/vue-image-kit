@@ -7,15 +7,18 @@ const makeImage = (name: string): ProcessedImage => ({
   srcAbsPath: `/src/${name}.jpg`,
   originalWidth: 1200,
   originalHeight: 800,
+  originalFormat: 'jpg',
+  originalSizeBytes: 245_300,
   variants: [
-    { absPath: `/out/${name}-400.jpg`, url: `/images/${name}-400.jpg`, width: 400,  format: 'jpg'  },
-    { absPath: `/out/${name}-800.jpg`, url: `/images/${name}-800.jpg`, width: 800,  format: 'jpg'  },
-    { absPath: `/out/${name}.jpg`,     url: `/images/${name}.jpg`,     width: 1200, format: 'jpg'  },
-    { absPath: `/out/${name}.webp`,    url: `/images/${name}.webp`,    width: 1200, format: 'webp' },
-    { absPath: `/out/${name}.avif`,    url: `/images/${name}.avif`,    width: 1200, format: 'avif' },
+    { absPath: `/out/${name}-400.jpg`, url: `/images/${name}-400.jpg`, width: 400,  height: 267, format: 'jpg',  sizeBytes: 52_100,  skipped: false },
+    { absPath: `/out/${name}-800.jpg`, url: `/images/${name}-800.jpg`, width: 800,  height: 533, format: 'jpg',  sizeBytes: 118_400, skipped: false },
+    { absPath: `/out/${name}.jpg`,     url: `/images/${name}.jpg`,     width: 1200, height: 800, format: 'jpg',  sizeBytes: 198_200, skipped: false },
+    { absPath: `/out/${name}.webp`,    url: `/images/${name}.webp`,    width: 1200, height: 800, format: 'webp', sizeBytes: 112_900, skipped: false },
+    { absPath: `/out/${name}.avif`,    url: `/images/${name}.avif`,    width: 1200, height: 800, format: 'avif', sizeBytes: 79_600,  skipped: false },
   ],
   placeholder: 'data:image/jpeg;base64,/9j/abc',
   blurhash: 'LEHV6nWB2yk8pyo0',
+  thumbhash: '',
 })
 
 describe('generateManifestContent', () => {

@@ -7,7 +7,7 @@ import globals from 'globals'
 export default tseslint.config(
   // Global ignores
   {
-    ignores: ['dist/**', 'node_modules/**', 'demo/**', 'coverage/**'],
+    ignores: ['dist/**', 'node_modules/**', 'demo/**', 'demo-nuxt/**', 'coverage/**'],
   },
 
   // Base JS rules
@@ -36,13 +36,25 @@ export default tseslint.config(
 
   // Test files
   {
-    files: ['src/__tests__/**/*.ts'],
+    files: ['test/**/*.ts'],
     languageOptions: {
       globals: { ...globals.browser, ...globals.node },
     },
     rules: {
       'vue/one-component-per-file': 'off',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+    },
+  },
+
+  // Node/CommonJS build scripts
+  {
+    files: ['scripts/**/*.cjs'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: { ...globals.node },
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
     },
   },
 
@@ -57,6 +69,15 @@ export default tseslint.config(
       'vue/require-default-prop': 'off',
       '@typescript-eslint/no-floating-promises': 'off',
       'no-console': ['warn', { allow: ['warn', 'error'] }],
+    },
+  },
+
+  // CLI: console output is the product, not debug noise — must come after the
+  // project-wide override above so it wins for files under src/cli/**
+  {
+    files: ['src/cli/**/*.ts'],
+    rules: {
+      'no-console': 'off',
     },
   },
 

@@ -6,7 +6,7 @@ declare module '#app' {
   }
 
   interface RuntimeConfig {
-    public: Record<string, any>
+    public: Record<string, unknown>
   }
 
   export function defineNuxtPlugin(fn: (nuxtApp: NuxtApp) => void): (nuxtApp: NuxtApp) => void

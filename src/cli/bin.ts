@@ -31,6 +31,8 @@ Options:
   --skip-existing      Skip files that already exist
   --concurrency <n>    Parallel workers (default: 4)
   --watch              Watch input dir and regenerate on change
+  --incremental        Skip reprocessing unchanged sources (auto-enabled under --watch)
+  --no-incremental     Disable incremental mode even under --watch
   --help               Show this help
 
 Examples:
@@ -62,6 +64,8 @@ function parseCliArgs(): Partial<CliConfig> {
       'skip-existing': { type: 'boolean', default: false },
       concurrency:  { type: 'string' },
       watch:        { type: 'boolean', default: false },
+      incremental:  { type: 'boolean' },
+      'no-incremental': { type: 'boolean', default: false },
       help:         { type: 'boolean', default: false },
     },
   })
@@ -91,6 +95,9 @@ function parseCliArgs(): Partial<CliConfig> {
 
   if (values['no-thumbhash']) result.thumbhash = false
   else if (values.thumbhash != null) result.thumbhash = values.thumbhash
+
+  if (values['no-incremental']) result.incremental = false
+  else if (values.incremental != null) result.incremental = values.incremental
 
   if (values.widths) {
     result.widths = values.widths.split(',').map((w) => {
@@ -140,6 +147,14 @@ async function main() {
 
     const fileConfig = await loadConfig()
     const config = mergeConfig(DEFAULTS, fileConfig, cliArgs)
+
+    // --watch means "run generate() repeatedly" — incremental pays for
+    // itself there even if the user never asked for it. A one-shot
+    // `generate` stays non-incremental unless requested: an explicit
+    // --incremental/--no-incremental (CLI flag or config file) always wins.
+    if (config.watch && cliArgs.incremental === undefined && fileConfig.incremental === undefined) {
+      config.incremental = true
+    }
 
     try {
       if (config.watch) {

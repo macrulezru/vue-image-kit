@@ -1,6 +1,6 @@
 {
   "name": "@macrulez/vue-image-kit",
-  "version": "1.0.6",
+  "version": "1.1.0",
   "description": "Vue 3 image optimization — lazy loading, WebP/AVIF, srcset, Blurhash/LQIP placeholders, CDN adapters and a CLI, with zero runtime dependencies.",
   "author": "macrulez <macrulezru@gmail.com> (https://macrulez.ru/en)",
   "license": "MIT",
@@ -45,6 +45,11 @@
     },
     "./vite/client": {
       "types": "./dist/vite/client.d.ts"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js",
+      "require": "./dist/server/index.cjs"
     }
   },
   "sideEffects": false,
@@ -60,18 +65,25 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vite build && npm run build:cdn && npm run build:nuxt && npm run build:cli && npm run build:vite",
+    "build": "vite build && npm run build:cdn && npm run build:nuxt && npm run build:cli && npm run build:vite && npm run build:server",
     "build:cdn": "vite build --config vite.cdn.config.ts",
     "build:nuxt": "vite build --config vite.nuxt.config.ts",
     "build:cli": "tsc -p tsconfig.cli.json && node scripts/fix-cli-shebang.cjs",
     "build:vite": "vite build --config vite.plugin.config.ts",
+    "build:server": "vite build --config vite.server.config.ts",
+    "check:size": "node scripts/check-bundle-size.cjs",
     "demo": "cd demo && npm install && npm run dev",
     "demo:dev": "cd demo && npm run dev",
     "demo:build": "cd demo && npm run build",
+    "demo:nuxt": "cd demo-nuxt && npm install && npm run dev",
+    "demo:nuxt:dev": "cd demo-nuxt && npm run dev",
+    "demo:nuxt:build": "cd demo-nuxt && npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.cli.json --noEmit",
+    "pretest:e2e": "cd demo && npm install",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.cli.json --noEmit && tsc -p tsconfig.nuxt.json --noEmit && tsc -p tsconfig.vite.json --noEmit && tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.e2e.json",
     "prepublishOnly": "npm run build",
     "lint": "eslint . --ext .vue,.js,.jsx,.ts,.tsx --fix",
     "format": "prettier --write src/",
@@ -108,6 +120,7 @@
     "@eslint/js": "^10.0.1",
     "@nuxt/kit": "^4.4.6",
     "@nuxt/schema": "^4.4.6",
+    "@playwright/test": "^1.62.1",
     "@types/node": "^25.9.1",
     "@vitejs/plugin-vue": "^5.0.0",
     "@vitest/coverage-v8": "^1.6.1",

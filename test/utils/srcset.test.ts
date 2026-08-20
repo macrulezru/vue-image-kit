@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generateSrcset, generateSizes, generateDensitySrcset, buildSizes, generatePreloadLink } from '../../src/utils/srcset'
+import { generateSrcset, generateSizes, generateDensitySrcset, buildSizes, generatePreloadLink, pickSmallestSrcsetUrl } from '../../src/utils/srcset'
 
 describe('generateSrcset', () => {
   it('generates srcset string from widths array', () => {
@@ -133,5 +133,27 @@ describe('generatePreloadLink', () => {
     expect(link).toContain('imagesrcset=')
     expect(link).toContain('imagesizes="100vw"')
     expect(link).toContain('type="image/jpeg"')
+  })
+})
+
+describe('pickSmallestSrcsetUrl', () => {
+  it('picks the URL with the smallest w descriptor', () => {
+    expect(pickSmallestSrcsetUrl('/a-400.jpg 400w, /a-800.jpg 800w, /a-1200.jpg 1200w')).toBe('/a-400.jpg')
+  })
+
+  it('is order-independent', () => {
+    expect(pickSmallestSrcsetUrl('/a-1200.jpg 1200w, /a-400.jpg 400w, /a-800.jpg 800w')).toBe('/a-400.jpg')
+  })
+
+  it('returns undefined for an empty string', () => {
+    expect(pickSmallestSrcsetUrl('')).toBeUndefined()
+  })
+
+  it('returns undefined for a density-only (x) srcset', () => {
+    expect(pickSmallestSrcsetUrl('/a.png 1x, /a@2x.png 2x')).toBeUndefined()
+  })
+
+  it('ignores malformed entries and still finds the smallest valid one', () => {
+    expect(pickSmallestSrcsetUrl('garbage, /a-400.jpg 400w')).toBe('/a-400.jpg')
   })
 })

@@ -8,6 +8,42 @@ function buildSrcset(image: ProcessedImage): string {
 }
 
 export function buildEntry(image: ProcessedImage, widths: number[]): ManifestEntry {
+  // SVG passthrough — a single vector variant; no responsive/format variants apply.
+  const svgVariant = image.variants.find((v) => v.format === 'svg')
+  if (svgVariant) {
+    return {
+      name: image.name,
+      src: svgVariant.url,
+      srcset: '',
+      webp: '',
+      avif: '',
+      width: image.originalWidth,
+      height: image.originalHeight,
+      placeholder: '',
+      blurhash: '',
+      thumbhash: '',
+    }
+  }
+
+  // Animated GIF — original copied through as `src`, optional animated WebP
+  // re-encode as `webp`. No srcset/avif (see buildGifVariants for why).
+  const gifVariant = image.variants.find((v) => v.format === 'gif')
+  if (gifVariant) {
+    const webpVariant = image.variants.find((v) => v.format === 'webp')
+    return {
+      name: image.name,
+      src: gifVariant.url,
+      srcset: '',
+      webp: webpVariant?.url ?? '',
+      avif: '',
+      width: image.originalWidth,
+      height: image.originalHeight,
+      placeholder: image.placeholder,
+      blurhash: image.blurhash,
+      thumbhash: image.thumbhash,
+    }
+  }
+
   const jpgByWidth = new Map(
     image.variants.filter((v) => v.format === 'jpg').map((v) => [v.width, v.url]),
   )
