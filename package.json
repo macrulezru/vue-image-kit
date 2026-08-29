@@ -1,10 +1,10 @@
 {
   "name": "@macrulez/vue-image-kit",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Vue 3 image optimization — lazy loading, WebP/AVIF, srcset, Blurhash/LQIP placeholders, CDN adapters and a CLI, with zero runtime dependencies.",
   "author": "macrulez <macrulezru@gmail.com> (https://macrulez.ru/en)",
   "license": "MIT",
-  "homepage": "https://github.com/macrulezru/vue-image-kit#readme",
+  "homepage": "https://npm.vuecraft.ru/en/packages/vue-image-kit/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/macrulezru/vue-image-kit.git"
