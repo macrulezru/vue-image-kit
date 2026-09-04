@@ -1,6 +1,6 @@
 import { defineNuxtPlugin, useRuntimeConfig } from '#app'
-import { VImageKitPlugin } from 'vue-image-kit'
-import type { BreakpointMap } from 'vue-image-kit'
+import { VImageKitPlugin } from '@macrulez/vue-image-kit'
+import type { BreakpointMap } from '@macrulez/vue-image-kit'
 
 export default defineNuxtPlugin((nuxtApp) => {
   const config = useRuntimeConfig()

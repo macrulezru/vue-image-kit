@@ -8,8 +8,9 @@ export default defineConfig({
       include: ['src/nuxt/**/*.ts', 'src/nuxt/**/*.d.ts'],
       outDir: 'dist/nuxt',
       // Pin the root so declarations land flat in dist/nuxt to match the
-      // package "./nuxt" types export (the module imports 'vue-image-kit',
-      // which would otherwise push the inferred root up a level).
+      // package "./nuxt" types export (the module imports
+      // '@macrulez/vue-image-kit', which would otherwise push the inferred
+      // root up a level).
       entryRoot: 'src/nuxt',
       tsconfigPath: './tsconfig.nuxt.json',
     }),
@@ -29,7 +30,7 @@ export default defineConfig({
       // module.ts and runtime/server-handler.ts are Node-only (module setup
       // runs during Nuxt's own build; the server handler runs in Nitro) —
       // node builtins must stay external, not get browser-externalized.
-      external: ['@nuxt/kit', '#app', '#imports', 'vue', 'vue-image-kit', 'sharp', /^node:/],
+      external: ['@nuxt/kit', '#app', '#imports', 'vue', '@macrulez/vue-image-kit', 'sharp', /^node:/],
       output: { exports: 'named' },
     },
     minify: false,

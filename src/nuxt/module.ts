@@ -157,6 +157,6 @@ export default defineNuxtModule<ModuleOptions>({
     // value export doesn't cost anything for the (common) case where most of
     // them are never used — tree-shaking still removes what's unreferenced,
     // exactly as if the consumer had written the import by hand.
-    addImports(AUTO_IMPORT_NAMES.map((name) => ({ name, from: 'vue-image-kit' })))
+    addImports(AUTO_IMPORT_NAMES.map((name) => ({ name, from: '@macrulez/vue-image-kit' })))
   },
 })
