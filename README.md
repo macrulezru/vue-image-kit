@@ -104,7 +104,7 @@ Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe —
 ## Installation
 
 ```bash
-npm install vue-image-kit
+npm install @macrulez/vue-image-kit
 ```
 
 Peer dependency:
@@ -122,7 +122,7 @@ npm install vue@>=3.0
 ```ts
 // main.ts
 import { createApp } from 'vue'
-import { VImageKitPlugin } from 'vue-image-kit'
+import { VImageKitPlugin } from '@macrulez/vue-image-kit'
 import App from './App.vue'
 
 const app = createApp(App)
@@ -150,7 +150,7 @@ app.mount('#app')
 
 ```vue
 <script setup lang="ts">
-import { VImage } from 'vue-image-kit'
+import { VImage } from '@macrulez/vue-image-kit'
 </script>
 
 <template>
@@ -167,7 +167,7 @@ import { VImage } from 'vue-image-kit'
 ```ts
 // nuxt.config.ts
 export default defineNuxtConfig({
-  modules: ['vue-image-kit/nuxt'],
+  modules: ['@macrulez/vue-image-kit/nuxt'],
   vueImageKit: {
     breakpoints: {
       sm: '(max-width: 640px)',
@@ -465,7 +465,7 @@ idle  →  loading  →  loaded
 ```vue
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useImage } from 'vue-image-kit'
+import { useImage } from '@macrulez/vue-image-kit'
 
 const containerRef = ref<HTMLElement | null>(null)
 
@@ -555,7 +555,7 @@ The directive is registered automatically with `VImageKitPlugin`. To register it
 
 ```vue
 <script setup lang="ts">
-import { vLazyImg } from 'vue-image-kit'
+import { vLazyImg } from '@macrulez/vue-image-kit'
 </script>
 
 <template>
@@ -566,7 +566,7 @@ import { vLazyImg } from 'vue-image-kit'
 Or globally without the plugin:
 
 ```ts
-import { vLazyImg } from 'vue-image-kit'
+import { vLazyImg } from '@macrulez/vue-image-kit'
 
 app.directive('lazy-img', vLazyImg)
 ```
@@ -575,7 +575,7 @@ app.directive('lazy-img', vLazyImg)
 
 ```vue
 <script setup lang="ts">
-import { vLazyImg } from 'vue-image-kit'
+import { vLazyImg } from '@macrulez/vue-image-kit'
 
 const cards = [
   { id: 1, bg: '/card-1.jpg', placeholder: 'data:image/jpeg;base64,/9j/...' },
@@ -611,7 +611,7 @@ The `v-lazy-img` directive lazy-loads a background but can't do `srcset`. `useBa
 
 ```vue
 <script setup lang="ts">
-import { useBackgroundImage } from 'vue-image-kit'
+import { useBackgroundImage } from '@macrulez/vue-image-kit'
 
 const { target, style, isLoaded } = useBackgroundImage('/hero.jpg', {
   placeholder: 'data:image/jpeg;base64,/9j/...',
@@ -668,7 +668,7 @@ VImage decodes the hash automatically and uses it as a blur-up placeholder. No m
 **Using the decoder directly** (for custom markup or `v-lazy-img`):
 
 ```ts
-import { decodeThumbHash } from 'vue-image-kit'
+import { decodeThumbHash } from '@macrulez/vue-image-kit'
 
 const dataUrl = decodeThumbHash('3OcRJYB4d3h/iIeHeEh3eIhw+j5n')
 // → 'data:image/png;base64,...'
@@ -677,7 +677,7 @@ const dataUrl = decodeThumbHash('3OcRJYB4d3h/iIeHeEh3eIhw+j5n')
 **Average color — the cheapest placeholder of all** (decoded from the header, no pixels):
 
 ```ts
-import { thumbHashToAverageRGBA, thumbHashToAverageColor } from 'vue-image-kit'
+import { thumbHashToAverageRGBA, thumbHashToAverageColor } from '@macrulez/vue-image-kit'
 
 thumbHashToAverageRGBA('3OcRJYB4d3h/iIeHeEh3eIhw+j5n')
 // → { r, g, b, a }  (each channel 0–1)
@@ -759,7 +759,7 @@ Pass `blurhash` together with `width` and `height` to enable the canvas placehol
 **Using the decoder directly:**
 
 ```ts
-import { decodeBlurhash } from 'vue-image-kit'
+import { decodeBlurhash } from '@macrulez/vue-image-kit'
 
 const pixels = decodeBlurhash('LEHV6nWB2yk8pyo0adR*.7kCMdnj', 32, 32)
 // pixels: Uint8ClampedArray<ArrayBuffer> — RGBA, row-major
@@ -815,7 +815,7 @@ const lqip = `data:image/jpeg;base64,${buffer.toString('base64')}`
 When a user uploads a photo, encode a placeholder **in the browser** so you can show a blur-up preview instantly — before the full image is uploaded or processed. Both encoders are dependency-free (the ThumbHash encoder is a faithful port of the reference, byte-identical to the `thumbhash` package) and accept a `File`/`Blob`, `HTMLImageElement`, `HTMLCanvasElement`, `ImageBitmap`, or `ImageData`.
 
 ```ts
-import { encodeThumbHash, encodeBlurhash, decodeThumbHash } from 'vue-image-kit'
+import { encodeThumbHash, encodeBlurhash, decodeThumbHash } from '@macrulez/vue-image-kit'
 
 async function onFileSelected(file: File) {
   const thumbhash = await encodeThumbHash(file)
@@ -836,7 +836,7 @@ The source is downscaled to `maxSize` on its longest edge before encoding (a Thu
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue'
-import { encodeThumbHash } from 'vue-image-kit'
+import { encodeThumbHash } from '@macrulez/vue-image-kit'
 
 const hash = ref('')
 async function handleUpload(e: Event) {
@@ -906,7 +906,7 @@ For fixed-size images — icons, avatars, logos — use `densities` instead of `
 **Using the utilities directly:**
 
 ```ts
-import { generateSrcset, generateSizes, generateDensitySrcset } from 'vue-image-kit'
+import { generateSrcset, generateSizes, generateDensitySrcset } from '@macrulez/vue-image-kit'
 
 generateSrcset('/photo.jpg', [400, 800, 1200])
 // → '/photo.jpg 400w, /photo.jpg 800w, /photo.jpg 1200w'
@@ -1178,7 +1178,7 @@ Register `<VImage>` and `v-lazy-img` globally with a single `app.use()` call:
 
 ```ts
 import { createApp } from 'vue'
-import { VImageKitPlugin } from 'vue-image-kit'
+import { VImageKitPlugin } from '@macrulez/vue-image-kit'
 import App from './App.vue'
 
 const app = createApp(App)
@@ -1204,7 +1204,7 @@ import {
   decodeBlurhash,   // standalone decoder
   generateSrcset,   // srcset utility
   generateSizes,    // sizes utility
-} from 'vue-image-kit'
+} from '@macrulez/vue-image-kit'
 ```
 
 ---
@@ -1219,14 +1219,14 @@ import type {
   SrcSet,           // { avif?: string; webp?: string; fallback: string }
   ResponsiveSrc,    // Record<string, string | SrcSet> — breakpoint-key → URL, or a format set for that breakpoint
   BreakpointMap,    // Record<string, string> — breakpoint-key → CSS media query
-  VImageKitOptions, // { breakpoints?: BreakpointMap }
+  VImageKitOptions, // { breakpoints?: BreakpointMap; serverRoute?: string }
   LazyImgOptions,   // { src, placeholder?, rootMargin?, threshold?, onLoad?, onError? }
   ObjectFit,        // 'cover' | 'contain' | 'fill' | 'none' | 'scale-down'
   FocalPoint,       // { x: number; y: number } — fractions 0–1
   Densities,        // number[] | Record<number, string> — density descriptors
   ImageMeta,        // CLI manifest entry / `?vik` import shape, for the `image` prop
   Layout,           // 'fixed' | 'responsive' | 'fill' — the `layout` prop
-} from 'vue-image-kit'
+} from '@macrulez/vue-image-kit'
 ```
 
 ### `ImageStatus`
@@ -1265,7 +1265,7 @@ The `v-lazy-img` directive accepts either a plain `string` (the `src`) or a `Laz
 ### Working with typed options in v-lazy-img
 
 ```ts
-import type { LazyImgOptions } from 'vue-image-kit'
+import type { LazyImgOptions } from '@macrulez/vue-image-kit'
 
 const bgOptions: LazyImgOptions = {
   src: '/hero.jpg',
@@ -1550,7 +1550,7 @@ Vite plugin option) always overrides the automatic default either way.
 import {
   cloudinary, imgix, bunny, sanity, storyblok, contentful, vercel,
   cloudflare, imagekit, twicpics, netlify, gumlet,
-} from 'vue-image-kit/cdn'
+} from '@macrulez/vue-image-kit/cdn'
 ```
 
 All adapters share the same interface:
@@ -1578,7 +1578,7 @@ cdn.srcset('photo.jpg', [400, 800, 1200])
 const cdn = imgix('https://mysite.imgix.net')
 
 cdn.url('photo.jpg', { width: 800, dpr: 2 })
-// → https://mysite.imgix.net/photo.jpg?w=800&dpr=2&auto=format
+// → https://mysite.imgix.net/photo.jpg?w=800&auto=format&dpr=2
 
 cdn.srcset('photo.jpg', [400, 800, 1200])
 ```
@@ -1659,19 +1659,15 @@ cdn.url('photo.jpg', { width: 800, format: 'webp' })
 // → https://demo.gumlet.io/photo.jpg?w=800&format=webp
 ```
 
-**Use with VImage:**
+**Use with VImage:** `VImage` has no `srcset` prop — `srcset` is always generated internally from `widths`/`densities`/`image`. To drive it through a CDN adapter, use the `cdn` prop (see [Auto CDN detection with VImage](#auto-cdn-detection-with-vimage) below) so the component calls `.srcset()` for you:
 
 ```vue
-<script setup lang="ts">
-import { cloudinary } from 'vue-image-kit/cdn'
-const cdn = cloudinary({ cloudName: 'my-cloud' })
-</script>
-
 <template>
   <VImage
-    src="/photo.jpg"
+    src="https://res.cloudinary.com/my-cloud/image/upload/photo.jpg"
     alt="Photo"
-    :srcset="cdn.srcset('/photo.jpg', [400, 800, 1200])"
+    cdn
+    :widths="[400, 800, 1200]"
     sizes="(max-width: 768px) 100vw, 50vw"
   />
 </template>
@@ -1687,7 +1683,7 @@ Bunny, ImageKit, Sanity, Storyblok, Contentful, Gumlet. Returns the URL
 unconditionally — a local `/images/photo.jpg` just passes through.
 
 ```ts
-import { autoLoader } from 'vue-image-kit/cdn'
+import { autoLoader } from '@macrulez/vue-image-kit/cdn'
 
 autoLoader('https://res.cloudinary.com/demo/image/upload/photo.jpg', { width: 800 })
 // → https://res.cloudinary.com/demo/w_800,q_auto,f_auto/image/upload/photo.jpg
@@ -1702,7 +1698,7 @@ fingerprint — pass them explicitly via `config.hosts`, keyed by your actual
 domain:
 
 ```ts
-import { autoLoader, netlify } from 'vue-image-kit/cdn'
+import { autoLoader, netlify } from '@macrulez/vue-image-kit/cdn'
 
 autoLoader(src, { width: 800 }, {
   hosts: { 'myapp.netlify.app': netlify({ origin: 'https://myapp.netlify.app' }) },
@@ -1716,7 +1712,7 @@ input unchanged when nothing is detected, since there's no sensible
 "unchanged srcset" to fall back to:
 
 ```ts
-import { autoSrcset } from 'vue-image-kit/cdn'
+import { autoSrcset } from '@macrulez/vue-image-kit/cdn'
 
 autoSrcset('https://mysite.imgix.net/photo.jpg', [400, 800, 1200])
 // → 'https://mysite.imgix.net/photo.jpg?w=400&auto=format 400w, ...'
@@ -1751,7 +1747,7 @@ domain" providers (Netlify/Vercel/Cloudflare/TwicPics) via `hosts`, same as
 
 ```vue
 <script setup lang="ts">
-import { netlify } from 'vue-image-kit/cdn'
+import { netlify } from '@macrulez/vue-image-kit/cdn'
 const cdnConfig = { hosts: { 'myapp.netlify.app': netlify({ origin: 'https://myapp.netlify.app' }) } }
 </script>
 
@@ -1771,7 +1767,7 @@ format/resolution choices you made by hand.
 Build a `sizes` attribute string from a breakpoint-keyed object — works with the plugin's named breakpoints.
 
 ```ts
-import { buildSizes } from 'vue-image-kit'
+import { buildSizes } from '@macrulez/vue-image-kit'
 
 const breakpoints = { sm: '(max-width: 640px)', md: '(max-width: 1024px)' }
 
@@ -1786,7 +1782,7 @@ buildSizes({ sm: '100vw', md: '50vw', default: '33vw' }, breakpoints)
 Generate a `<link rel="preload">` HTML string for critical above-the-fold images. Use in Nuxt's `useHead` or inject into SSR `<head>` to improve LCP.
 
 ```ts
-import { generatePreloadLink, generateSrcset } from 'vue-image-kit'
+import { generatePreloadLink, generateSrcset } from '@macrulez/vue-image-kit'
 
 const srcset = generateSrcset('/hero.jpg', [400, 800, 1200])
 
@@ -1801,7 +1797,7 @@ const link = generatePreloadLink('/hero.jpg', {
 
 ```vue
 <script setup lang="ts">
-import { generatePreloadLink } from 'vue-image-kit'
+import { generatePreloadLink } from '@macrulez/vue-image-kit'
 
 useHead({
   link: [{ innerHTML: generatePreloadLink('/hero.jpg', { sizes: '100vw' }) }]
@@ -1817,7 +1813,7 @@ Preload a batch of images before navigation — useful for galleries and carouse
 
 ```vue
 <script setup lang="ts">
-import { useImagePreloader } from 'vue-image-kit'
+import { useImagePreloader } from '@macrulez/vue-image-kit'
 
 const { preload, progress, isComplete, errors } = useImagePreloader()
 
@@ -1893,7 +1889,7 @@ SSR-safe (`saveData` starts `false` on the server) and reactive to the connectio
 API) — `saveData` just stays `false` there, so nothing breaks, it simply can't help.
 
 ```ts
-import { useNetworkAware } from 'vue-image-kit'
+import { useNetworkAware } from '@macrulez/vue-image-kit'
 
 const { saveData, effectiveType } = useNetworkAware()
 ```
@@ -1925,7 +1921,7 @@ For a direct check outside a component (e.g. before kicking off a batch preload
 yourself), `isSaveDataEnabled()` is the same check without the reactive wrapper:
 
 ```ts
-import { isSaveDataEnabled } from 'vue-image-kit'
+import { isSaveDataEnabled } from '@macrulez/vue-image-kit'
 
 if (!isSaveDataEnabled()) {
   await preload(nextSlideUrls)
@@ -1981,7 +1977,7 @@ the box:
 ```ts
 // nuxt.config.ts
 export default defineNuxtConfig({
-  modules: ['vue-image-kit/nuxt'],
+  modules: ['@macrulez/vue-image-kit/nuxt'],
   vueImageKit: {
     breakpoints: {
       sm: '(max-width: 640px)',
@@ -2005,7 +2001,7 @@ file needed:
 ```ts
 // nuxt.config.ts
 export default defineNuxtConfig({
-  modules: ['vue-image-kit/nuxt'],
+  modules: ['@macrulez/vue-image-kit/nuxt'],
   vueImageKit: {
     onDemandServer: true, // root defaults to Nuxt's own `public/` dir
   },
@@ -2047,7 +2043,7 @@ Process images at build time — same as the CLI but integrated into the Vite li
 // vite.config.ts
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import { vueImageKit } from 'vue-image-kit/vite'
+import { vueImageKit } from '@macrulez/vue-image-kit/vite'
 
 export default defineConfig({
   plugins: [
@@ -2102,7 +2098,7 @@ Both re-run when the source image changes in dev. `sharp` is required; `thumbhas
 **TypeScript** — enable typed `?vik` / `?thumbhash` imports by referencing the bundled declarations once (e.g. in `env.d.ts`):
 
 ```ts
-/// <reference types="vue-image-kit/vite/client" />
+/// <reference types="@macrulez/vue-image-kit/vite/client" />
 ```
 
 ### On-demand dev serving
@@ -2136,7 +2132,7 @@ middleware above uses — a small, framework-agnostic Node request handler you
 mount yourself.
 
 ```ts
-import { createImageHandler } from 'vue-image-kit/server'
+import { createImageHandler } from '@macrulez/vue-image-kit/server'
 
 const handler = createImageHandler({ root: './public' })
 ```
@@ -2145,7 +2141,7 @@ const handler = createImageHandler({ root: './public' })
 
 ```ts
 import { createServer } from 'node:http'
-import { createImageHandler } from 'vue-image-kit/server'
+import { createImageHandler } from '@macrulez/vue-image-kit/server'
 
 const imageHandler = createImageHandler({ root: './public' })
 
@@ -2294,7 +2290,7 @@ Ships as tree-shakeable **ESM** (`vue-image-kit.js`) and **CommonJS** (`vue-imag
 ```ts
 // Only vLazyImg and its IO logic is included in the bundle.
 // VImage, useBlurhash, decodeBlurhash are not imported → not bundled.
-import { vLazyImg } from 'vue-image-kit'
+import { vLazyImg } from '@macrulez/vue-image-kit'
 app.directive('lazy-img', vLazyImg)
 ```
 

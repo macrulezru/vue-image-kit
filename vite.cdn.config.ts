@@ -7,6 +7,7 @@ export default defineConfig({
     dts({
       include: ['src/cdn/**/*.ts'],
       outDir: 'dist/cdn',
+      entryRoot: 'src/cdn',
     }),
   ],
   build: {

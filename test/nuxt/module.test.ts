@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { resolve } from 'node:path'
-import { resolveModuleConfig, DEFAULT_SERVER_ROUTE } from '../../src/nuxt/module'
+import { resolveModuleConfig, DEFAULT_SERVER_ROUTE, AUTO_IMPORT_NAMES } from '../../src/nuxt/module'
+import * as indexExports from '../../src/index'
 
 // resolveModuleConfig is the pure part of module.ts's setup() — extracted
 // specifically so it's testable without a live Nuxt/Nitro context, which
@@ -62,5 +63,36 @@ describe('resolveModuleConfig', () => {
     expect(result.serverConfig).toMatchObject({ maxAge: 3600, allowedWidths: [400, 800] })
     expect(result.serverConfig).not.toHaveProperty('cacheDir')
     expect(result.serverConfig).not.toHaveProperty('maxWidth')
+  })
+})
+
+describe('AUTO_IMPORT_NAMES', () => {
+  // VImage/vLazyImg are registered separately as a global component/directive
+  // (addPlugin), VImageKitPlugin installs itself so auto-importing it would be
+  // pointless, and the two injection-key constants are advanced escape hatches
+  // a Nuxt app using this module never needs directly.
+  const intentionallyExcluded = new Set([
+    'VImage',
+    'vLazyImg',
+    'VImageKitPlugin',
+    'default',
+    'BREAKPOINTS_KEY',
+    'SERVER_ROUTE_KEY',
+  ])
+
+  it('covers every real value export from the package root except the intentionally-excluded ones', () => {
+    const realExports = Object.keys(indexExports)
+    const covered = new Set(AUTO_IMPORT_NAMES as readonly string[])
+
+    const missing = realExports.filter(
+      (name) => !intentionallyExcluded.has(name) && !covered.has(name),
+    )
+    expect(missing).toEqual([])
+  })
+
+  it("doesn't list a name that isn't actually exported from the package root", () => {
+    const realExports = new Set(Object.keys(indexExports))
+    const stale = AUTO_IMPORT_NAMES.filter((name) => !realExports.has(name))
+    expect(stale).toEqual([])
   })
 })
