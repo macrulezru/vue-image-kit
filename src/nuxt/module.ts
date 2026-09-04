@@ -20,6 +20,40 @@ import type { BreakpointMap } from '../types'
 
 export const DEFAULT_SERVER_ROUTE = '/_vik/image'
 
+// Every public value export worth auto-importing — VImage/vLazyImg are
+// registered separately as a global component/directive (see addPlugin
+// below), VImageKitPlugin isn't meant to be auto-imported (the module
+// installs it itself), and the two injection-key constants (BREAKPOINTS_KEY/
+// SERVER_ROUTE_KEY) are advanced escape hatches nobody needs inside a Nuxt
+// app the module already wires up. Kept as its own exported constant, not
+// inlined into the addImports() call below, specifically so a test can
+// assert it stays in sync with `../index`'s real exports — this list went
+// stale once already (composables added to index.ts over time were never
+// added here) with nothing catching it.
+export const AUTO_IMPORT_NAMES = [
+  'useImage',
+  'useBlurhash',
+  'useLazyLoad',
+  'useBreakpoints',
+  'useImagePreloader',
+  'useBackgroundImage',
+  'useNetworkAware',
+  'isSaveDataEnabled',
+  'useServerRoute',
+  'generateSrcset',
+  'generateSizes',
+  'generateDensitySrcset',
+  'buildSizes',
+  'generatePreloadLink',
+  'pickSmallestSrcsetUrl',
+  'decodeBlurhash',
+  'decodeThumbHash',
+  'thumbHashToAverageRGBA',
+  'thumbHashToAverageColor',
+  'encodeBlurhash',
+  'encodeThumbHash',
+] as const
+
 export interface OnDemandServerOptions {
   /** Directory `src` is resolved (and confined) to. Default: `public` (Nuxt's own static-serve dir), resolved against the project root. */
   root?: string
@@ -116,18 +150,13 @@ export default defineNuxtModule<ModuleOptions>({
     // Register Vue plugin (registers VImage component + v-lazy-img directive)
     addPlugin(resolver.resolve('./runtime/plugin'))
 
-    // Auto-imports for composables — no explicit import needed in components
-    addImports([
-      { name: 'useImage',          from: 'vue-image-kit' },
-      { name: 'useBlurhash',       from: 'vue-image-kit' },
-      { name: 'useLazyLoad',       from: 'vue-image-kit' },
-      { name: 'useImagePreloader', from: 'vue-image-kit' },
-      { name: 'generateSrcset',    from: 'vue-image-kit' },
-      { name: 'generateSizes',     from: 'vue-image-kit' },
-      { name: 'buildSizes',        from: 'vue-image-kit' },
-      { name: 'generatePreloadLink', from: 'vue-image-kit' },
-      { name: 'decodeBlurhash',    from: 'vue-image-kit' },
-      { name: 'decodeThumbHash',   from: 'vue-image-kit' },
-    ])
+    // Auto-imports for composables and utilities — no explicit import needed
+    // in components. `addImports` is a lazy, per-file resolution table (via
+    // Nuxt's unimport): an entry here only causes an import to be injected
+    // into a file that actually references the name, so listing every public
+    // value export doesn't cost anything for the (common) case where most of
+    // them are never used — tree-shaking still removes what's unreferenced,
+    // exactly as if the consumer had written the import by hand.
+    addImports(AUTO_IMPORT_NAMES.map((name) => ({ name, from: 'vue-image-kit' })))
   },
 })
