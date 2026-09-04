@@ -128,6 +128,48 @@ export default defineNuxtConfig({
 
 `<VImage>`, `v-lazy-img`, and all composables are registered automatically — no imports needed.
 
+### More examples
+
+#### A different shot per screen, not just a different size
+
+`sources` swaps in a genuinely different image — different crop, different composition — per breakpoint. Real art direction through `<picture>`, not a stretched resize of the same photo.
+
+```vue
+<template>
+  <VImage
+    src="/hero-desktop.jpg"
+    alt="Hero"
+    :sources="{
+      sm: '/hero-mobile.jpg',
+      md: '/hero-tablet.jpg',
+    }"
+  />
+</template>
+
+<!-- Generates a real <picture> with one <source media="..."> per
+     breakpoint, sorted automatically, plus the fallback <img>. -->
+```
+
+#### Respects Save-Data — doesn't pull the heavy version
+
+`respect-save-data` downgrades `src` to the lightest candidate it can find and drops priority loading while the visitor has data-saving mode on — their phone decides, not the developer.
+
+```vue
+<template>
+  <VImage
+    src="/photo.jpg"
+    alt="Photo"
+    priority
+    respect-save-data
+    :densities="{ 1: '/photo.jpg', 2: '/photo@2x.jpg' }"
+  />
+</template>
+
+<!-- While the visitor has Save-Data on: priority is neutralized (stays
+     lazy instead of eager), and src downgrades to the lightest candidate
+     it can find — the lowest density here, @1x instead of @2x. -->
+```
+
 ---
 
 ## Documentation & links
