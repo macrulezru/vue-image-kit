@@ -66,6 +66,17 @@ Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe —
 
 ---
 
+## When you'd reach for this
+
+An image is almost always the heaviest thing on a page — and almost always what determines LCP, the metric Google and real users judge loading speed by. vue-image-kit bundles the whole set of techniques usually applied one at a time by hand: the right format, lazy loading, placeholders, priority for the one image that matters most.
+
+- **The hero image on screen shouldn't wait its turn** — A banner or product photo visible the moment the page opens gets priority and starts loading ahead of every other image — otherwise it's that image, not some small icon near the bottom, that decides how fast the page feels.
+- **Images below the fold shouldn't load for nothing** — A feed of fifty photos doesn't pull all fifty files the moment the page opens — images far from the viewport only start loading once the user has scrolled nearly to them.
+- **Images live in a CDN, not the project folder** — One project keeps images in Cloudinary, another in its own cloud, and each service builds the URL for a given size and format its own way — that URL gets assembled automatically for whichever provider is in use, instead of by hand for each one.
+- **While a photo is still loading, its spot shouldn't be empty** — An empty box that suddenly turns into a picture makes the page jump and feels unpolished — the spot where an image hasn't loaded yet shows a blurred or color placeholder prepared ahead of time instead.
+
+---
+
 ## Installation
 
 | Peer dependency | Version    | Required                                                                                             |
