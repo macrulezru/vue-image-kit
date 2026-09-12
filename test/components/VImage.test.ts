@@ -291,6 +291,41 @@ describe('VImage', () => {
       expect(colorSpan(wrapper)).toBeUndefined()
       expect(wrapper.find('img[aria-hidden="true"]').exists()).toBe(true)
     })
+
+    it('in blur mode, a real blurhash wins over a LQIP/ThumbHash placeholder instead of mounting both', () => {
+      // Regression: the blurhash <canvas> and the LQIP/ThumbHash placeholder
+      // <img> used to be independent v-if branches — supplying both a
+      // blurhash and a placeholder/thumbhash meant both mounted
+      // simultaneously (double-rendering), even though the prop doc
+      // ("'blur' (default) shows blurhash/LQIP/ThumbHash") documents them
+      // as alternatives, not layers.
+      const wrapper = mount(VImage, {
+        props: {
+          src: '/img.jpg',
+          alt: 'Test',
+          thumbhash: THUMBHASH,
+          blurhash: 'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
+          width: 100,
+          height: 100,
+        },
+      })
+      expect(wrapper.find('canvas').exists()).toBe(true)
+      expect(wrapper.find('img[aria-hidden="true"]').exists()).toBe(false)
+    })
+
+    it('falls back to the LQIP/ThumbHash placeholder when blurhash cannot render (missing width/height)', () => {
+      const wrapper = mount(VImage, {
+        props: {
+          src: '/img.jpg',
+          alt: 'Test',
+          thumbhash: THUMBHASH,
+          blurhash: 'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
+          // no width/height — the canvas can't decode without them
+        },
+      })
+      expect(wrapper.find('canvas').exists()).toBe(false)
+      expect(wrapper.find('img[aria-hidden="true"]').exists()).toBe(true)
+    })
   })
 
   describe('shimmer placeholder', () => {
@@ -722,7 +757,11 @@ describe('VImage', () => {
       expect(wrapper.find('img:not([aria-hidden])').attributes('sizes')).toBe('50vw')
     })
 
-    it('does not auto-generate sizes outside of layout="responsive"', async () => {
+    it('unset layout auto-generates sizes too — visually identical to "responsive", so it gets the same heuristic', async () => {
+      // Regression: layout unset used to skip the auto-sizes heuristic
+      // entirely, even though it renders identically to layout="responsive"
+      // (see wrapperStyle) — an unset-layout <VImage> with widths but no
+      // explicit sizes silently fell back to the generic '100vw' default.
       const wrapper = mount(VImage, {
         props: {
           src: '/img.jpg', alt: 'No layout', width: 640, height: 320,
@@ -734,8 +773,25 @@ describe('VImage', () => {
       await nextTick()
       await nextTick()
 
-      // Falls back to the generic default — proves the width-based heuristic didn't fire.
-      expect(wrapper.find('img:not([aria-hidden])').attributes('sizes')).toBe('100vw')
+      expect(wrapper.find('img:not([aria-hidden])').attributes('sizes')).toBe('(min-width: 640px) 640px, 100vw')
+    })
+
+    it('does not auto-generate sizes for layout="fixed"/"fill"', async () => {
+      for (const layout of ['fixed', 'fill'] as const) {
+        const wrapper = mount(VImage, {
+          props: {
+            src: '/img.jpg', alt: 'Fixed or fill', width: 640, height: 320,
+            widths: [320, 640, 960], layout, lazy: false,
+          },
+        })
+        await nextTick()
+        triggerIntersect()
+        await nextTick()
+        await nextTick()
+
+        // Falls back to the generic default — proves the width-based heuristic didn't fire.
+        expect(wrapper.find('img:not([aria-hidden])').attributes('sizes')).toBe('100vw')
+      }
     })
   })
 
