@@ -1,8 +1,9 @@
 import type { Directive, DirectiveBinding } from 'vue'
 import type { LazyImgOptions } from '../types'
+import { observeShared } from '../utils/observer-pool'
 
 interface LazyImgState {
-  observer: IntersectionObserver | null
+  unsubscribe: (() => void) | null
   src: string
 }
 
@@ -47,38 +48,29 @@ function applyImage(el: HTMLElement, options: LazyImgOptions): void {
   img.src = src
 }
 
-function createObserver(el: HTMLElement, options: LazyImgOptions): IntersectionObserver | null {
+// Shared with every other lazy-loading path (useLazyLoad/useImage/<VImage>/
+// useBackgroundImage) via utils/observer-pool.ts, instead of each `v-lazy-img`
+// element creating its own dedicated IntersectionObserver — the pool buckets
+// elements by rootMargin+threshold so pages with many lazy images share one
+// observer per distinct config instead of one per element.
+function watchIntersection(el: HTMLElement, options: LazyImgOptions): (() => void) | null {
   if (typeof window === 'undefined' || !('IntersectionObserver' in window)) {
     applyImage(el, options)
     return null
   }
 
-  const observer = new IntersectionObserver(
-    (entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting) {
-          applyImage(el, options)
-          observer.disconnect()
-          const state = stateMap.get(el)
-          if (state) state.observer = null
-        }
-      }
-    },
-    {
-      rootMargin: options.rootMargin ?? '200px',
-      threshold: options.threshold ?? 0,
-    },
-  )
-
-  observer.observe(el)
-  return observer
+  return observeShared(el, options.rootMargin ?? '200px', options.threshold ?? 0, () => {
+    applyImage(el, options)
+    const state = stateMap.get(el)
+    if (state) state.unsubscribe = null
+  })
 }
 
 export const vLazyImg: Directive<HTMLElement, string | LazyImgOptions> = {
   mounted(el, binding) {
     const options = resolveOptions(binding)
-    const observer = createObserver(el, options)
-    stateMap.set(el, { observer, src: options.src })
+    const unsubscribe = watchIntersection(el, options)
+    stateMap.set(el, { unsubscribe, src: options.src })
   },
 
   updated(el, binding) {
@@ -89,14 +81,14 @@ export const vLazyImg: Directive<HTMLElement, string | LazyImgOptions> = {
     // when parent re-renders with identical data but new object references
     if (state?.src === options.src) return
 
-    state?.observer?.disconnect()
-    const observer = createObserver(el, options)
-    stateMap.set(el, { observer, src: options.src })
+    state?.unsubscribe?.()
+    const unsubscribe = watchIntersection(el, options)
+    stateMap.set(el, { unsubscribe, src: options.src })
   },
 
   unmounted(el) {
     const state = stateMap.get(el)
-    state?.observer?.disconnect()
+    state?.unsubscribe?.()
     stateMap.delete(el)
   },
 }

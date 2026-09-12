@@ -45,7 +45,7 @@ interface Props {
   priority?: boolean
   /** Opt-in: on a save-data connection, neutralize `priority` (stays lazy), downgrade `src` to the smallest URL available from `densities`/`image.srcset`, and drop any `densities`/CDN/server/manifest `srcset` from the rendered `<img>` entirely — a browser picks from `srcset` over plain `src` whenever one is present, so leaving it in place would undo the downgrade. No effect otherwise. */
   respectSaveData?: boolean
-  /** Wrapper sizing preset: 'fixed' (exact box), 'responsive' (fills container, auto `sizes`), 'fill' (absolutely fills a positioned parent). Unset keeps the current default (fills container width, no auto `sizes`). */
+  /** Wrapper sizing preset: 'fixed' (exact box), 'responsive' (fills container, auto `sizes`), 'fill' (absolutely fills a positioned parent). Unset keeps the current default (fills container width) and, like 'responsive', gets the auto `sizes` heuristic too — the two are otherwise visually identical. */
   layout?: Layout
   /** Opt-in: route a string `src` through `autoLoader()` — detects Cloudinary/imgix/Bunny/ImageKit/Sanity/Storyblok/Contentful/Gumlet from the URL's hostname and rewrites it with CDN transforms, no manual adapter wiring. `true` for hostname-only detection; pass an `AutoLoaderConfig` (`{ hosts }`) to also cover "your own domain" providers (Netlify/Vercel/Cloudflare/TwicPics). Combines with `widths` — each candidate gets its own CDN-transformed URL via the adapter's `.srcset()` instead of `widths`' usual same-URL-every-candidate. No effect on an unrecognized host (passthrough) or a `SrcSet`/`densities` src. */
   cdn?: boolean | AutoLoaderConfig
@@ -157,8 +157,10 @@ const mergedPlaceholder = computed(() => props.placeholder ?? props.image?.place
 
 // `layout="responsive"` fills its container at up to its intrinsic width —
 // a reasonable default `sizes` heuristic when none is given explicitly.
+// Unset behaves identically to 'responsive' visually (see wrapperStyle
+// below), so it gets the same heuristic — only 'fill'/'fixed' opt out.
 const autoSizes = computed(() => {
-  if (props.layout !== 'responsive' || !mergedWidth.value) return undefined
+  if (props.layout === 'fill' || props.layout === 'fixed' || !mergedWidth.value) return undefined
   return `(min-width: ${mergedWidth.value}px) ${mergedWidth.value}px, 100vw`
 })
 const mergedSizes = computed(() => props.sizes ?? props.image?.sizes ?? autoSizes.value)
@@ -234,6 +236,11 @@ const effectivePlaceholder = computed(() => {
   // In color/shimmer mode the blur placeholder is suppressed — skip the (costly) decode.
   if (colorPlaceholder.value) return undefined
   if (props.placeholderMode === 'color' || props.placeholderMode === 'shimmer') return undefined
+  // 'blur' mode's own documented priority is "blurhash/LQIP/ThumbHash" — when a real
+  // blurhash can render (the canvas below has the same mergedBlurhash+width+height
+  // condition), it wins outright instead of mounting alongside an explicit `placeholder`/
+  // decoded ThumbHash image underneath it.
+  if (mergedBlurhash.value && mergedWidth.value && mergedHeight.value) return undefined
   if (mergedPlaceholder.value) return mergedPlaceholder.value
   if (mergedThumbhash.value) return decodeThumbHash(mergedThumbhash.value)
   return undefined
@@ -251,8 +258,7 @@ const aspectRatio = computed(() => {
 // regardless of layout, see imgStyle/canvasStyle below).
 // 'fixed' is an exact box at the intrinsic size, no responsive scaling.
 // Unset/'responsive' both fill the container width with aspect-ratio
-// preserved — the current default; 'responsive' additionally drives
-// `autoSizes` above.
+// preserved — the current default; both also drive `autoSizes` above.
 const wrapperStyle = computed(() => {
   if (props.layout === 'fill') {
     return {

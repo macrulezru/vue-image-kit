@@ -2,23 +2,34 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { defineComponent, nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import { vLazyImg } from '../../src/directives/vLazyImg'
+import { clearObserverPool } from '../../src/utils/observer-pool'
 
+// v-lazy-img shares the same IntersectionObserver pool (utils/observer-pool.ts)
+// as every other lazy-loading path now — see useLazyLoad.test.ts for the same
+// mocking pattern. `ioCallback` always captures the LATEST pool entry's
+// callback (elements sharing a rootMargin+threshold share one real observer),
+// which is enough for these single-element tests; clearObserverPool() between
+// tests keeps each test's pool state (and therefore IntersectionObserver call
+// count) independent.
 type IOCallback = (entries: IntersectionObserverEntry[]) => void
 
 let ioCallback: IOCallback | null = null
 let observeMock: ReturnType<typeof vi.fn>
+let unobserveMock: ReturnType<typeof vi.fn>
 let disconnectMock: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
+  clearObserverPool()
   ioCallback = null
   observeMock = vi.fn()
+  unobserveMock = vi.fn()
   disconnectMock = vi.fn()
 
   vi.stubGlobal(
     'IntersectionObserver',
     vi.fn((cb: IOCallback) => {
       ioCallback = cb
-      return { observe: observeMock, disconnect: disconnectMock }
+      return { observe: observeMock, unobserve: unobserveMock, disconnect: disconnectMock }
     }),
   )
 
@@ -31,6 +42,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  clearObserverPool()
 })
 
 function triggerIntersect(el: Element): void {
@@ -177,5 +189,29 @@ describe('vLazyImg directive', () => {
     await nextTick()
 
     expect((IntersectionObserver as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(callsBefore)
+  })
+
+  it('shares one IntersectionObserver across multiple elements with the same rootMargin/threshold', async () => {
+    // Regression: v-lazy-img used to create its own dedicated IntersectionObserver
+    // per element (createObserver()) instead of going through the shared pool
+    // every other lazy-loading path (useLazyLoad/useImage/<VImage>/
+    // useBackgroundImage) already uses — a real inconsistency on pages with many
+    // lazily-loaded backgrounds.
+    const MultiComponent = defineComponent({
+      directives: { 'lazy-img': vLazyImg },
+      template: `
+        <div>
+          <div class="a" v-lazy-img="'/a.jpg'" />
+          <div class="b" v-lazy-img="'/b.jpg'" />
+          <div class="c" v-lazy-img="'/c.jpg'" />
+        </div>
+      `,
+    })
+
+    mount(MultiComponent)
+    await nextTick()
+
+    expect(IntersectionObserver).toHaveBeenCalledTimes(1)
+    expect(observeMock).toHaveBeenCalledTimes(3)
   })
 })
