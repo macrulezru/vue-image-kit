@@ -148,10 +148,6 @@ async function main() {
     const fileConfig = await loadConfig()
     const config = mergeConfig(DEFAULTS, fileConfig, cliArgs)
 
-    // --watch means "run generate() repeatedly" — incremental pays for
-    // itself there even if the user never asked for it. A one-shot
-    // `generate` stays non-incremental unless requested: an explicit
-    // --incremental/--no-incremental (CLI flag or config file) always wins.
     if (config.watch && cliArgs.incremental === undefined && fileConfig.incremental === undefined) {
       config.incremental = true
     }

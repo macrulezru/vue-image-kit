@@ -1,13 +1,5 @@
 import type { CdnAdapter, CdnUrlOptions } from './types.js'
 
-/**
- * Sanity Image CDN adapter.
- *
- * @example
- * const cdn = sanity({ projectId: 'abc123', dataset: 'production' })
- * cdn.url('image-abc123-800x600-jpg', { width: 400 })
- * // → https://cdn.sanity.io/images/abc123/production/image-abc123-800x600-jpg?w=400&auto=format&q=80
- */
 export function sanity(options: { projectId: string; dataset: string }): CdnAdapter {
   const { projectId, dataset } = options
   const base = `https://cdn.sanity.io/images/${projectId}/${dataset}`

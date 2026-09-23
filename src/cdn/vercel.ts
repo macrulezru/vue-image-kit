@@ -1,14 +1,5 @@
 import type { CdnAdapter, CdnUrlOptions } from './types.js'
 
-/**
- * Vercel Image Optimization adapter.
- * Works on Vercel deployments; uses the /_vercel/image endpoint.
- *
- * @example
- * const cdn = vercel({ origin: 'https://myapp.vercel.app' })
- * cdn.url('/photo.jpg', { width: 800, quality: 75 })
- * // → https://myapp.vercel.app/_vercel/image?url=%2Fphoto.jpg&w=800&q=75
- */
 export function vercel(options: { origin?: string } = {}): CdnAdapter {
   const origin = options.origin ?? ''
 

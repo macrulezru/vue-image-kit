@@ -100,7 +100,6 @@ describe('isUnchanged', () => {
 
   it('falls back to a content hash and is still true when mtime changed but content did not', () => {
     const entry = buildIncrementalEntry(srcPath, fakeImage)
-    // Simulate a git checkout: mtime bumped, content byte-identical.
     const future = new Date(Date.now() + 60_000)
     utimesSync(srcPath, future, future)
     expect(isUnchanged(entry, srcPath)).toBe(true)
@@ -112,6 +111,6 @@ describe('buildIncrementalEntry', () => {
     const entry = buildIncrementalEntry(srcPath, fakeImage)
     expect(entry.image).toEqual(fakeImage)
     expect(typeof entry.mtimeMs).toBe('number')
-    expect(entry.hash).toHaveLength(64) // sha256 hex
+    expect(entry.hash).toHaveLength(64)
   })
 })

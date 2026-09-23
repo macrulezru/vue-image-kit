@@ -3,12 +3,6 @@ import ts from 'typescript'
 import { generateManifestContent, buildEntry } from '../../src/cli/manifest'
 import type { ProcessedImage } from '../../src/cli/types'
 
-// Type-checks generated manifest source against the ImageData interface it
-// exports — the real regression this file guards against isn't a string in
-// the output, it's the generated `.ts` module failing `tsc` in a consumer's
-// project (the SVG/GIF branches, and any raster width sharp skipped via
-// withoutEnlargement, produce object literals missing one or more `src{w}`
-// fields; a `required` field there breaks the manifest that just declared it).
 function typeCheckDiagnostics(source: string): readonly ts.Diagnostic[] {
   const fileName = 'manifest.generated.ts'
   const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.ES2020, true)
@@ -88,7 +82,6 @@ describe('generateManifestContent', () => {
   })
 
   it('generates valid TypeScript (no syntax markers that are wrong)', () => {
-    // Basic check: brackets are balanced
     const opens = (content.match(/\[/g) ?? []).length
     const closes = (content.match(/\]/g) ?? []).length
     expect(opens).toBe(closes)
@@ -127,8 +120,6 @@ describe('generateManifestContent — mixed raster/SVG/GIF batch', () => {
     thumbhash: '',
   }
 
-  // Original is 400px wide — smaller than the configured 800/1200 widths, so
-  // withoutEnlargement means sharp never produced those variants.
   const smallRaster: ProcessedImage = {
     name: 'thumb',
     srcAbsPath: '/src/thumb.jpg',
@@ -148,11 +139,9 @@ describe('generateManifestContent — mixed raster/SVG/GIF batch', () => {
 
   it('omits src{w} fields the SVG/GIF/undersized-raster entries never generated', () => {
     const widths = [400, 800, 1200]
-    // SVG/GIF entries have no width-shortcut fields at all.
     expect(buildEntry(svgImage, widths)).not.toHaveProperty('src400')
     expect(buildEntry(svgImage, widths)).not.toHaveProperty('src800')
     expect(buildEntry(gifImage, widths)).not.toHaveProperty('src400')
-    // The small raster only ever produced its own original-width variant.
     const thumbEntry = buildEntry(smallRaster, widths)
     expect(thumbEntry).toHaveProperty('src400')
     expect(thumbEntry).not.toHaveProperty('src800')
@@ -160,7 +149,6 @@ describe('generateManifestContent — mixed raster/SVG/GIF batch', () => {
   })
 
   it('type-checks — this is the actual bug: a required src{w} field would make', () => {
-    // these very object literals fail their own generated interface.
     const diagnostics = typeCheckDiagnostics(content)
     expect(diagnostics).toEqual([])
   })

@@ -1,14 +1,5 @@
 import type { CdnAdapter, CdnUrlOptions } from './types.js'
 
-/**
- * TwicPics adapter — manipulations go in the `twic` query parameter, joined by
- * slashes after the `v1/` version prefix.
- *
- * @example
- * const cdn = twicpics('https://demo.twic.pics')
- * cdn.url('photo.jpg', { width: 800, format: 'webp' })
- * // → https://demo.twic.pics/photo.jpg?twic=v1/resize=800/output=webp
- */
 export function twicpics(baseUrl: string): CdnAdapter {
   const base = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl
 
@@ -17,7 +8,6 @@ export function twicpics(baseUrl: string): CdnAdapter {
       const cleanPath = path.startsWith('/') ? path : `/${path}`
       const ops: string[] = []
 
-      // cover needs both dimensions; otherwise resize by the given axes
       if (opts.fit === 'cover' && opts.width && opts.height) {
         ops.push(`cover=${opts.width}x${opts.height}`)
       } else if (opts.width && opts.height) {

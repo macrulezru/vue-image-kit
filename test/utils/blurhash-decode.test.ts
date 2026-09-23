@@ -89,7 +89,6 @@ describe('signPow', () => {
 })
 
 describe('decodeBlurhash', () => {
-  // Valid 28-char blurhash: L=21 → numX=4, numY=3, expectedLen=4+2*12=28
   const KNOWN_HASH = 'LEHV6nWB2yk8pyo0adR*.7kCMdnj'
 
   it('returns Uint8ClampedArray', () => {

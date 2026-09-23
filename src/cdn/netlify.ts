@@ -1,13 +1,5 @@
 import type { CdnAdapter, CdnUrlOptions } from './types.js'
 
-/**
- * Netlify Image CDN adapter — uses the `/.netlify/images` endpoint.
- *
- * @example
- * const cdn = netlify({ origin: 'https://myapp.netlify.app' })
- * cdn.url('/photo.jpg', { width: 800, format: 'webp', quality: 75 })
- * // → https://myapp.netlify.app/.netlify/images?url=%2Fphoto.jpg&w=800&fm=webp&q=75
- */
 export function netlify(options: { origin?: string } = {}): CdnAdapter {
   const origin = options.origin ?? ''
 

@@ -1,8 +1,3 @@
-// Registered via `addServerHandler` in ../module.ts when `onDemandServer` is
-// enabled. Thin h3/Nitro wrapper around the framework-agnostic handler from
-// `vue-image-kit/server` — `event.node.req`/`res` are the real Node
-// IncomingMessage/ServerResponse, so the same handler that works for plain
-// Node http or Express works here unchanged.
 import { defineEventHandler, useRuntimeConfig } from '#imports'
 import { createImageHandler } from '../../server/handler.js'
 import type { ImageHandler, ImageHandlerOptions } from '../../server/handler.js'

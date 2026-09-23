@@ -39,7 +39,6 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-/** Find the observer instance currently watching `el`, then fire intersection for it. */
 function intersect(el: Element, isIntersecting = true): void {
   const inst = instances.find((i) => i.observed.has(el))
   inst?.callback([{ isIntersecting, target: el } as IntersectionObserverEntry])
@@ -99,7 +98,7 @@ describe('observeShared', () => {
     const cb = vi.fn()
     observeShared(el, '0px', 0, cb)
     intersect(el, true)
-    intersect(el, true) // second fire must be ignored — already unobserved
+    intersect(el, true)
     expect(cb).toHaveBeenCalledTimes(1)
     expect(instances[0]!.unobserve).toHaveBeenCalledWith(el)
   })
@@ -110,11 +109,10 @@ describe('observeShared', () => {
     observeShared(b, '0px', 0, () => {})
 
     intersect(a, true)
-    expect(instances[0]!.disconnect).not.toHaveBeenCalled() // b still watched
+    expect(instances[0]!.disconnect).not.toHaveBeenCalled()
     intersect(b, true)
     expect(instances[0]!.disconnect).toHaveBeenCalled()
 
-    // Pool entry was removed → next observe builds a fresh observer
     observeShared(div(), '0px', 0, () => {})
     expect(instances).toHaveLength(2)
   })
@@ -148,7 +146,6 @@ describe('clearObserverPool', () => {
     expect(instances[0]!.disconnect).toHaveBeenCalled()
     expect(instances[1]!.disconnect).toHaveBeenCalled()
 
-    // Pool is empty → observing again allocates fresh observers
     observeShared(div(), '0px', 0, () => {})
     expect(instances).toHaveLength(3)
   })

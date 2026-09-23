@@ -2,13 +2,11 @@ import type { ProcessedImage, ManifestEntry } from './types.js'
 
 function buildSrcset(image: ProcessedImage): string {
   const jpgVariants = image.variants.filter((v) => v.format === 'jpg')
-  // sort by width ascending
   jpgVariants.sort((a, b) => a.width - b.width)
   return jpgVariants.map((v) => `${v.url} ${v.width}w`).join(', ')
 }
 
 export function buildEntry(image: ProcessedImage, widths: number[]): ManifestEntry {
-  // SVG passthrough — a single vector variant; no responsive/format variants apply.
   const svgVariant = image.variants.find((v) => v.format === 'svg')
   if (svgVariant) {
     return {
@@ -25,8 +23,6 @@ export function buildEntry(image: ProcessedImage, widths: number[]): ManifestEnt
     }
   }
 
-  // Animated GIF — original copied through as `src`, optional animated WebP
-  // re-encode as `webp`. No srcset/avif (see buildGifVariants for why).
   const gifVariant = image.variants.find((v) => v.format === 'gif')
   if (gifVariant) {
     const webpVariant = image.variants.find((v) => v.format === 'webp')
@@ -67,7 +63,6 @@ export function buildEntry(image: ProcessedImage, widths: number[]): ManifestEnt
     thumbhash: image.thumbhash,
   }
 
-  // Add src{width} shortcuts for each requested width
   for (const w of widths) {
     if (jpgByWidth.has(w)) {
       entry[`src${w}`] = jpgByWidth.get(w)!
@@ -85,12 +80,6 @@ function indent(obj: ManifestEntry): string {
 }
 
 function buildInterface(widths: number[]): string {
-  // Optional, not required: the SVG/GIF branches of buildEntry() return
-  // before this loop runs at all, and a raster image smaller than a given
-  // width never gets that width's variant (sharp's withoutEnlargement skips
-  // it) — either way, the generated object literal for that entry legally
-  // lacks the field, so a required `string` would make TypeScript reject the
-  // very manifest this function just wrote.
   const widthFields = widths.map((w) => `  src${w}?: string`).join('\n')
   return [
     'export interface ImageData {',

@@ -1,38 +1,20 @@
-/**
- * Browser-side encoders — produce a BlurHash or ThumbHash from a `File`/`Blob`,
- * `HTMLImageElement`, `HTMLCanvasElement`, `ImageBitmap`, or `ImageData`.
- *
- * Use case: user-generated content. When someone uploads a photo you can encode
- * a placeholder on the client and show a blur-up preview instantly — before the
- * full image is processed or uploaded.
- *
- * These require a DOM (canvas) and are therefore browser-only.
- */
 
 export type EncodeSource =
   | ImageData
   | HTMLCanvasElement
   | HTMLImageElement
   | ImageBitmap
-  | Blob // includes File
+  | Blob
 
 export interface EncodeBlurhashOptions {
-  /** Horizontal components (detail), 1–9. Default 4. */
   componentX?: number
-  /** Vertical components (detail), 1–9. Default 3. */
   componentY?: number
-  /** Longest edge the source is downscaled to before encoding. Default 64. */
   maxSize?: number
 }
 
 export interface EncodeThumbHashOptions {
-  /** Longest edge the source is downscaled to before encoding. Default/max 100. */
   maxSize?: number
 }
-
-// ---------------------------------------------------------------------------
-// Source → ImageData
-// ---------------------------------------------------------------------------
 
 function assertBrowser(): void {
   if (typeof document === 'undefined') {
@@ -93,13 +75,8 @@ async function sourceToImageData(source: EncodeSource, maxSize: number): Promise
     return readScaled(source, source.naturalWidth, source.naturalHeight, maxSize)
   }
 
-  // HTMLCanvasElement | ImageBitmap
   return readScaled(source, source.width as number, source.height as number, maxSize)
 }
-
-// ---------------------------------------------------------------------------
-// BlurHash
-// ---------------------------------------------------------------------------
 
 const BASE83 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~'
 
@@ -179,13 +156,6 @@ function blurhashFromImageData(data: ImageData, numX: number, numY: number): str
   return hash
 }
 
-/**
- * Encodes a BlurHash string from any supported source.
- *
- * @example
- * const hash = await encodeBlurhash(file)          // from an <input type="file">
- * const hash = await encodeBlurhash(canvas, { componentX: 5, componentY: 4 })
- */
 export async function encodeBlurhash(
   source: EncodeSource,
   options: EncodeBlurhashOptions = {},
@@ -197,15 +167,10 @@ export async function encodeBlurhash(
   return blurhashFromImageData(data, numX, numY)
 }
 
-// ---------------------------------------------------------------------------
-// ThumbHash — faithful port of evanw/thumbhash rgbaToThumbHash
-// ---------------------------------------------------------------------------
-
 function rgbaToThumbHash(w: number, h: number, rgba: Uint8ClampedArray | Uint8Array): Uint8Array {
   if (w > 100 || h > 100) throw new Error(`[vue-image-kit] ${w}x${h} doesn't fit in 100x100`)
   const { PI, round, max, cos, abs } = Math
 
-  // Average color, premultiplied by alpha
   let avgR = 0, avgG = 0, avgB = 0, avgA = 0
   for (let i = 0, j = 0; i < w * h; i++, j += 4) {
     const alpha = rgba[j + 3]! / 255
@@ -224,12 +189,11 @@ function rgbaToThumbHash(w: number, h: number, rgba: Uint8ClampedArray | Uint8Ar
   const lLimit = hasAlpha ? 5 : 7
   const lx = max(1, round((lLimit * w) / max(w, h)))
   const ly = max(1, round((lLimit * h) / max(w, h)))
-  const l: number[] = [] // luminance
-  const p: number[] = [] // yellow - blue
-  const q: number[] = [] // red - green
-  const a: number[] = [] // alpha
+  const l: number[] = []
+  const p: number[] = []
+  const q: number[] = []
+  const a: number[] = []
 
-  // RGBA → LPQA, composited over the average color
   for (let i = 0, j = 0; i < w * h; i++, j += 4) {
     const alpha = rgba[j + 3]! / 255
     const r = avgR * (1 - alpha) + (alpha / 255) * rgba[j]!
@@ -241,7 +205,6 @@ function rgbaToThumbHash(w: number, h: number, rgba: Uint8ClampedArray | Uint8Ar
     a[i] = alpha
   }
 
-  // DCT → DC + normalized AC terms
   const encodeChannel = (channel: number[], nx: number, ny: number): [number, number[], number] => {
     let dc = 0
     const ac: number[] = []
@@ -306,14 +269,6 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(bin)
 }
 
-/**
- * Encodes a base64 ThumbHash string from any supported source. The image is
- * downscaled to fit within 100×100 first (a ThumbHash requirement).
- *
- * @example
- * const hash = await encodeThumbHash(file)
- * // pass straight to <VImage :thumbhash="hash"> or decodeThumbHash(hash)
- */
 export async function encodeThumbHash(
   source: EncodeSource,
   options: EncodeThumbHashOptions = {},

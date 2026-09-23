@@ -9,11 +9,6 @@ interface UseImageOptions {
   widths?: number[]
   densities?: Densities
   sizes?: string
-  /**
-   * A pre-built `srcset` string (e.g. from a CLI/manifest `srcset` field) to
-   * use as-is instead of generating one from `widths`. Ignored when
-   * `densities` or `widths` is set — those take precedence.
-   */
   rawSrcset?: string
   lazy?: boolean
   rootMargin?: string
@@ -63,9 +58,6 @@ export function useImage(options: UseImageOptions): UseImageReturn {
   const fallbackSrc = typeof src === 'string' ? src : src.fallback
 
   const imgAttrs = computed<ImgAttrs>(() => {
-    // Density (x) descriptors take precedence over width (w) — they can't be
-    // mixed, and `sizes` only applies to width-based candidates. `densities` is
-    // either a list (reusing `src`) or a map of density → distinct URL.
     let srcset: string | undefined
     let sizesAttr: string | undefined
     const densityList = Array.isArray(densities)
@@ -105,7 +97,7 @@ export function useImage(options: UseImageOptions): UseImageReturn {
   function onImgError(): void {
     if (retryCount < maxRetries) {
       retryCount++
-      const delay = retryDelay * Math.pow(2, retryCount - 1) // exponential backoff
+      const delay = retryDelay * Math.pow(2, retryCount - 1)
       setTimeout(() => {
         status.value = 'idle'
         setTimeout(() => { status.value = 'loading' }, 0)

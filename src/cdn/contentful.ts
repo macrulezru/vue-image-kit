@@ -1,13 +1,5 @@
 import type { CdnAdapter, CdnUrlOptions } from './types.js'
 
-/**
- * Contentful Images API adapter.
- *
- * @example
- * const cdn = contentful()
- * cdn.url('https://images.ctfassets.net/space/token/photo.jpg', { width: 800 })
- * // → https://images.ctfassets.net/space/token/photo.jpg?w=800&fm=webp&q=80
- */
 export function contentful(): CdnAdapter {
   return {
     url(path, opts: CdnUrlOptions = {}) {

@@ -141,14 +141,13 @@ describe('useLazyLoad', () => {
       template: '<div ref="elRef" />',
     }))
 
-    await nextTick()   // let deferred observe() run
-    wrapper.unmount()  // triggers onUnmounted → unsubscribe → disconnect
+    await nextTick()
+    wrapper.unmount()
     expect(observerInstance?.disconnect).toHaveBeenCalled()
   })
 
   it('returns isIntersecting = true on SSR (no window)', () => {
     const originalWindow = globalThis.window
-    // @ts-expect-error simulate SSR
     delete globalThis.window
 
     const result = useLazyLoad()

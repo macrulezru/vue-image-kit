@@ -2,9 +2,6 @@ import { ref, onMounted } from 'vue'
 import type { Ref } from 'vue'
 import { decodeBlurhash } from '../utils/blurhash-decode'
 
-// Blurhash is always decoded at thumbnail size — CSS scales it up.
-// Decoding at the original image resolution (e.g. 1200×800) would mean
-// computing 960 000 pixels per component instead of ~672.
 const DECODE_WIDTH = 32
 
 interface UseBlurhashOptions {
@@ -39,7 +36,7 @@ export function useBlurhash(options: UseBlurhashOptions): Ref<HTMLCanvasElement 
       const imageData = new ImageData(pixels, decodeW, decodeH)
       ctx.putImageData(imageData, 0, 0)
     } catch {
-      // invalid blurhash — leave canvas blank
+      return
     }
   })
 

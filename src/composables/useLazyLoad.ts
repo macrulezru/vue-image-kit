@@ -36,8 +36,6 @@ export function useLazyLoad(options: UseLazyLoadOptions = {}): UseLazyLoadReturn
       })
     }
 
-    // observe() may be called in setup() before the element is mounted.
-    // Defer to the next microtask so the ref has time to be populated.
     if (elRef.value) {
       doObserve()
     } else {

@@ -3,13 +3,6 @@ import { resolve } from 'node:path'
 import { resolveModuleConfig, DEFAULT_SERVER_ROUTE, AUTO_IMPORT_NAMES } from '../../src/nuxt/module'
 import * as indexExports from '../../src/index'
 
-// resolveModuleConfig is the pure part of module.ts's setup() — extracted
-// specifically so it's testable without a live Nuxt/Nitro context, which
-// @nuxt/kit's addServerHandler/addPlugin/etc. require and this environment
-// can't provide. The addServerHandler/addPlugin wiring itself is NOT
-// exercised by these tests, or by a running Nuxt app — flagging that
-// honestly rather than claiming full coverage.
-
 describe('resolveModuleConfig', () => {
   it('defaults to the standard route with no breakpoints and no server config', () => {
     const result = resolveModuleConfig({}, '/project')
@@ -67,10 +60,6 @@ describe('resolveModuleConfig', () => {
 })
 
 describe('AUTO_IMPORT_NAMES', () => {
-  // VImage/vLazyImg are registered separately as a global component/directive
-  // (addPlugin), VImageKitPlugin installs itself so auto-importing it would be
-  // pointless, and the two injection-key constants are advanced escape hatches
-  // a Nuxt app using this module never needs directly.
   const intentionallyExcluded = new Set([
     'VImage',
     'vLazyImg',

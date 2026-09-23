@@ -3,7 +3,6 @@ import { defineComponent, nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import { useBlurhash } from '../../src/composables/useBlurhash'
 
-// Valid 28-char hash: L=21 → numX=4, numY=3
 const VALID_HASH = 'LEHV6nWB2yk8pyo0adR*.7kCMdnj'
 
 describe('useBlurhash', () => {

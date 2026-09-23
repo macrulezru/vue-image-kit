@@ -1,13 +1,5 @@
 import type { CdnAdapter, CdnUrlOptions } from './types.js'
 
-/**
- * Bunny CDN adapter (bunny.net Image Processing).
- *
- * @example
- * const cdn = bunny('https://myzone.b-cdn.net')
- * cdn.url('photo.jpg', { width: 800, format: 'webp' })
- * // → https://myzone.b-cdn.net/photo.jpg?width=800&format=webp&quality=80
- */
 export function bunny(baseUrl: string): CdnAdapter {
   const base = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl
 

@@ -1,7 +1,5 @@
 export interface CdnAdapter {
-  /** Returns a single transformed image URL */
   url(path: string, options?: CdnUrlOptions): string
-  /** Returns a ready-made srcset string for the given widths */
   srcset(path: string, widths: number[], options?: CdnUrlOptions): string
 }
 

@@ -8,7 +8,6 @@ type IOCallback = (entries: IntersectionObserverEntry[]) => void
 let observerCallback: IOCallback | null = null
 let observedEl: Element | null = null
 
-// Image stub — fires onload on the next microtask when src is assigned.
 class MockImage {
   onload: (() => void) | null = null
   onerror: (() => void) | null = null
@@ -63,7 +62,7 @@ function mountBg(src: string, opts: UseBackgroundImageOptions = {}) {
 async function intersect(): Promise<void> {
   observerCallback?.([{ isIntersecting: true, target: observedEl! } as IntersectionObserverEntry])
   await nextTick()
-  await Promise.resolve() // let the Image.onload microtask run
+  await Promise.resolve()
   await nextTick()
 }
 
@@ -110,7 +109,6 @@ describe('useBackgroundImage', () => {
 
   it('loads immediately on mount when lazy is false', async () => {
     const wrapper = mountBg('/bg.jpg', { lazy: false })
-    // mount → onMounted load() → loading, then Image.onload
     await nextTick()
     await Promise.resolve()
     await nextTick()
@@ -126,7 +124,6 @@ describe('useBackgroundImage', () => {
   })
 
   it('sets status to error when the image fails to load', async () => {
-    // Image stub that fires onerror instead
     class FailingImage {
       onload: (() => void) | null = null
       onerror: (() => void) | null = null

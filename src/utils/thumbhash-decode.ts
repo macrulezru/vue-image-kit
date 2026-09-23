@@ -1,11 +1,4 @@
-/**
- * ThumbHash decoder — produces a data:image/png;base64,… URL from a ThumbHash string.
- * Implements the ThumbHash spec: https://github.com/evanw/thumbhash
- *
- * Unlike BlurHash, ThumbHash supports alpha channels and returns a PNG data URL.
- */
 
-// Aspect ratio from the header alone — used to derive output dimensions.
 function thumbHashToApproximateAspectRatio(hash: Uint8Array): number {
   const header = hash[3] ?? 0
   const hasAlpha = (hash[2] ?? 0) & 0x80
@@ -15,17 +8,10 @@ function thumbHashToApproximateAspectRatio(hash: Uint8Array): number {
   return lx / ly
 }
 
-/**
- * Faithful port of Evan Wallace's reference `thumbHashToRGBA`
- * (github.com/evanw/thumbhash). AC terms are packed as 4-bit nibbles in a
- * triangular (low-frequency) scan; chroma is boosted 1.25× to offset
- * quantization. Returns the decoded thumbnail as raw RGBA.
- */
 export function thumbHashToRGBA(hash: Uint8Array): { w: number; h: number; rgba: Uint8Array } {
   const { PI, min, max, cos, round } = Math
   const at = (i: number): number => hash[i] ?? 0
 
-  // Read the constants
   const header24 = at(0) | (at(1) << 8) | (at(2) << 16)
   const header16 = at(3) | (at(4) << 8)
   const lDC = (header24 & 63) / 63
@@ -41,7 +27,6 @@ export function thumbHashToRGBA(hash: Uint8Array): { w: number; h: number; rgba:
   const aDC = hasAlpha ? (at(5) & 15) / 15 : 1
   const aScale = (at(5) >> 4) / 15
 
-  // Read the varying factors (chroma boosted 1.25× to compensate for quantization)
   const acStart = hasAlpha ? 6 : 5
   let acIndex = 0
   const decodeChannel = (nx: number, ny: number, scale: number): number[] => {
@@ -56,7 +41,6 @@ export function thumbHashToRGBA(hash: Uint8Array): { w: number; h: number; rgba:
   const qAC = decodeChannel(3, 3, qScale * 1.25)
   const aAC = hasAlpha ? decodeChannel(5, 5, aScale) : []
 
-  // Decode using the DCT into RGB
   const ratio = thumbHashToApproximateAspectRatio(hash)
   const w = round(ratio > 1 ? 32 : 32 * ratio)
   const h = round(ratio > 1 ? 32 / ratio : 32)
@@ -68,18 +52,15 @@ export function thumbHashToRGBA(hash: Uint8Array): { w: number; h: number; rgba:
     for (let x = 0; x < w; x++, i += 4) {
       let l = lDC, p = pDC, q = qDC, a = aDC
 
-      // Precompute the cosine coefficients
       for (let cx = 0, n = max(lx, hasAlpha ? 5 : 3); cx < n; cx++)
         fx[cx] = cos((PI / w) * (x + 0.5) * cx)
       for (let cy = 0, n = max(ly, hasAlpha ? 5 : 3); cy < n; cy++)
         fy[cy] = cos((PI / h) * (y + 0.5) * cy)
 
-      // Decode L
       for (let cy = 0, j = 0; cy < ly; cy++)
         for (let cx = cy ? 0 : 1, fy2 = fy[cy]! * 2; cx * ly < lx * (ly - cy); cx++, j++)
           l += lAC[j]! * fx[cx]! * fy2
 
-      // Decode P and Q
       for (let cy = 0, j = 0; cy < 3; cy++)
         for (let cx = cy ? 0 : 1, fy2 = fy[cy]! * 2; cx < 3 - cy; cx++, j++) {
           const f = fx[cx]! * fy2
@@ -87,13 +68,11 @@ export function thumbHashToRGBA(hash: Uint8Array): { w: number; h: number; rgba:
           q += qAC[j]! * f
         }
 
-      // Decode A
       if (hasAlpha)
         for (let cy = 0, j = 0; cy < 5; cy++)
           for (let cx = cy ? 0 : 1, fy2 = fy[cy]! * 2; cx < 5 - cy; cx++, j++)
             a += aAC[j]! * fx[cx]! * fy2
 
-      // Convert to RGB
       const b = l - (2 / 3) * p
       const r = (3 * l - b + q) / 2
       const g = r - q
@@ -107,7 +86,6 @@ export function thumbHashToRGBA(hash: Uint8Array): { w: number; h: number; rgba:
   return { w, h, rgba }
 }
 
-// Minimal uncompressed PNG encoder (RGBA, no external deps)
 function rgbaToPng(w: number, h: number, rgba: Uint8Array): string {
   function crc32(buf: Uint8Array): number {
     let c = 0xffffffff
@@ -132,17 +110,15 @@ function rgbaToPng(w: number, h: number, rgba: Uint8Array): string {
     return out
   }
 
-  // IHDR
   const ihdr = new Uint8Array(13)
   const dv = new DataView(ihdr.buffer)
   dv.setUint32(0, w); dv.setUint32(4, h)
-  ihdr[8] = 8; ihdr[9] = 6  // 8-bit RGBA
+  ihdr[8] = 8; ihdr[9] = 6
 
-  // IDAT: uncompressed zlib store
   const rowSize = 1 + w * 4
   const raw = new Uint8Array(h * rowSize)
   for (let y = 0; y < h; y++) {
-    raw[y * rowSize] = 0  // filter none
+    raw[y * rowSize] = 0
     raw.set(rgba.subarray(y * w * 4, (y + 1) * w * 4), y * rowSize + 1)
   }
 
@@ -177,13 +153,6 @@ function rgbaToPng(w: number, h: number, rgba: Uint8Array): string {
   return `data:image/png;base64,${btoa(bin)}`
 }
 
-/**
- * Decodes a ThumbHash string (base64 or Uint8Array) to a PNG data URL.
- *
- * @example
- * const dataUrl = decodeThumbHash('3OcRJYB4d3h/iIeHeEh3eIhw+j5n')
- * // → 'data:image/png;base64,...'
- */
 function hashToBytes(hash: string | Uint8Array): Uint8Array {
   if (typeof hash !== 'string') return hash
   const bin = atob(hash)
@@ -198,16 +167,6 @@ export function decodeThumbHash(hash: string | Uint8Array): string {
   return rgbaToPng(w, h, rgba)
 }
 
-/**
- * Extracts the average (DC) color of a ThumbHash straight from its header — no
- * pixel decode, no canvas. Channels are returned as 0–1 floats. Faithful port of
- * the reference `thumbHashToAverageRGBA` (github.com/evanw/thumbhash).
- *
- * Ideal as an ultra-cheap solid-color placeholder.
- *
- * @example
- * const { r, g, b, a } = thumbHashToAverageRGBA('3OcRJYB4d3h/iIeHeEh3eIhw+j5n')
- */
 export function thumbHashToAverageRGBA(
   hash: string | Uint8Array,
 ): { r: number; g: number; b: number; a: number } {
@@ -230,10 +189,6 @@ export function thumbHashToAverageRGBA(
   }
 }
 
-/**
- * Convenience wrapper around {@link thumbHashToAverageRGBA} that returns a CSS
- * `rgba(...)` string suitable for a `background-color` placeholder.
- */
 export function thumbHashToAverageColor(hash: string | Uint8Array): string {
   const { r, g, b, a } = thumbHashToAverageRGBA(hash)
   const to255 = (n: number) => Math.round(n * 255)

@@ -61,7 +61,6 @@ describe('mergeConfig', () => {
 describe('loadConfig', () => {
   let tmpDir: string
 
-  // Create a fresh temp directory for each test
   function makeTmpDir(): string {
     const dir = join(tmpdir(), `vimage-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     mkdirSync(dir, { recursive: true })

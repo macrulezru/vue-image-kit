@@ -1,14 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useImagePreloader } from '../../src/composables/useImagePreloader'
 
-// Minimal Image mock — resolves or rejects based on the src
 class MockImage {
   src: string = ''
   onload: (() => void) | null = null
   onerror: ((e: Event) => void) | null = null
 
   constructor() {
-    // Defer to next microtask so callers can assign onload/onerror first
     Promise.resolve().then(() => {
       if (this.src.includes('fail')) {
         this.onerror?.(new Event('error'))
@@ -62,7 +60,7 @@ describe('useImagePreloader', () => {
     const { preload, total, isComplete } = useImagePreloader()
     await preload([])
     expect(total.value).toBe(0)
-    expect(isComplete.value).toBe(false) // no images = not complete
+    expect(isComplete.value).toBe(false)
   })
 
   it('resets state on each preload call', async () => {

@@ -134,10 +134,8 @@ describe('printBatchSummary', () => {
   it('prints total input/output size and the smallest-format savings vs. original', () => {
     printBatchSummary([makeImage()])
     const out = loggedLines()
-    // originalSizeBytes 245_300 → 239.6 KB; variants 52_100 + 112_900 → 161.1 KB
     expect(out).toContain('Input:  1 image(s), 239.6 KB total')
     expect(out).toContain('Output: 2 file(s), 161.1 KB total')
-    // smallest variant is 52_100 vs original 245_300 → saves ~79%
     expect(out).toContain('Smallest available format saves ~79% vs. original, on average')
   })
 

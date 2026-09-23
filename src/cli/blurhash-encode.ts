@@ -35,10 +35,6 @@ function encodeAC(r: number, g: number, b: number, maxValue: number): number {
   return qr * 19 * 19 + qg * 19 + qb
 }
 
-/**
- * Encodes raw RGB pixel data (3 bytes/pixel, no alpha) to a BlurHash string.
- * For performance, pass a small thumbnail (e.g. 64×64) rather than the full image.
- */
 export function encodeBlurhash(
   pixels: Buffer,
   width: number,
@@ -73,7 +69,6 @@ export function encodeBlurhash(
 
   const [dc, ...acList] = components as [[number, number, number], ...[number, number, number][]]
 
-  // Max AC value
   const maxAC = acList.reduce(
     (m, [r, g, b]) => Math.max(m, Math.abs(r), Math.abs(g), Math.abs(b)),
     0,

@@ -9,18 +9,11 @@ import { decodeThumbHash } from '../../src/utils/thumbhash-decode'
 import { DEFAULTS } from '../../src/cli/config'
 import type { CliConfig } from '../../src/cli/types'
 
-// Integration test: drives the real sharp + thumbhash pipeline used by the
-// Vite plugin's build-time `?vik` / `?thumbhash` imports.
-
-// On Windows, libvips/sharp can keep a native handle on the source file open
-// until the Sharp wrapper is GC'd, which races with an immediate rmSync and
-// throws EBUSY — unrelated to correctness. Best-effort cleanup only; the OS
-// reclaims the temp dir regardless.
 function cleanupDir(dir: string): void {
   try {
     rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   } catch {
-    // ignore — see above
+    return
   }
 }
 
@@ -31,12 +24,9 @@ let config: CliConfig
 
 beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), 'vik-test-'))
-  // Source and output must be distinct dirs — the original-width jpg variant
-  // keeps the source's name, which would otherwise overwrite the input.
   outDir = join(dir, 'out')
   srcPath = join(dir, 'photo.jpg')
 
-  // 64×48 solid blue image so encoders have real content.
   await sharp({
     create: { width: 64, height: 48, channels: 3, background: { r: 30, g: 120, b: 200 } },
   })
@@ -75,7 +65,6 @@ describe('processImage (build-time ?vik pipeline)', () => {
       expect(image.variants.some((v) => v.format === format)).toBe(true)
     }
 
-    // Files were actually written to disk
     for (const v of image.variants) {
       expect(existsSync(v.absPath)).toBe(true)
     }
@@ -95,7 +84,6 @@ describe('processImage (build-time ?vik pipeline)', () => {
     expect(meta.placeholder).toMatch(/^data:image\/jpeg;base64,/)
     expect(meta.blurhash.length).toBeGreaterThan(0)
     expect(meta.thumbhash.length).toBeGreaterThan(0)
-    // Per-width shortcut keys
     expect(meta.src16).toBe('/images/photo-16.jpg')
   })
 })
@@ -148,7 +136,6 @@ describe('animated GIF handling', () => {
     expect(existsSync(gifVariant!.absPath)).toBe(true)
     expect(existsSync(webpVariant!.absPath)).toBe(true)
 
-    // Placeholders still derive from a static (first-frame) read.
     expect(image.blurhash.length).toBeGreaterThan(0)
 
     const meta = buildEntry(image, gifConfig.widths)
@@ -186,8 +173,6 @@ describe('computeThumbhash (build-time ?thumbhash pipeline)', () => {
     expect(hash.length).toBeGreaterThan(0)
     expect(() => atob(hash)).not.toThrow()
 
-    // Round-trip through our own decoder — the source is a blue image, so blue
-    // should dominate red in the decoded average.
     const url = decodeThumbHash(hash)
     expect(url).toMatch(/^data:image\/png;base64,/)
   })
@@ -201,7 +186,6 @@ describe('computeThumbhash (build-time ?thumbhash pipeline)', () => {
 
     await computeThumbhash(onlySrc)
 
-    // Only the source file exists — no resized/encoded variants were emitted.
     const { readdirSync } = await import('node:fs')
     expect(readdirSync(cleanDir)).toEqual(['solo.png'])
     rmSync(cleanDir, { recursive: true, force: true })
