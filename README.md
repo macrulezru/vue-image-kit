@@ -2,11 +2,11 @@
 
 ![Image Kit](https://github.com/macrulezru/assets/blob/master/packages-images/vue-image-kit.png?raw=true)
 
-A complete image optimization toolkit for Vue 3. One `<VImage>` component handles lazy loading, WebP/AVIF format switching, responsive art direction, Blurhash and LQIP placeholders, automatic `srcset` generation, error retry with exponential backoff, and smooth CSS transitions — with **zero external runtime dependencies** and a small, tree-shakeable footprint.
+A complete image optimization toolkit for Vue 3. One `<VImage>` component handles lazy loading, WebP/AVIF format switching, responsive art direction, Blurhash and LQIP placeholders, automatic `srcset` generation, error retry with exponential backoff, and an optional fade-in transition — with **zero external runtime dependencies** and a small, tree-shakeable footprint.
 
 Everything you need beyond the component is included: a **CLI** that processes images at build time (resize, convert, generate LQIP and BlurHash, write a TypeScript manifest), **CDN URL builders** for 12 providers (Cloudinary, imgix, Bunny, Sanity, Storyblok, Contentful, Vercel, Cloudflare, ImageKit, TwicPics, Netlify, Gumlet) with hostname auto-detection, a **Nuxt 3 module** with auto-imports, a **Vite plugin** (including on-demand dev serving), a **self-hosted on-demand image server** for when there's no CDN, and **headless composables** for fully custom markup.
 
-Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe — renders a native `<img loading="lazy">` on the server, activates IntersectionObserver and canvas after hydration.
+Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe — renders a native `<img loading="lazy">` on the server, activates IntersectionObserver-based lazy loading after hydration.
 
 ---
 
@@ -14,9 +14,9 @@ Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe —
 
 **Placeholders**
 
-- **Blurhash placeholder** — custom in-house decoder (no external packages); renders to `<canvas>` in `onMounted`; SSR renders a sized `<div>` preserving aspect-ratio
+- **Blurhash placeholder** — custom in-house decoder (no external packages); decodes to a small data URL applied as a CSS background on the image itself, swapped out once the real image loads; SSR renders the `<img>` directly, sized via `width`/`height` to preserve aspect-ratio
 - **ThumbHash placeholder** — `thumbhash` prop on VImage auto-decodes to PNG data URL; supports alpha channel; better quality than BlurHash; `--thumbhash` flag in CLI generates hashes at build time
-- **LQIP blur-up** — `data:image/…;base64,…` string as `placeholder`; blurred preview with `filter: blur()`; cross-fades via CSS `opacity` transition
+- **LQIP blur-up** — `data:image/…;base64,…` string as `placeholder`; low-res preview applied as a background image behind the real image, swapped out once it loads; optional `fadeIn` prop cross-fades the swap via CSS `opacity` transition
 - **Average-color placeholder** — `placeholderMode="color"` derives a solid background color from the ThumbHash header (0 bytes, no canvas); or set `placeholderColor` directly
 - **Shimmer placeholder** — `placeholderMode="shimmer"` shows an animated CSS skeleton (no hash needed); respects `prefers-reduced-motion`
 - **Client-side encoders** — `encodeThumbHash()` / `encodeBlurhash()` produce a hash from a `File`/`Canvas`/`ImageData` in the browser, for instant UGC previews; dependency-free
@@ -42,7 +42,8 @@ Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe —
 
 - **`useImage()`** — headless state machine (`idle → loading → loaded | error`) + computed `imgAttrs`; works with any markup
 - **`useImagePreloader()`** — preload a batch of URLs before navigation; `{ loaded, total, progress, isComplete, errors }`
-- **`useBlurhash()`**, **`useBreakpoints()`**, **`useLazyLoad()`** — the lower-level composables `VImage` itself is built on, exposed for fully custom markup
+- **`useBreakpoints()`**, **`useLazyLoad()`** — the lower-level composables `VImage` itself is built on, exposed for fully custom markup
+- **`useBlurhash()`** — decodes a BlurHash to a `<canvas>` for fully custom markup that wants its own placeholder element
 - **`useNetworkAware()`** — reactive save-data/connection-type state
 
 **CDN adapters — `@macrulez/vue-image-kit/cdn`**
