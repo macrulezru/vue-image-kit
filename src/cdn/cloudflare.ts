@@ -1,14 +1,5 @@
 import type { CdnAdapter, CdnUrlOptions } from './types.js'
 
-/**
- * Cloudflare Images (Image Resizing) adapter — uses the `/cdn-cgi/image/`
- * endpoint with comma-separated options.
- *
- * @example
- * const cdn = cloudflare('https://example.com')
- * cdn.url('/photo.jpg', { width: 800, format: 'webp' })
- * // → https://example.com/cdn-cgi/image/width=800,format=webp/photo.jpg
- */
 export function cloudflare(baseUrl: string): CdnAdapter {
   const base = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl
 

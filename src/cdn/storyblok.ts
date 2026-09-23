@@ -1,22 +1,9 @@
 import type { CdnAdapter, CdnUrlOptions } from './types.js'
 
-/**
- * Storyblok Image Service adapter.
- *
- * @example
- * const cdn = storyblok()
- * cdn.url('https://a.storyblok.com/f/12345/photo.jpg', { width: 800 })
- * // → https://a.storyblok.com/f/12345/800x0/filters:format(webp)/photo.jpg
- */
 export function storyblok(): CdnAdapter {
   function transform(fullUrl: string, opts: CdnUrlOptions = {}): string {
-    // Storyblok image URLs look like:
-    // https://a.storyblok.com/f/{spaceId}/{filename}
-    // Transforms are inserted before the filename:
-    // https://a.storyblok.com/f/{spaceId}/{WxH}/filters:format(webp)/{filename}
     const url = new URL(fullUrl)
     const parts = url.pathname.split('/')
-    // Find the index after /f/{spaceId}/
     const fIndex = parts.indexOf('f')
     if (fIndex === -1 || fIndex + 2 >= parts.length) return fullUrl
 
@@ -35,8 +22,6 @@ export function storyblok(): CdnAdapter {
     const filterStr = filters.length > 0 ? `/filters:${filters.join(':')}` : ''
     const transformPath = `${beforeFile.join('/')}/${size}${filterStr}/${filename}`
 
-    // Preserve any existing query string (e.g. a cache-busting `?v=`) —
-    // transforms themselves live in the path, not the query, for Storyblok.
     return `${url.origin}${transformPath}${url.search}`
   }
 

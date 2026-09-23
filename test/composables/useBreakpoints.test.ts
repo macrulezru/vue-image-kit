@@ -143,7 +143,6 @@ describe('useBreakpoints', () => {
         md: { avif: '/md.avif', fallback: '/md.jpg' },
         sm: { avif: '/sm.avif', webp: '/sm.webp', fallback: '/sm.jpg' },
       })
-      // sm sorts before md (max-width ascending), each group stays together and ordered.
       expect(result.map((s) => s.src)).toEqual(['/sm.avif', '/sm.webp', '/sm.jpg', '/md.avif', '/md.jpg'])
     })
 

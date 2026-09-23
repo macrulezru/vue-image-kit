@@ -1,4 +1,3 @@
-// tsc strips the shebang from bin.ts — re-add it after compilation
 const fs = require('node:fs')
 const path = require('node:path')
 

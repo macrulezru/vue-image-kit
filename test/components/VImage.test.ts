@@ -32,6 +32,34 @@ function triggerIntersect(): void {
 }
 
 describe('VImage', () => {
+  describe('attrs fallthrough (no wrapper element)', () => {
+    it('applies to the idle placeholder before loading starts', () => {
+      const wrapper = mount(VImage, {
+        props: { src: '/img.jpg', alt: 'Test' },
+        attrs: { 'data-testid': 'my-image', class: 'custom-class' },
+      })
+      const el = wrapper.find('[data-testid="my-image"]')
+      expect(el.exists()).toBe(true)
+      expect(el.element.tagName).toBe('SPAN')
+      expect(el.classes()).toContain('custom-class')
+    })
+
+    it('applies to the real <img> once it starts rendering', async () => {
+      const wrapper = mount(VImage, {
+        props: { src: '/img.jpg', alt: 'Test', lazy: false },
+        attrs: { 'data-testid': 'my-image', class: 'custom-class' },
+      })
+      await nextTick()
+      triggerIntersect()
+      await nextTick()
+      await nextTick()
+      const el = wrapper.find('[data-testid="my-image"]')
+      expect(el.exists()).toBe(true)
+      expect(el.element.tagName).toBe('IMG')
+      expect(el.classes()).toContain('custom-class')
+    })
+  })
+
   it('renders without error with required props', () => {
     const wrapper = mount(VImage, {
       props: { src: '/img.jpg', alt: 'Test image' },
@@ -155,14 +183,14 @@ describe('VImage', () => {
     expect(wrapper.emitted('error')).toBeTruthy()
   })
 
-  it('renders LQIP placeholder img when placeholder prop provided', () => {
+  it('renders LQIP placeholder as a background-image on the idle span', () => {
     const b64 = 'data:image/jpeg;base64,/9j/4AAQ=='
     const wrapper = mount(VImage, {
       props: { src: '/img.jpg', alt: 'Test', placeholder: b64 },
     })
-    const placeholderImg = wrapper.find('img[aria-hidden="true"]')
-    expect(placeholderImg.exists()).toBe(true)
-    expect(placeholderImg.attributes('src')).toBe(b64)
+    const span = wrapper.find('span[aria-hidden="true"]')
+    expect(span.exists()).toBe(true)
+    expect(span.attributes('style')).toContain(`background-image: url("${b64}")`)
   })
 
   describe('density descriptors', () => {
@@ -222,7 +250,7 @@ describe('VImage', () => {
       expect(img.attributes('style')).toContain('object-position: 100% 0%')
     })
 
-    it('also applies object-position to the placeholder so it aligns', () => {
+    it('also applies the focal point to the placeholder background so it aligns', () => {
       const wrapper = mount(VImage, {
         props: {
           src: '/img.jpg',
@@ -231,13 +259,12 @@ describe('VImage', () => {
           focal: { x: 0.25, y: 0.75 },
         },
       })
-      const placeholder = wrapper.find('img[aria-hidden="true"]')
-      expect(placeholder.attributes('style')).toContain('object-position: 25% 75%')
+      const placeholder = wrapper.find('span[aria-hidden="true"]')
+      expect(placeholder.attributes('style')).toContain('background-position: 25% 75%')
     })
   })
 
   describe('color placeholder', () => {
-    // KNOWN_HASH average → rgba(150, 146, 104, 1.000)
     const THUMBHASH = 'YQkGHQAnSJlXh4eXh4eEd4iAeA=='
 
     function colorSpan(wrapper: ReturnType<typeof mount>) {
@@ -261,7 +288,6 @@ describe('VImage', () => {
       })
       const span = colorSpan(wrapper)
       expect(span).toBeDefined()
-      // jsdom normalises rgba(…, 1.000) to rgb(…)
       expect(span!.attributes('style')).toContain('background-color: rgb(150, 146, 104)')
     })
 
@@ -277,29 +303,27 @@ describe('VImage', () => {
           placeholderMode: 'color',
         },
       })
-      // No decoded ThumbHash/LQIP <img> and no blurhash <canvas>
       expect(wrapper.find('img[aria-hidden="true"]').exists()).toBe(false)
       expect(wrapper.find('canvas').exists()).toBe(false)
-      expect(colorSpan(wrapper)).toBeDefined()
+      const span = colorSpan(wrapper)
+      expect(span).toBeDefined()
+      expect(span!.attributes('style')).not.toContain('background-image')
     })
 
     it('does not render a color span without color settings', () => {
       const wrapper = mount(VImage, {
         props: { src: '/img.jpg', alt: 'Test', thumbhash: THUMBHASH },
       })
-      // Default mode is blur → ThumbHash is decoded to an <img>, not a color span
       expect(colorSpan(wrapper)).toBeUndefined()
-      expect(wrapper.find('img[aria-hidden="true"]').exists()).toBe(true)
+      const span = wrapper.find('span[aria-hidden="true"]')
+      expect(span.attributes('style')).toContain('background-image: url("data:')
     })
 
     it('in blur mode, a real blurhash wins over a LQIP/ThumbHash placeholder instead of mounting both', () => {
-      // Regression: the blurhash <canvas> and the LQIP/ThumbHash placeholder
-      // <img> used to be independent v-if branches — supplying both a
-      // blurhash and a placeholder/thumbhash meant both mounted
-      // simultaneously (double-rendering), even though the prop doc
-      // ("'blur' (default) shows blurhash/LQIP/ThumbHash") documents them
-      // as alternatives, not layers.
-      const wrapper = mount(VImage, {
+      const thumbhashOnly = mount(VImage, {
+        props: { src: '/img.jpg', alt: 'Test', thumbhash: THUMBHASH, width: 100, height: 100 },
+      })
+      const withBlurhash = mount(VImage, {
         props: {
           src: '/img.jpg',
           alt: 'Test',
@@ -309,8 +333,11 @@ describe('VImage', () => {
           height: 100,
         },
       })
-      expect(wrapper.find('canvas').exists()).toBe(true)
-      expect(wrapper.find('img[aria-hidden="true"]').exists()).toBe(false)
+      const thumbhashOnlyStyle = thumbhashOnly.find('span[aria-hidden="true"]').attributes('style')
+      const withBlurhashStyle = withBlurhash.find('span[aria-hidden="true"]').attributes('style')
+      expect(thumbhashOnlyStyle).toContain('background-image: url("data:')
+      expect(withBlurhashStyle).toContain('background-image: url("data:')
+      expect(withBlurhashStyle).not.toBe(thumbhashOnlyStyle)
     })
 
     it('falls back to the LQIP/ThumbHash placeholder when blurhash cannot render (missing width/height)', () => {
@@ -320,11 +347,10 @@ describe('VImage', () => {
           alt: 'Test',
           thumbhash: THUMBHASH,
           blurhash: 'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
-          // no width/height — the canvas can't decode without them
         },
       })
-      expect(wrapper.find('canvas').exists()).toBe(false)
-      expect(wrapper.find('img[aria-hidden="true"]').exists()).toBe(true)
+      const span = wrapper.find('span[aria-hidden="true"]')
+      expect(span.attributes('style')).toContain('background-image: url("data:')
     })
   })
 
@@ -341,7 +367,6 @@ describe('VImage', () => {
         },
       })
       expect(wrapper.find('.vik-shimmer').exists()).toBe(true)
-      // shimmer suppresses the blur canvas and any placeholder img
       expect(wrapper.find('canvas').exists()).toBe(false)
       expect(wrapper.find('img[aria-hidden="true"]').exists()).toBe(false)
     })
@@ -351,7 +376,7 @@ describe('VImage', () => {
       expect(wrapper.find('.vik-shimmer').exists()).toBe(false)
     })
 
-    it('hides the shimmer (opacity 0) once the image has loaded', async () => {
+    it('removes the shimmer class once the image has loaded', async () => {
       const wrapper = mount(VImage, {
         props: { src: '/img.jpg', alt: 'Test', placeholderMode: 'shimmer', lazy: false },
       })
@@ -359,9 +384,10 @@ describe('VImage', () => {
       triggerIntersect()
       await nextTick()
       const img = wrapper.find('img:not([aria-hidden])')
+      expect(img.classes()).toContain('vik-shimmer')
       await img.trigger('load')
       await nextTick()
-      expect(wrapper.find('.vik-shimmer').attributes('style')).toContain('opacity: 0')
+      expect(wrapper.find('img:not([aria-hidden])').classes()).not.toContain('vik-shimmer')
     })
   })
 
@@ -597,7 +623,6 @@ describe('VImage', () => {
         props: { src: '/hero.jpg', alt: 'Hero', priority: true, respectSaveData: true },
       })
 
-      // priority still wins — lazy loading skipped, no IO registered.
       expect(observeSpy).not.toHaveBeenCalled()
     })
 
@@ -633,9 +658,6 @@ describe('VImage', () => {
 
       const img = wrapper.find('img:not([aria-hidden])')
       expect(img.attributes('src')).toBe('/small.jpg')
-      // The whole point of the downgrade: no srcset/density descriptors left
-      // for the browser to override `src` with — it would otherwise still
-      // fetch /large@2x.jpg on a high-DPR device regardless of `src`.
       expect(img.attributes('srcset')).toBeUndefined()
     })
 
@@ -678,31 +700,24 @@ describe('VImage', () => {
       await nextTick()
       await nextTick()
 
-      // useImage()'s own precedence is density > widths > rawSrcset — with
-      // `widths` also set, `densities` would otherwise still win and leak the
-      // large URLs unless it's actually dropped from the options passed in,
-      // not just coincidentally absent because nothing else was set either.
       const img = wrapper.find('img:not([aria-hidden])')
       expect(img.attributes('src')).toBe('/small.jpg')
       expect(img.attributes('src')).not.toContain('@2x')
       expect(img.attributes('src')).not.toContain('@3x')
       expect(img.attributes('srcset')).not.toContain('@2x')
       expect(img.attributes('srcset')).not.toContain('@3x')
-      // `widths` itself is left alone by design (see the `respectSaveData`
-      // prop's own comment) — harmless here since it just repeats the
-      // already-downgraded small URL for every width candidate.
       expect(img.attributes('srcset')).toBe('/small.jpg 400w, /small.jpg 800w')
     })
   })
 
   describe('layout prop', () => {
-    it('defaults to filling the container with aspect-ratio (unchanged legacy behavior)', () => {
+    it('defaults to filling the container with aspect-ratio', () => {
       const wrapper = mount(VImage, {
         props: { src: '/img.jpg', alt: 'Default', width: 800, height: 400 },
       })
       const style = wrapper.find('span').element.style
-      expect(style.position).toBe('relative')
-      expect(style.width).toBe('')
+      expect(style.position).toBe('')
+      expect(style.width).toBe('100%')
       expect(style.aspectRatio).toBe('800 / 400')
     })
 
@@ -758,10 +773,6 @@ describe('VImage', () => {
     })
 
     it('unset layout auto-generates sizes too — visually identical to "responsive", so it gets the same heuristic', async () => {
-      // Regression: layout unset used to skip the auto-sizes heuristic
-      // entirely, even though it renders identically to layout="responsive"
-      // (see wrapperStyle) — an unset-layout <VImage> with widths but no
-      // explicit sizes silently fell back to the generic '100vw' default.
       const wrapper = mount(VImage, {
         props: {
           src: '/img.jpg', alt: 'No layout', width: 640, height: 320,
@@ -789,7 +800,6 @@ describe('VImage', () => {
         await nextTick()
         await nextTick()
 
-        // Falls back to the generic default — proves the width-based heuristic didn't fire.
         expect(wrapper.find('img:not([aria-hidden])').attributes('sizes')).toBe('100vw')
       }
     })

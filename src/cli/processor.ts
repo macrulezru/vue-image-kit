@@ -30,14 +30,11 @@ function fileSize(path: string): number {
   }
 }
 
-// Exported so the Vite plugin (build-time `?vik`/`?thumbhash` imports) can't
-// drift out of sync with what the CLI directory scan actually processes.
 export const SUPPORTED_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.tiff', '.tif', '.gif', '.svg'])
 
 type SharpFactory = Awaited<ReturnType<typeof getSharp>>
 type SharpImage = ReturnType<SharpFactory>
 
-// Lazy-load sharp to give a clear error when not installed
 async function getSharp() {
   try {
     const sharp = (await import('sharp')).default
@@ -52,7 +49,6 @@ async function getSharp() {
   }
 }
 
-// Lazy-load thumbhash with the same clear-error contract as sharp.
 async function getRgbaToThumbHash(): Promise<(w: number, h: number, rgba: Uint8Array) => Uint8Array> {
   try {
     return (await import('thumbhash')).rgbaToThumbHash
@@ -66,7 +62,6 @@ async function getRgbaToThumbHash(): Promise<(w: number, h: number, rgba: Uint8A
   }
 }
 
-// Encode a ThumbHash (base64) from a sharp image — resized to a 100px RGBA thumbnail.
 async function thumbhashFromImage(image: SharpImage): Promise<string> {
   const rgbaToThumbHash = await getRgbaToThumbHash()
   const { data, info } = await image
@@ -122,9 +117,6 @@ function copyThrough(srcPath: string, outPath: string, config: CliConfig): void 
   copyFileSync(srcPath, outPath)
 }
 
-// SVG is already resolution-independent — copy it through untouched instead
-// of rasterizing. `sharp` can still read width/height (via librsvg) for the
-// manifest without us re-encoding anything.
 async function processSvg(
   srcPath: string,
   name: string,
@@ -138,19 +130,17 @@ async function processSvg(
   const skipped = config.skipExisting && existsSync(outPath)
   copyThrough(srcPath, outPath, config)
 
-  let width = 0
-  let height = 0
+  let width: number
+  let height: number
   try {
     const meta = await sharp(srcPath).metadata()
     width = meta.width ?? 0
     height = meta.height ?? 0
   } catch {
-    // Some minimal/malformed SVGs aren't readable by librsvg — dimensions
-    // just stay 0 rather than failing the whole batch over one icon.
+    width = 0
+    height = 0
   }
 
-  // Byte-identical copy — the source's own size is always the output size,
-  // dry-run or not.
   const sizeBytes = fileSize(srcPath)
 
   return {
@@ -167,11 +157,6 @@ async function processSvg(
   }
 }
 
-// Animated GIF: copy the original through as the guaranteed-compatible
-// fallback, and (when webp is in the requested formats) re-encode to
-// animated WebP, which is meaningfully smaller. AVIF is skipped — sharp's
-// (libavif) animated-AVIF support is too inconsistent across platforms to
-// promise here.
 async function buildGifVariants(
   srcPath: string,
   name: string,
@@ -187,7 +172,6 @@ async function buildGifVariants(
   const gifOutPath = join(outputDir, gifFilename)
   const gifSkipped = config.skipExisting && existsSync(gifOutPath)
   copyThrough(srcPath, gifOutPath, config)
-  // Byte-identical copy — the source's own size is always the output size.
   variants.push({
     absPath: gifOutPath,
     url: buildUrl(config.publicPath, gifFilename),
@@ -234,7 +218,6 @@ async function buildRasterVariants(
   outputDir: string,
   config: CliConfig,
 ): Promise<ProcessedVariant[]> {
-  // Skip widths larger than the original; always include the original size.
   const targetWidths = config.widths.filter((w) => w <= originalWidth)
   if (!targetWidths.includes(originalWidth)) {
     targetWidths.push(originalWidth)
@@ -245,8 +228,6 @@ async function buildRasterVariants(
 
   for (const width of targetWidths) {
     const isOriginal = width === originalWidth
-    // Aspect-ratio estimate — overwritten by sharp's real OutputInfo below
-    // whenever we actually encode (skip-existing/dry-run fall back to it).
     const estimatedHeight = originalWidth > 0 ? Math.round((width * originalHeight) / originalWidth) : 0
 
     for (const format of config.formats) {
@@ -317,7 +298,6 @@ async function processOne(
     ? await buildGifVariants(srcPath, name, originalWidth, originalHeight, outputDir, config, sharp)
     : await buildRasterVariants(image, name, originalWidth, originalHeight, outputDir, config)
 
-  // LQIP — tiny 20px JPEG → base64 data URL
   let placeholder = ''
   if (config.lqip && !config.dryRun) {
     const lqipBuf = await image
@@ -328,7 +308,6 @@ async function processOne(
     placeholder = `data:image/jpeg;base64,${lqipBuf.toString('base64')}`
   }
 
-  // BlurHash — compute from a small thumbnail for speed
   let blurhashStr = ''
   if (config.blurhash && !config.dryRun) {
     const thumbSize = 64
@@ -338,14 +317,12 @@ async function processOne(
       .raw()
       .toBuffer({ resolveWithObject: true })
 
-    // sharp .raw() by default gives RGB (3 channels) unless image has alpha
     const channels = info.channels
     let rgbBuf: Buffer
 
     if (channels === 3) {
       rgbBuf = data
     } else {
-      // Strip alpha if present (RGBA → RGB)
       rgbBuf = Buffer.alloc(info.width * info.height * 3)
       for (let i = 0; i < info.width * info.height; i++) {
         rgbBuf[i * 3] = data[i * channels]!
@@ -357,7 +334,6 @@ async function processOne(
     blurhashStr = encodeBlurhash(rgbBuf, info.width, info.height)
   }
 
-  // ThumbHash — RGBA thumbnail (alpha preserved)
   let thumbhashStr = ''
   if (config.thumbhash && !config.dryRun) {
     thumbhashStr = await thumbhashFromImage(image)
@@ -394,8 +370,6 @@ export async function generate(config: CliConfig): Promise<void> {
     return
   }
 
-  // Disabled under --dry-run: nothing is actually written, so there's
-  // nothing valid to persist and no files to compare against next time.
   let incrementalState: IncrementalState | null = null
   if (config.incremental && !config.dryRun) {
     const configHash = computeConfigHash(config)
@@ -415,10 +389,6 @@ export async function generate(config: CliConfig): Promise<void> {
 
     if (incrementalState) {
       const entry = incrementalState.entries[absSrc]
-      // Trust the cached entry only if every output file it references is
-      // still actually on disk — the incremental state can't tell the
-      // difference between "source unchanged" and "source unchanged, but
-      // someone deleted a generated file out from under it" on its own.
       if (isUnchanged(entry, absSrc) && entry!.image.variants.every((v) => existsSync(v.absPath))) {
         skippedCount++
         return entry!.image
@@ -436,8 +406,6 @@ export async function generate(config: CliConfig): Promise<void> {
   })
 
   if (incrementalState) {
-    // Drop entries for sources that no longer exist, so a manifest can't
-    // grow forever across renames/deletions.
     const currentPaths = new Set(srcFiles.map((p) => resolve(p)))
     for (const key of Object.keys(incrementalState.entries)) {
       if (!currentPaths.has(key)) delete incrementalState.entries[key]
@@ -460,20 +428,11 @@ export async function generate(config: CliConfig): Promise<void> {
   }
 }
 
-/**
- * Process a single source image (resize, formats, placeholders) and return its
- * metadata. Used by the Vite plugin for build-time `?vik` imports — bypasses the
- * directory scan and manifest, writing variants straight into `config.output`.
- */
 export async function processImage(srcPath: string, config: CliConfig): Promise<ProcessedImage> {
   const sharp = await getSharp()
   return processOne(srcPath, config, sharp)
 }
 
-/**
- * Compute only the ThumbHash (base64) for a single image — no variant files are
- * written. Used by the Vite plugin for `?thumbhash` imports.
- */
 export async function computeThumbhash(srcPath: string): Promise<string> {
   const sharp = await getSharp()
   return thumbhashFromImage(sharp(srcPath))
@@ -490,7 +449,6 @@ export async function watch(config: CliConfig): Promise<void> {
     generate(config).catch((err) => console.error('[vue-image-kit] Error:', err))
   }
 
-  // Initial run
   run()
 
   fsWatch(resolve(config.input), { recursive: true }, (_event, filename) => {

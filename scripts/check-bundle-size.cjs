@@ -1,6 +1,3 @@
-// Fails CI when a shipped browser bundle grows past its budget — keeps the
-// numbers in the README's "Bundle size & peer dependencies" table honest
-// without anyone having to remember to update them by hand.
 const fs = require('node:fs')
 const path = require('node:path')
 const zlib = require('node:zlib')

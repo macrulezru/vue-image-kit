@@ -21,7 +21,6 @@ export async function loadConfig(cwd = process.cwd()): Promise<PartialCliConfig>
         const { readFileSync } = await import('node:fs')
         return JSON.parse(readFileSync(absPath, 'utf8')) as PartialCliConfig
       }
-      // Dynamic import for .js/.mjs/.cjs
       const mod = await import(resolve(absPath))
       const config = (mod.default ?? mod) as PartialCliConfig
       return config

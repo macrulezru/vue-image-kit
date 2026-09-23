@@ -1,23 +1,20 @@
 import { describe, it, expect } from 'vitest'
 import { encodeBlurhash } from '../../src/cli/blurhash-encode'
 
-// 4×4 pixels of solid red (RGB, 3 bytes per pixel)
 function solidRed(w: number, h: number): Buffer {
   const buf = Buffer.alloc(w * h * 3)
   for (let i = 0; i < w * h; i++) {
-    buf[i * 3] = 255   // R
-    buf[i * 3 + 1] = 0 // G
-    buf[i * 3 + 2] = 0 // B
+    buf[i * 3] = 255
+    buf[i * 3 + 1] = 0
+    buf[i * 3 + 2] = 0
   }
   return buf
 }
 
-// 4×4 pixels of solid white
 function solidWhite(w: number, h: number): Buffer {
   return Buffer.alloc(w * h * 3, 255)
 }
 
-// 4×4 pixels of solid black
 function solidBlack(w: number, h: number): Buffer {
   return Buffer.alloc(w * h * 3, 0)
 }

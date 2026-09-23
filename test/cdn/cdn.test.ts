@@ -14,8 +14,6 @@ import {
   gumlet,
 } from '../../src/cdn/index'
 
-// ─── Cloudinary ───────────────────────────────────────────────────────────────
-
 describe('cloudinary', () => {
   const cdn = cloudinary({ cloudName: 'demo' })
 
@@ -50,7 +48,6 @@ describe('cloudinary', () => {
     expect(srcset).toContain('400w')
     expect(srcset).toContain('800w')
     expect(srcset).toContain('1200w')
-    // split on ", " (comma+space) — Cloudinary URLs contain commas in transforms
     expect(srcset.split(', ').length).toBe(3)
   })
 
@@ -75,8 +72,6 @@ describe('cloudinary', () => {
     expect(url).toContain('c_fill')
   })
 })
-
-// ─── imgix ────────────────────────────────────────────────────────────────────
 
 describe('imgix', () => {
   const cdn = imgix('https://mysite.imgix.net')
@@ -120,8 +115,6 @@ describe('imgix', () => {
   })
 })
 
-// ─── Bunny CDN ────────────────────────────────────────────────────────────────
-
 describe('bunny', () => {
   const cdn = bunny('https://myzone.b-cdn.net')
 
@@ -145,8 +138,6 @@ describe('bunny', () => {
     expect(srcset.split(',').length).toBe(3)
   })
 })
-
-// ─── Sanity ───────────────────────────────────────────────────────────────────
 
 describe('sanity', () => {
   const cdn = sanity({ projectId: 'abc123', dataset: 'production' })
@@ -177,8 +168,6 @@ describe('sanity', () => {
     expect(srcset).toContain('800w')
   })
 })
-
-// ─── Storyblok ────────────────────────────────────────────────────────────────
 
 describe('storyblok', () => {
   const cdn = storyblok()
@@ -216,8 +205,6 @@ describe('storyblok', () => {
   })
 })
 
-// ─── Contentful ───────────────────────────────────────────────────────────────
-
 describe('contentful', () => {
   const cdn = contentful()
   const base = 'https://images.ctfassets.net/space/token/photo.jpg'
@@ -248,8 +235,6 @@ describe('contentful', () => {
     expect(srcset).toContain('800w')
   })
 })
-
-// ─── Vercel ───────────────────────────────────────────────────────────────────
 
 describe('vercel', () => {
   const cdn = vercel({ origin: 'https://myapp.vercel.app' })
@@ -284,8 +269,6 @@ describe('vercel', () => {
   })
 })
 
-// ─── Cloudflare Images ──────────────────────────────────────────────────────
-
 describe('cloudflare', () => {
   const cdn = cloudflare('https://example.com')
 
@@ -318,8 +301,6 @@ describe('cloudflare', () => {
   })
 })
 
-// ─── ImageKit ───────────────────────────────────────────────────────────────
-
 describe('imagekit', () => {
   const cdn = imagekit('https://ik.imagekit.io/demo')
 
@@ -351,8 +332,6 @@ describe('imagekit', () => {
   })
 })
 
-// ─── TwicPics ─────────────────────────────────────────────────────────────
-
 describe('twicpics', () => {
   const cdn = twicpics('https://demo.twic.pics')
 
@@ -380,8 +359,6 @@ describe('twicpics', () => {
     expect(srcset).toContain('800w')
   })
 })
-
-// ─── Netlify Image CDN ──────────────────────────────────────────────────────
 
 describe('netlify', () => {
   const cdn = netlify({ origin: 'https://app.netlify.app' })
@@ -413,8 +390,6 @@ describe('netlify', () => {
     expect(srcset).toContain('800w')
   })
 })
-
-// ─── Gumlet ───────────────────────────────────────────────────────────────
 
 describe('gumlet', () => {
   const cdn = gumlet('https://demo.gumlet.io')

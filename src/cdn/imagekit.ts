@@ -1,14 +1,5 @@
 import type { CdnAdapter, CdnUrlOptions } from './types.js'
 
-/**
- * ImageKit.io adapter — transformations go in the `tr` query parameter as
- * dash-separated key-value pairs.
- *
- * @example
- * const cdn = imagekit('https://ik.imagekit.io/your_id')
- * cdn.url('photo.jpg', { width: 800, format: 'webp' })
- * // → https://ik.imagekit.io/your_id/photo.jpg?tr=w-800,f-webp
- */
 export function imagekit(baseUrl: string): CdnAdapter {
   const base = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl
 
@@ -23,7 +14,6 @@ export function imagekit(baseUrl: string): CdnAdapter {
       tr.push(opts.format ? `f-${opts.format}` : 'f-auto')
 
       if (opts.fit) {
-        // ImageKit crop strategies (c-) / crop modes (cm-)
         const fitMap: Record<string, string> = {
           cover: 'c-maintain_ratio',
           contain: 'cm-pad_resize',

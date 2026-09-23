@@ -11,16 +11,6 @@ interface UseImagePreloaderReturn {
   preload: (urls: string[]) => Promise<void>
 }
 
-/**
- * Preloads a batch of images before navigation (e.g. next slide in a gallery).
- *
- * @example
- * const { preload, progress, isComplete } = useImagePreloader()
- *
- * onMounted(async () => {
- *   await preload(['/slide-1.jpg', '/slide-2.jpg', '/slide-3.jpg'])
- * })
- */
 export function useImagePreloader(): UseImagePreloaderReturn {
   const loaded = ref(0)
   const totalCount = ref(0)
@@ -34,8 +24,6 @@ export function useImagePreloader(): UseImagePreloaderReturn {
 
   function preload(urls: string[]): Promise<void> {
     if (urls.length === 0) return Promise.resolve()
-    // Preloading is a bandwidth trade for a smoother later transition — the
-    // wrong trade to make once the user has asked their browser/OS to save data.
     if (isSaveDataEnabled()) return Promise.resolve()
 
     loaded.value = 0

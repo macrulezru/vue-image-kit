@@ -1,13 +1,5 @@
 import type { CdnAdapter, CdnUrlOptions } from './types.js'
 
-/**
- * Gumlet adapter — query-parameter based (imgix-like API).
- *
- * @example
- * const cdn = gumlet('https://demo.gumlet.io')
- * cdn.url('photo.jpg', { width: 800, format: 'webp' })
- * // → https://demo.gumlet.io/photo.jpg?w=800&format=webp
- */
 export function gumlet(baseUrl: string): CdnAdapter {
   const base = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl
 

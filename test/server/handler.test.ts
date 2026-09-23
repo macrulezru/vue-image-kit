@@ -6,13 +6,6 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import sharp from 'sharp'
 import { createImageHandler } from '../../src/server/handler'
 
-// Integration test: drives the real sharp pipeline, same as
-// test/cli/process-image.test.ts, but through the request-handler surface.
-
-// On Windows, libvips/sharp can keep a native read handle on a source file
-// open past the end of a previous request that read it, briefly blocking a
-// fresh sharp() write to that same path (see test/cli/process-image.test.ts
-// for the same class of issue). Retry instead of failing the test over it.
 async function writeJpegWithRetry(
   path: string,
   color: { r: number; g: number; b: number },
@@ -70,10 +63,6 @@ beforeAll(async () => {
     .jpeg()
     .toFile(srcPath)
 
-  // Symlink creation needs elevated privileges on Windows unless Developer
-  // Mode is on — probe once so the symlink-escape test can skip gracefully
-  // instead of failing on unrelated environments (CI runs on ubuntu-latest,
-  // where this always works).
   try {
     const probeTarget = join(root, '.symlink-probe-target')
     const probeLink = join(root, '.symlink-probe-link')
@@ -169,7 +158,6 @@ describe('createImageHandler', () => {
     expect(second.state.statusCode).toBe(200)
     expect(second.state.body).toEqual(first.state.body)
 
-    // Same cache key — still exactly one cached file, not a second one.
     expect(readdirSync(cacheDir)).toHaveLength(1)
   })
 
@@ -208,13 +196,7 @@ describe('createImageHandler', () => {
     await handler(mockReq('/img?src=/photo.jpg&w=100&format=webp'), first.res)
     expect(first.state.statusCode).toBe(200)
 
-    // Overwrite the source under the same path/name — same cache-key inputs
-    // as before except the source itself, so this only proves the fix if the
-    // key actually incorporates the source's own version.
     await writeJpegWithRetry(isolatedSrc, { r: 250, g: 250, b: 250 })
-    // Force a deliberately distinct mtime instead of trusting a real-clock
-    // sleep to outlast the filesystem's mtime resolution (coarser than 1ms
-    // on some filesystems/CI runners) — deterministic regardless of timing.
     const bumped = new Date(statSync(isolatedSrc).mtime.getTime() + 60_000)
     utimesSync(isolatedSrc, bumped, bumped)
 
@@ -223,7 +205,6 @@ describe('createImageHandler', () => {
     expect(second.state.statusCode).toBe(200)
     expect(second.state.body).not.toEqual(first.state.body)
 
-    // Two distinct sources → two distinct cache entries, not one overwritten.
     expect(readdirSync(isolatedCacheDir).filter((f) => !f.startsWith('.tmp-'))).toHaveLength(2)
 
     rmSync(isolatedRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
@@ -341,7 +322,6 @@ describe('createImageHandler', () => {
       expect(meta.width).toBe(70)
     }
 
-    // Exactly one real cache file, and no leftover temp files from the race.
     const files = readdirSync(concurrentCacheDir)
     expect(files.filter((f) => !f.startsWith('.tmp-'))).toHaveLength(1)
     expect(files.filter((f) => f.startsWith('.tmp-'))).toHaveLength(0)

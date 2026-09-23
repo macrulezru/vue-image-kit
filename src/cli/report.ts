@@ -11,7 +11,6 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KB`
 }
 
-// Aggregate totals can run into MB — auto-scales instead of printing e.g. "4213.7 KB".
 function formatTotalBytes(bytes: number): string {
   const kb = bytes / 1024
   return kb >= 1024 ? `${(kb / 1024).toFixed(2)} MB` : `${kb.toFixed(1)} KB`
@@ -25,11 +24,6 @@ function padLeft(s: string, width: number): string {
   return ' '.repeat(Math.max(0, width - s.length)) + s
 }
 
-/**
- * Prints a detailed per-image block: source path/format/dimensions/size, then
- * one aligned line per output variant (path, format, dimensions, size — with
- * a `(existing)` or `(dry-run — not written)` suffix where relevant).
- */
 export function printImageReport(image: ProcessedImage): void {
   console.log(`[vue-image-kit] ${image.name}`)
   console.log(`  Input   ${toRelative(image.srcAbsPath)}`)
@@ -59,18 +53,6 @@ export function printImageReport(image: ProcessedImage): void {
   }
 }
 
-/**
- * Prints the batch total after all images in a `generate()` run are
- * processed: image/file counts, total input vs. output size, and how much
- * the *smallest available format* saves vs. the original on average.
- *
- * That last number deliberately isn't "total output vs. total input" — with
- * multiple widths × formats generated per image, total output is naturally
- * many times the single original's size, which would read as "this made
- * things worse" when it didn't. Comparing each image's lightest variant
- * (whichever format ends up smallest) against its original answers the
- * question that actually matters: how much smaller can this get.
- */
 export function printBatchSummary(images: ProcessedImage[]): void {
   const fileCount = images.reduce((n, img) => n + img.variants.length, 0)
   console.log(`[vue-image-kit] Done. ${images.length} image(s) → ${fileCount} file(s).`)
@@ -80,7 +62,7 @@ export function printBatchSummary(images: ProcessedImage[]): void {
     (sum, img) => sum + img.variants.reduce((m, v) => m + Math.max(v.sizeBytes, 0), 0),
     0,
   )
-  if (totalInputBytes <= 0 || totalOutputBytes <= 0) return // dry-run or unreadable — nothing meaningful to add
+  if (totalInputBytes <= 0 || totalOutputBytes <= 0) return
 
   const totalSmallestBytes = images.reduce((sum, img) => {
     const smallest = img.variants.reduce(

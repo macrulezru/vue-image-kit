@@ -4,37 +4,23 @@ import { useLazyLoad } from './useLazyLoad'
 import type { ImageStatus } from '../types'
 
 export interface UseBackgroundImageOptions {
-  /** URL or data URL shown (blurred) until the full image loads. */
   placeholder?: string
-  /**
-   * Density descriptors for a responsive `image-set()` background, e.g. `[1, 2]`
-   * → `image-set(url("…") 1x, url("…") 2x)`. This is the CSS-native equivalent of
-   * `srcset` that plain `background-image` (and `v-lazy-img`) can't express.
-   */
   densities?: number[]
-  /** Optional MIME hint for the `image-set()` entries, e.g. `'image/webp'`. */
   type?: string
-  /** Lazy-load with IntersectionObserver. Default `true`. */
   lazy?: boolean
   rootMargin?: string
   threshold?: number
-  /** CSS transition for the blur-up. Default `'0.4s ease'`. */
   transition?: string
-  /** `background-size`. Default `'cover'`. */
   backgroundSize?: string
-  /** `background-position`. Default `'center'`. */
   backgroundPosition?: string
 }
 
 export interface UseBackgroundImageReturn {
-  /** Attach to the element via a template ref. */
   target: Ref<HTMLElement | null>
-  /** Bind via `:style`. Switches placeholder → full image on load. */
   style: ComputedRef<StyleValue>
   status: Ref<ImageStatus>
   isLoaded: ComputedRef<boolean>
   isLoading: ComputedRef<boolean>
-  /** Manually trigger loading (e.g. when not using lazy mode). */
   load: () => void
 }
 
@@ -45,19 +31,6 @@ function buildBackgroundImage(src: string, densities?: number[], type?: string):
   return `image-set(${entries})`
 }
 
-/**
- * Responsive + lazy `background-image` for any element. CSS backgrounds support
- * neither `srcset` nor native lazy loading; this composable adds both — an
- * `image-set()` value for resolution switching plus IntersectionObserver gating
- * with a blur-up placeholder.
- *
- * @example
- * const { target, style } = useBackgroundImage('/hero.jpg', {
- *   placeholder: lqip,
- *   densities: [1, 2],
- * })
- * // <div ref="target" :style="style" />
- */
 export function useBackgroundImage(
   src: string,
   options: UseBackgroundImageOptions = {},

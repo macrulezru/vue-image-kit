@@ -20,8 +20,6 @@ export default defineConfig({
     outDir: 'dist/server',
     emptyOutDir: true,
     rollupOptions: {
-      // Node builtins + the optional sharp peer dep must stay external —
-      // this is a Node-only entry, never bundled for the browser.
       external: [
         'sharp',
         /^node:/,

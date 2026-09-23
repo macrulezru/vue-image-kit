@@ -99,7 +99,5 @@ describe('useNetworkAware', () => {
 
     connection.change(true)
     await nextTick()
-    // No assertion target left on the unmounted instance — just verifying
-    // this doesn't throw (listener was removed, not left dangling).
   })
 })

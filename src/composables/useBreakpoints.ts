@@ -9,14 +9,9 @@ import type { InjectionKey } from 'vue'
 interface MediaSource {
   media: string
   src: string
-  /** MIME type for a format-qualified <source> (art direction + format switching combined). */
   type?: string
 }
 
-// <picture> берёт первый подходящий source сверху вниз.
-// max-width: сортируем по возрастанию (640 → 1024 → …)
-// min-width: сортируем по убыванию (1600 → 1025 → …)
-// прочие медиа-запросы: сохраняем исходный порядок
 function sortSources(sources: MediaSource[]): MediaSource[] {
   const maxWidth: MediaSource[] = []
   const minWidth: MediaSource[] = []
@@ -40,7 +35,6 @@ function sortSources(sources: MediaSource[]): MediaSource[] {
     return bw - aw
   })
 
-  // max-width ascending first (mobile-first), then min-width descending (desktop-first), then other
   return [...maxWidth, ...minWidth, ...other]
 }
 
@@ -60,10 +54,6 @@ export function useBreakpoints(localBreakpoints?: BreakpointMap): UseBreakpoints
   function resolveMediaSources(sources: ResponsiveSrc | undefined): MediaSource[] {
     if (!sources) return []
 
-    // A breakpoint's value is either a plain URL, or a { avif?, webp?,
-    // fallback } object — art direction and format switching combined. All
-    // entries for one breakpoint share its media query; sortSources' stable
-    // sort keeps them adjacent and in this push order (avif → webp → fallback).
     const result: MediaSource[] = []
     for (const [key, value] of Object.entries(sources)) {
       const media = merged.value[key]

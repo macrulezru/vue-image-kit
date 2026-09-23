@@ -2,7 +2,6 @@ import type { CdnAdapter, CdnUrlOptions } from './types.js'
 
 export interface CloudinaryOptions {
   cloudName: string
-  /** Default: 'image/upload' */
   resourceType?: string
 }
 
@@ -22,17 +21,6 @@ function buildTransforms(opts: CdnUrlOptions): string {
   return parts.join(',')
 }
 
-/**
- * Cloudinary CDN adapter.
- *
- * @example
- * const cdn = cloudinary({ cloudName: 'my-cloud' })
- * cdn.url('photo.jpg', { width: 800 })
- * // → https://res.cloudinary.com/my-cloud/w_800,q_auto,f_auto/image/upload/photo.jpg
- *
- * cdn.srcset('photo.jpg', [400, 800, 1200])
- * // → 'https://res.cloudinary.com/my-cloud/w_400,q_auto,f_auto/image/upload/photo.jpg 400w, ...'
- */
 export function cloudinary(options: CloudinaryOptions): CdnAdapter {
   const { cloudName, resourceType = 'image/upload' } = options
   const base = `https://res.cloudinary.com/${cloudName}`

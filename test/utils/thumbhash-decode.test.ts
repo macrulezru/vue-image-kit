@@ -6,8 +6,6 @@ import {
   thumbHashToAverageColor,
 } from '../../src/utils/thumbhash-decode'
 
-// Valid ThumbHash — header bytes: lx=7, ly=3, isLandscape=false → 23×32 px thumbnail.
-// This hash decodes to a warm olive image (R≈G>B), NOT a red one.
 const KNOWN_HASH = 'YQkGHQAnSJlXh4eXh4eEd4iAeA=='
 
 function toBytes(b64: string): Uint8Array {
@@ -53,9 +51,6 @@ describe('decodeThumbHash', () => {
 })
 
 describe('thumbHashToRGBA — pixel regression (guards the red-cast bug)', () => {
-  // Golden values produced by Evan Wallace's reference implementation
-  // (github.com/evanw/thumbhash) for KNOWN_HASH. If the YCbCr→RGB formula
-  // regresses, these RGB triples drift and the test fails.
   const { w, h, rgba } = thumbHashToRGBA(toBytes(KNOWN_HASH))
 
   it('decodes to the expected 23×32 thumbnail', () => {
@@ -64,7 +59,6 @@ describe('thumbHashToRGBA — pixel regression (guards the red-cast bug)', () =>
     expect(rgba.length).toBe(w * h * 4)
   })
 
-  // Allow ±2 per channel for rounding differences across engines.
   const close = (got: number[], want: number[]) => {
     for (let c = 0; c < 4; c++) expect(Math.abs(got[c]! - want[c]!)).toBeLessThanOrEqual(2)
   }
@@ -83,7 +77,6 @@ describe('thumbHashToRGBA — pixel regression (guards the red-cast bug)', () =>
 
   it('matches the reference average RGBA (DC color, no decode)', () => {
     const avg = thumbHashToAverageRGBA(KNOWN_HASH)
-    // Reference thumbHashToAverageRGBA values for KNOWN_HASH.
     expect(avg.r).toBeCloseTo(0.5899, 3)
     expect(avg.g).toBeCloseTo(0.5741, 3)
     expect(avg.b).toBeCloseTo(0.4074, 3)
@@ -99,8 +92,6 @@ describe('thumbHashToRGBA — pixel regression (guards the red-cast bug)', () =>
   })
 
   it('is a warm olive image, not red — R≈G and both clearly exceed B', () => {
-    // The red-cast bug inflated R relative to G/B. Assert the true relationship:
-    // average red and green are within ~6% of each other and both well above blue.
     let sumR = 0, sumG = 0, sumB = 0
     const n = w * h
     for (let i = 0; i < n; i++) {

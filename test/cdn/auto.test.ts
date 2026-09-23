@@ -43,10 +43,6 @@ describe('autoLoader', () => {
   })
 
   it('leaves a query-bearing imgix URL unchanged instead of dropping the query', () => {
-    // detectImgix builds a fresh URL from `url.pathname` alone via the
-    // adapter's own `.url()` — it has no way to merge an existing query
-    // string (e.g. a signed-URL token) into imgix's own param scheme, so it
-    // must bail out rather than silently drop it.
     const url = 'https://mysite.imgix.net/photo.jpg?s=abc123token'
     expect(autoLoader(url, { width: 800 })).toBe(url)
   })
@@ -97,7 +93,6 @@ describe('autoLoader', () => {
   })
 
   it('config.hosts takes precedence over hostname-fingerprint detection', () => {
-    // Contrived, but proves the precedence order rather than assuming it.
     const url = autoLoader(
       'https://mysite.imgix.net/photo.jpg',
       { width: 800 },

@@ -7,22 +7,14 @@ import { generate } from '../../src/cli/processor'
 import { DEFAULTS } from '../../src/cli/config'
 import type { CliConfig } from '../../src/cli/types'
 
-// End-to-end: drives the real generate() pipeline (real sharp encodes) across
-// multiple runs against the same output dir, the way --watch or the Vite
-// plugin's buildStart/handleHotUpdate actually invoke it repeatedly.
-
 function cleanupDir(dir: string): void {
   try {
     rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   } catch {
-    // best-effort — see test/cli/process-image.test.ts for why
+    return
   }
 }
 
-// On Windows, libvips/sharp can keep a native read handle on a source file
-// open past the end of the previous generate() call, briefly blocking a
-// fresh sharp() write to that same path (see test/cli/process-image.test.ts
-// for the same class of issue). Retry instead of failing the test over it.
 async function writeJpegWithRetry(path: string, color: { r: number; g: number; b: number }): Promise<void> {
   for (let attempt = 1; ; attempt++) {
     try {
@@ -32,7 +24,7 @@ async function writeJpegWithRetry(path: string, color: { r: number; g: number; b
       return
     } catch (err) {
       if (attempt >= 30) throw err
-      if (global.gc) global.gc() // vitest runs with --expose-gc; nudges the stale Sharp wrapper's release sooner
+      if (global.gc) global.gc()
       await new Promise((r) => setTimeout(r, 200))
     }
   }
@@ -45,7 +37,7 @@ async function setup() {
   mkdirSync(input, { recursive: true })
 
   await writeJpegWithRetry(join(input, 'photo.jpg'), { r: 10, g: 20, b: 30 })
-  await new Promise((r) => setTimeout(r, 5)) // ensure a later touch produces a distinct mtime
+  await new Promise((r) => setTimeout(r, 5))
 
   const config: CliConfig = {
     ...DEFAULTS,
@@ -151,10 +143,6 @@ describe('generate() — incremental mode', () => {
 
     const log = captureLog()
     await generate(config)
-    // Not trusted as "unchanged" — the .vik-incremental.json entry still
-    // matches the source's mtime/hash, but one of the output files it
-    // promised no longer exists, so it must be regenerated instead of
-    // silently skipped.
     expect(log.text()).toContain('[vue-image-kit] photo')
     expect(log.text()).not.toContain('unchanged, skipped')
     log.restore()

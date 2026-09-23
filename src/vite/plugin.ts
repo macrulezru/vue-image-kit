@@ -1,40 +1,3 @@
-/**
- * Vite plugin for vue-image-kit.
- *
- * Two responsibilities:
- *
- * 1. **Batch generation** — on `buildStart` (and on HMR for source images) it runs
- *    the same `generate` pipeline as the CLI: resize to the configured widths,
- *    emit WebP/AVIF, LQIP, BlurHash, and (optionally) an `images.ts` manifest.
- *
- * 2. **Build-time imports** — query-suffixed imports that return metadata straight
- *    into JS, so you never wire props by hand:
- *
- *      import meta from './photo.jpg?vik'
- *      // → { src, srcset, webp, avif, width, height, placeholder, blurhash, thumbhash, name }
- *
- *      import hash from './photo.jpg?thumbhash'
- *      // → 'base64string'
- *
- *    `?vik` resizes/encodes the image into `output` (URLs use `publicPath`, exactly
- *    like the manifest). `?thumbhash` computes only the hash and writes nothing.
- *
- * Requires `sharp` (and `thumbhash` for hash output) as dev dependencies.
- *
- * Usage in vite.config.ts:
- *   import { vueImageKit } from 'vue-image-kit/vite'
- *   export default defineConfig({
- *     plugins: [vue(), vueImageKit({ widths: [400, 800, 1200] })]
- *   })
- *
- * For typed `?vik` / `?thumbhash` imports add to a `.d.ts` in your project:
- *   /// <reference types="vue-image-kit/vite/client" />
- *
- * 3. **On-demand dev serving** (opt-in via `dev.onDemand`) — mounts the
- *    `vue-image-kit/server` handler as dev-server middleware, so images
- *    resize on request during `vite dev` without a batch `generate()` run.
- *    Never active during `vite build` (`configureServer` is a dev-only hook).
- */
 import type { Plugin } from 'vite'
 import type { CliConfig, ManifestEntry } from '../cli/types.js'
 import { mergeConfig, DEFAULTS, loadConfig } from '../cli/config.js'
@@ -44,32 +7,22 @@ import { createImageHandler } from '../server/handler.js'
 import type { ImageHandlerOptions } from '../server/handler.js'
 
 export interface OnDemandDevOptions extends Pick<ImageHandlerOptions, 'cacheDir' | 'maxAge' | 'allowedWidths' | 'maxWidth'> {
-  /** Mount the on-demand resize handler during `vite dev`. Default: false. */
   onDemand?: boolean
-  /** Route to mount it at. Default: '/_vik/image'. */
   route?: string
 }
 
 export type VitePluginOptions = Partial<CliConfig> & { dev?: OnDemandDevOptions }
 
-/** Metadata returned by a `?vik` import. */
 export type VikImageMeta = ManifestEntry
 
 export type ImageRequestType = 'vik' | 'thumbhash'
 
 export interface ImageRequest {
-  /** Absolute or relative path with the query stripped. */
   filePath: string
-  /** The raw query string (without the leading `?`). */
   query: string
   type: ImageRequestType
 }
 
-/**
- * Parse a module id into a vue-image-kit build-time request, or `null` if it is
- * not one. Recognises `?vik` and `?thumbhash` query flags (alongside any other
- * params). Exported for testing.
- */
 export function parseImageRequest(id: string): ImageRequest | null {
   const queryIndex = id.indexOf('?')
   if (queryIndex < 0) return null
@@ -95,12 +48,6 @@ export function vueImageKit(options: VitePluginOptions = {}): Plugin {
       const fileConfig = await loadConfig()
       resolved = mergeConfig(DEFAULTS, fileConfig, options)
 
-      // `vite dev` re-runs generate() on every buildStart/handleHotUpdate —
-      // incremental pays for itself there even if the user never asked for
-      // it. A one-shot `vite build` stays non-incremental by default (safer
-      // for a deploy artifact — no risk of a stale cache landing in it)
-      // unless requested. An explicit `incremental` (plugin options or
-      // config file) always wins either way.
       if (isDev && options.incremental === undefined && fileConfig.incremental === undefined) {
         resolved.incremental = true
       }
@@ -144,7 +91,6 @@ export function vueImageKit(options: VitePluginOptions = {}): Plugin {
       const result = await this.resolve(req.filePath, importer, { skipSelf: true })
       if (!result) return null
 
-      // Keep the query so `load` can tell what to produce.
       return `${result.id}?${req.query}`
     },
 
@@ -152,7 +98,6 @@ export function vueImageKit(options: VitePluginOptions = {}): Plugin {
       const req = parseImageRequest(id)
       if (!req) return null
 
-      // Re-run when the source image changes.
       this.addWatchFile(req.filePath)
 
       if (req.type === 'thumbhash') {
@@ -160,7 +105,6 @@ export function vueImageKit(options: VitePluginOptions = {}): Plugin {
         return `export default ${JSON.stringify(hash)}`
       }
 
-      // ?vik — always include the ThumbHash, the headline of the metadata.
       const config = { ...(await ensureConfig()), thumbhash: true }
       const image = await processImage(req.filePath, config)
       const meta = buildEntry(image, config.widths)

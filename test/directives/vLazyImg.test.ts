@@ -4,13 +4,6 @@ import { mount } from '@vue/test-utils'
 import { vLazyImg } from '../../src/directives/vLazyImg'
 import { clearObserverPool } from '../../src/utils/observer-pool'
 
-// v-lazy-img shares the same IntersectionObserver pool (utils/observer-pool.ts)
-// as every other lazy-loading path now — see useLazyLoad.test.ts for the same
-// mocking pattern. `ioCallback` always captures the LATEST pool entry's
-// callback (elements sharing a rootMargin+threshold share one real observer),
-// which is enough for these single-element tests; clearObserverPool() between
-// tests keeps each test's pool state (and therefore IntersectionObserver call
-// count) independent.
 type IOCallback = (entries: IntersectionObserverEntry[]) => void
 
 let ioCallback: IOCallback | null = null
@@ -192,11 +185,6 @@ describe('vLazyImg directive', () => {
   })
 
   it('shares one IntersectionObserver across multiple elements with the same rootMargin/threshold', async () => {
-    // Regression: v-lazy-img used to create its own dedicated IntersectionObserver
-    // per element (createObserver()) instead of going through the shared pool
-    // every other lazy-loading path (useLazyLoad/useImage/<VImage>/
-    // useBackgroundImage) already uses — a real inconsistency on pages with many
-    // lazily-loaded backgrounds.
     const MultiComponent = defineComponent({
       directives: { 'lazy-img': vLazyImg },
       template: `

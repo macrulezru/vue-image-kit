@@ -1,9 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { gotoTab } from './utils'
 
-// The wrapper's sizing strategy is pure CSS (position/inset/aspect-ratio) —
-// jsdom's layout engine is a no-op, so only a real browser can confirm the
-// box actually ends up where the CSS says it should.
 test.describe('layout presets (real CSS layout)', () => {
   test('fill absolutely fills its positioned parent', async ({ page }) => {
     await page.goto('/')
@@ -11,6 +8,7 @@ test.describe('layout presets (real CSS layout)', () => {
 
     const parent = page.getByTestId('layout-fill-parent')
     const fill = page.getByTestId('layout-fill')
+    await fill.waitFor({ state: 'visible' })
 
     const parentBox = await parent.boundingBox()
     const fillBox = await fill.boundingBox()
@@ -28,6 +26,7 @@ test.describe('layout presets (real CSS layout)', () => {
     await gotoTab(page, 'Layout & priority')
 
     const fixed = page.getByTestId('layout-fixed')
+    await fixed.waitFor({ state: 'visible' })
     const box = await fixed.boundingBox()
 
     expect(box).not.toBeNull()
@@ -40,6 +39,7 @@ test.describe('layout presets (real CSS layout)', () => {
     await gotoTab(page, 'Layout & priority')
 
     const responsive = page.getByTestId('layout-responsive')
+    await responsive.waitFor({ state: 'visible' })
     const container = responsive.locator('xpath=..')
 
     const responsiveBox = await responsive.boundingBox()

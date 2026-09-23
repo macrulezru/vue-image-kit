@@ -1,16 +1,5 @@
 import type { CdnAdapter, CdnUrlOptions } from './types.js'
 
-/**
- * imgix CDN adapter.
- *
- * @example
- * const cdn = imgix('https://mysite.imgix.net')
- * cdn.url('photo.jpg', { width: 800, format: 'webp' })
- * // → https://mysite.imgix.net/photo.jpg?w=800&fm=webp&auto=format
- *
- * cdn.srcset('photo.jpg', [400, 800, 1200])
- * // → 'https://mysite.imgix.net/photo.jpg?w=400&auto=format 400w, ...'
- */
 export function imgix(baseUrl: string): CdnAdapter {
   const base = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl
 

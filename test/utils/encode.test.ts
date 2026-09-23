@@ -5,9 +5,6 @@ import { encodeBlurhash as cliEncodeBlurhash } from '../../src/cli/blurhash-enco
 import { decodeThumbHash } from '../../src/utils/thumbhash-decode'
 import { decodeBlurhash } from '../../src/utils/blurhash-decode'
 
-// jsdom provides neither ImageData nor createImageBitmap. Polyfill a minimal
-// ImageData so `instanceof ImageData` holds; passing maxSize >= dimensions makes
-// the encoders use the pixels directly (no canvas needed).
 class FakeImageData {
   data: Uint8ClampedArray
   width: number
@@ -30,15 +27,14 @@ afterAll(() => {
 const W = 16
 const H = 12
 
-// A deterministic opaque RGBA gradient.
 function makeRGBA(): Uint8ClampedArray {
   const rgba = new Uint8ClampedArray(W * H * 4)
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const i = (y * W + x) * 4
-      rgba[i] = Math.round((x / (W - 1)) * 255)       // R ramps across
-      rgba[i + 1] = Math.round((y / (H - 1)) * 255)   // G ramps down
-      rgba[i + 2] = 96                                // constant B
+      rgba[i] = Math.round((x / (W - 1)) * 255)
+      rgba[i + 1] = Math.round((y / (H - 1)) * 255)
+      rgba[i + 2] = 96
       rgba[i + 3] = 255
     }
   }
@@ -98,7 +94,6 @@ describe('encodeBlurhash', () => {
   })
 
   it('reflects component counts in the first base83 char', async () => {
-    // size flag = (numX-1) + (numY-1)*9; for 5x4 → 4 + 27 = 31 → base83 char 'V'
     const hash = await encodeBlurhash(imageData(makeRGBA()), { componentX: 5, componentY: 4, maxSize: W })
     const BASE83 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~'
     expect(hash[0]).toBe(BASE83[31])
@@ -106,7 +101,6 @@ describe('encodeBlurhash', () => {
 
   it('clamps out-of-range component counts to 1–9', async () => {
     const hash = await encodeBlurhash(imageData(makeRGBA()), { componentX: 99, componentY: 0, maxSize: W })
-    // clamped to 9 and 1 → size flag = 8 + 0 = 8
     const BASE83 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~'
     expect(hash[0]).toBe(BASE83[8])
   })

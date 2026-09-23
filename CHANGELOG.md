@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`<VImage>` no longer renders inside a wrapper `<span>`.** Every earlier version wrapped the real `<img>` (and, while loading, whichever blurhash `<canvas>`/LQIP-ThumbHash `<img>`/solid-color or shimmer `<span>` placeholder was active) in a persistent positioning `<span>`, which made the component awkward to drop into markup that expects to own the element it's styling directly. Every placeholder kind is now painted as a CSS `background-color`/`background-image` directly on the same single element that goes on to show the real photo — an idle placeholder element before loading starts, swapped outright (not nested) for the real `<img>`/`<picture>` once it does. `class`/`style`/`data-*`/other passthrough attributes now land on that one real element. The one visual trade-off: the smooth "blur visible through a fading-in sharp photo" crossfade isn't possible with a single element (backgrounds are occluded instantly, atomically, the moment the photo paints) — swapping is an instant cut by default now; the new opt-in `fadeIn` prop (below) softens the box's own initial appearance instead, which is a different, lesser effect, not a replacement for the old one. The blurhash preview itself also no longer gets an explicit CSS `blur()` filter boost (that needed a clipping wrapper to contain the edge bleed — precisely what's being removed here) and now relies solely on the browser's own upscale interpolation of the 32px-wide decoded thumbnail, which is already how most blur-up implementations look in practice.
+
+### Added
+
+- `<VImage>`'s new `fadeIn` prop (default `false`) opts into a ~0.3s opacity fade-in on mount — see the wrapper-removal note above for why this isn't the same effect the old crossfade was.
+
 ### Fixed
 
 - `pickSmallestSrcsetUrl` (`respectSaveData`'s downgrade path) split candidates on every bare comma, tearing apart CDN transform URLs that contain one with no trailing space (e.g. Cloudinary's `w_400,q_auto,f_auto`). Now splits on comma-followed-by-whitespace, matching how every srcset this package itself generates is actually joined.
