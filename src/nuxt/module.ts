@@ -107,5 +107,7 @@ export default defineNuxtModule<ModuleOptions>({
     addPlugin(resolver.resolve('./runtime/plugin'))
 
     addImports(AUTO_IMPORT_NAMES.map((name) => ({ name, from: '@macrulez/vue-image-kit' })))
+
+    nuxt.options.css.push('@macrulez/vue-image-kit/style.css')
   },
 })

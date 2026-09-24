@@ -33,11 +33,12 @@ function triggerIntersect(): void {
 
 describe('VImage', () => {
   describe('attrs fallthrough (no wrapper element)', () => {
-    it('applies to the idle placeholder before loading starts', () => {
+    it('applies to the idle placeholder before loading starts', async () => {
       const wrapper = mount(VImage, {
         props: { src: '/img.jpg', alt: 'Test' },
         attrs: { 'data-testid': 'my-image', class: 'custom-class' },
       })
+      await nextTick()
       const el = wrapper.find('[data-testid="my-image"]')
       expect(el.exists()).toBe(true)
       expect(el.element.tagName).toBe('SPAN')
@@ -183,11 +184,12 @@ describe('VImage', () => {
     expect(wrapper.emitted('error')).toBeTruthy()
   })
 
-  it('renders LQIP placeholder as a background-image on the idle span', () => {
+  it('renders LQIP placeholder as a background-image on the idle span', async () => {
     const b64 = 'data:image/jpeg;base64,/9j/4AAQ=='
     const wrapper = mount(VImage, {
       props: { src: '/img.jpg', alt: 'Test', placeholder: b64 },
     })
+    await nextTick()
     const span = wrapper.find('span[aria-hidden="true"]')
     expect(span.exists()).toBe(true)
     expect(span.attributes('style')).toContain(`background-image: url("${b64}")`)
@@ -250,7 +252,7 @@ describe('VImage', () => {
       expect(img.attributes('style')).toContain('object-position: 100% 0%')
     })
 
-    it('also applies the focal point to the placeholder background so it aligns', () => {
+    it('also applies the focal point to the placeholder background so it aligns', async () => {
       const wrapper = mount(VImage, {
         props: {
           src: '/img.jpg',
@@ -259,6 +261,7 @@ describe('VImage', () => {
           focal: { x: 0.25, y: 0.75 },
         },
       })
+      await nextTick()
       const placeholder = wrapper.find('span[aria-hidden="true"]')
       expect(placeholder.attributes('style')).toContain('background-position: 25% 75%')
     })
@@ -273,25 +276,27 @@ describe('VImage', () => {
         .find((s) => (s.attributes('style') ?? '').includes('background-color'))
     }
 
-    it('renders a solid background-color span from an explicit placeholderColor', () => {
+    it('renders a solid background-color span from an explicit placeholderColor', async () => {
       const wrapper = mount(VImage, {
         props: { src: '/img.jpg', alt: 'Test', placeholderColor: 'rgb(10, 20, 30)' },
       })
+      await nextTick()
       const span = colorSpan(wrapper)
       expect(span).toBeDefined()
       expect(span!.attributes('style')).toContain('background-color: rgb(10, 20, 30)')
     })
 
-    it('derives the average color from thumbhash in placeholderMode="color"', () => {
+    it('derives the average color from thumbhash in placeholderMode="color"', async () => {
       const wrapper = mount(VImage, {
         props: { src: '/img.jpg', alt: 'Test', thumbhash: THUMBHASH, placeholderMode: 'color' },
       })
+      await nextTick()
       const span = colorSpan(wrapper)
       expect(span).toBeDefined()
       expect(span!.attributes('style')).toContain('background-color: rgb(150, 146, 104)')
     })
 
-    it('suppresses the blur placeholder img and canvas in color mode', () => {
+    it('suppresses the blur placeholder img and canvas in color mode', async () => {
       const wrapper = mount(VImage, {
         props: {
           src: '/img.jpg',
@@ -303,6 +308,7 @@ describe('VImage', () => {
           placeholderMode: 'color',
         },
       })
+      await nextTick()
       expect(wrapper.find('img[aria-hidden="true"]').exists()).toBe(false)
       expect(wrapper.find('canvas').exists()).toBe(false)
       const span = colorSpan(wrapper)
@@ -310,16 +316,17 @@ describe('VImage', () => {
       expect(span!.attributes('style')).not.toContain('background-image')
     })
 
-    it('does not render a color span without color settings', () => {
+    it('does not render a color span without color settings', async () => {
       const wrapper = mount(VImage, {
         props: { src: '/img.jpg', alt: 'Test', thumbhash: THUMBHASH },
       })
+      await nextTick()
       expect(colorSpan(wrapper)).toBeUndefined()
       const span = wrapper.find('span[aria-hidden="true"]')
       expect(span.attributes('style')).toContain('background-image: url("data:')
     })
 
-    it('in blur mode, a real blurhash wins over a LQIP/ThumbHash placeholder instead of mounting both', () => {
+    it('in blur mode, a real blurhash wins over a LQIP/ThumbHash placeholder instead of mounting both', async () => {
       const thumbhashOnly = mount(VImage, {
         props: { src: '/img.jpg', alt: 'Test', thumbhash: THUMBHASH, width: 100, height: 100 },
       })
@@ -333,6 +340,7 @@ describe('VImage', () => {
           height: 100,
         },
       })
+      await nextTick()
       const thumbhashOnlyStyle = thumbhashOnly.find('span[aria-hidden="true"]').attributes('style')
       const withBlurhashStyle = withBlurhash.find('span[aria-hidden="true"]').attributes('style')
       expect(thumbhashOnlyStyle).toContain('background-image: url("data:')
@@ -340,7 +348,7 @@ describe('VImage', () => {
       expect(withBlurhashStyle).not.toBe(thumbhashOnlyStyle)
     })
 
-    it('falls back to the LQIP/ThumbHash placeholder when blurhash cannot render (missing width/height)', () => {
+    it('falls back to the LQIP/ThumbHash placeholder when blurhash cannot render (missing width/height)', async () => {
       const wrapper = mount(VImage, {
         props: {
           src: '/img.jpg',
@@ -349,13 +357,14 @@ describe('VImage', () => {
           blurhash: 'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
         },
       })
+      await nextTick()
       const span = wrapper.find('span[aria-hidden="true"]')
       expect(span.attributes('style')).toContain('background-image: url("data:')
     })
   })
 
   describe('shimmer placeholder', () => {
-    it('renders an animated shimmer span in placeholderMode="shimmer"', () => {
+    it('renders an animated shimmer span in placeholderMode="shimmer"', async () => {
       const wrapper = mount(VImage, {
         props: {
           src: '/img.jpg',
@@ -366,6 +375,7 @@ describe('VImage', () => {
           blurhash: 'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
         },
       })
+      await nextTick()
       expect(wrapper.find('.vik-shimmer').exists()).toBe(true)
       expect(wrapper.find('canvas').exists()).toBe(false)
       expect(wrapper.find('img[aria-hidden="true"]').exists()).toBe(false)
@@ -626,7 +636,7 @@ describe('VImage', () => {
       expect(observeSpy).not.toHaveBeenCalled()
     })
 
-    it('neutralizes priority (stays lazy) when saveData is on', () => {
+    it('neutralizes priority (stays lazy) when saveData is on', async () => {
       Object.defineProperty(navigator, 'connection', { value: { saveData: true }, configurable: true })
 
       const observeSpy = vi.fn()
@@ -635,6 +645,7 @@ describe('VImage', () => {
       mount(VImage, {
         props: { src: '/hero.jpg', alt: 'Hero', priority: true, respectSaveData: true },
       })
+      await nextTick()
 
       expect(observeSpy).toHaveBeenCalled()
     })
@@ -711,30 +722,44 @@ describe('VImage', () => {
   })
 
   describe('layout prop', () => {
-    it('defaults to filling the container with aspect-ratio', () => {
+    it('defaults to filling the container with aspect-ratio', async () => {
       const wrapper = mount(VImage, {
         props: { src: '/img.jpg', alt: 'Default', width: 800, height: 400 },
       })
+      await nextTick()
       const style = wrapper.find('span').element.style
       expect(style.position).toBe('')
       expect(style.width).toBe('100%')
       expect(style.aspectRatio).toBe('800 / 400')
     })
 
-    it('fixed: sizes the wrapper to an exact width/height box', () => {
+    it('does not force width: 100% on the idle placeholder when width/height are not given either', async () => {
+      const wrapper = mount(VImage, {
+        props: { src: '/img.jpg', alt: 'No dimensions' },
+      })
+      await nextTick()
+      const style = wrapper.find('span').element.style
+      expect(style.width).toBe('')
+      expect(style.height).toBe('')
+      expect(style.display).toBe('block')
+    })
+
+    it('fixed: sizes the wrapper to an exact width/height box', async () => {
       const wrapper = mount(VImage, {
         props: { src: '/img.jpg', alt: 'Fixed', width: 300, height: 150, layout: 'fixed' },
       })
+      await nextTick()
       const style = wrapper.find('span').element.style
       expect(style.width).toBe('300px')
       expect(style.height).toBe('150px')
       expect(style.display).toBe('inline-block')
     })
 
-    it('fill: absolutely fills the parent, ignoring width/height for sizing', () => {
+    it('fill: absolutely fills the parent, ignoring width/height for sizing', async () => {
       const wrapper = mount(VImage, {
         props: { src: '/img.jpg', alt: 'Fill', layout: 'fill' },
       })
+      await nextTick()
       const style = wrapper.find('span').element.style
       expect(style.position).toBe('absolute')
       expect(style.inset).toBe('0')
@@ -802,6 +827,80 @@ describe('VImage', () => {
 
         expect(wrapper.find('img:not([aria-hidden])').attributes('sizes')).toBe('100vw')
       }
+    })
+  })
+
+  describe('default box/object-fit styling', () => {
+    async function mountLoaded(props: Record<string, unknown> = {}) {
+      const wrapper = mount(VImage, {
+        props: { src: '/img.jpg', alt: 'Test', lazy: false, ...props },
+      })
+      await nextTick()
+      triggerIntersect()
+      await nextTick()
+      await nextTick()
+      return wrapper
+    }
+
+    it('applies only the base box class, no sizing/fit classes or inline styles, when neither width/height nor layout is given', async () => {
+      const wrapper = await mountLoaded()
+      const img = wrapper.find('img:not([aria-hidden])')
+      expect(img.classes()).toContain('vik-box')
+      expect(img.classes()).not.toContain('vik-box--responsive')
+      expect(img.classes()).not.toContain('vik-fit')
+      expect(img.attributes('style')).not.toContain('object-fit')
+      expect(img.attributes('style')).not.toContain('width')
+      expect(img.attributes('style')).not.toContain('display')
+    })
+
+    it('applies the vik-fit class (not an inline style) when width/height make object-fit meaningful', async () => {
+      const wrapper = await mountLoaded({ width: 400, height: 300 })
+      const img = wrapper.find('img:not([aria-hidden])')
+      expect(img.classes()).toContain('vik-fit')
+      expect(img.attributes('style')).not.toContain('object-fit')
+    })
+
+    it('always sets object-fit inline when fit is passed explicitly, and skips the vik-fit class', async () => {
+      const wrapper = await mountLoaded({ width: 400, height: 300, fit: 'contain' })
+      const img = wrapper.find('img:not([aria-hidden])')
+      expect(img.classes()).not.toContain('vik-fit')
+      expect(img.attributes('style')).toContain('object-fit: contain')
+    })
+
+    it('layout="fill": uses the vik-box--fill class and the vik-fit class, no fixed-size inline style', async () => {
+      const wrapper = await mountLoaded({ layout: 'fill' })
+      const img = wrapper.find('img:not([aria-hidden])')
+      expect(img.classes()).toContain('vik-box--fill')
+      expect(img.classes()).toContain('vik-fit')
+      expect(img.attributes('style')).not.toContain('width')
+    })
+
+    it('layout="fixed": uses the vik-box--fixed class plus an inline pixel width/height', async () => {
+      const wrapper = await mountLoaded({ layout: 'fixed', width: 300, height: 150 })
+      const img = wrapper.find('img:not([aria-hidden])')
+      expect(img.classes()).toContain('vik-box--fixed')
+      expect(img.classes()).toContain('vik-fit')
+      expect(img.attributes('style')).toContain('width: 300px')
+      expect(img.attributes('style')).toContain('height: 150px')
+    })
+
+    it('error state combines the base box classes with vik-box--error', async () => {
+      const wrapper = await mountLoaded({ src: '/broken.jpg', width: 400, height: 300 })
+      await wrapper.find('img:not([aria-hidden])').trigger('error')
+      await nextTick()
+      const span = wrapper.find('span')
+      expect(span.classes()).toContain('vik-box')
+      expect(span.classes()).toContain('vik-box--responsive')
+      expect(span.classes()).toContain('vik-box--error')
+    })
+
+    it('does not force width/height sizing on the error box either, when neither width/height nor layout is given', async () => {
+      const wrapper = await mountLoaded({ src: '/broken.jpg' })
+      await wrapper.find('img:not([aria-hidden])').trigger('error')
+      await nextTick()
+      const span = wrapper.find('span')
+      expect(span.classes()).not.toContain('vik-box--responsive')
+      expect(span.classes()).toContain('vik-box--error')
     })
   })
 

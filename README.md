@@ -102,12 +102,15 @@ npm install sharp thumbhash --save-dev
 // main.ts
 import { createApp } from 'vue'
 import { VImageKitPlugin } from '@macrulez/vue-image-kit'
+import '@macrulez/vue-image-kit/style.css'
 import App from './App.vue'
 
 const app = createApp(App)
 app.use(VImageKitPlugin)
 app.mount('#app')
 ```
+
+The CSS import ships the small set of layout/placeholder classes `<VImage>` relies on (box sizing per `layout` mode, the shimmer animation). It's a handful of plain, overridable classes, not a design system — nothing to configure.
 
 ```vue
 <template>
@@ -138,7 +141,7 @@ export default defineNuxtConfig({
 })
 ```
 
-`<VImage>`, `v-lazy-img`, and all composables are registered automatically — no imports needed.
+`<VImage>`, `v-lazy-img`, all composables, and the CSS import from the Vue 3 example above are registered automatically — no imports needed.
 
 ### More examples
 

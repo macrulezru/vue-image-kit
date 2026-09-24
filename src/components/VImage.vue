@@ -51,7 +51,6 @@ const props = withDefaults(defineProps<Props>(), {
   lazy: true,
   rootMargin: '200px',
   threshold: 0,
-  fit: 'cover',
   decoding: 'async',
   priority: false,
   respectSaveData: false,
@@ -64,6 +63,7 @@ const emit = defineEmits<{
 }>()
 
 const isSSR = typeof window === 'undefined'
+const isHydrating = ref(true)
 
 const observeTargetRef = ref<HTMLElement | null>(null)
 
@@ -250,6 +250,7 @@ const placeholderBackgroundStyle = computed(() => {
 
 const mountedOpacity = ref(false)
 onMounted(() => {
+  isHydrating.value = false
   if (props.fadeIn) {
     requestAnimationFrame(() => {
       mountedOpacity.value = true
@@ -288,15 +289,16 @@ const boxStyle = computed(() => {
       height: `${mergedHeight.value}px`,
     }
   }
-  return {
-    display: 'block' as const,
-    width: '100%',
-    height: 'auto',
-    ...(aspectRatio.value ? { aspectRatio: aspectRatio.value } : {}),
+  if (mergedWidth.value && mergedHeight.value) {
+    return {
+      display: 'block' as const,
+      width: '100%',
+      height: 'auto',
+      aspectRatio: aspectRatio.value,
+    }
   }
+  return { display: 'block' as const }
 })
-
-const pictureStyle = computed(() => ({ display: boxStyle.value.display }))
 
 const idleStyle = computed(() => ({
   ...boxStyle.value,
@@ -304,17 +306,37 @@ const idleStyle = computed(() => ({
   ...fadeStyle.value,
 }))
 
-const errorStyle = computed(() => ({
-  ...boxStyle.value,
-  display: 'flex' as const,
-  alignItems: 'center' as const,
-  justifyContent: 'center' as const,
-  backgroundColor: '#e5e7eb',
+const isFillLayout = computed(() => props.layout === 'fill')
+const isFixedLayout = computed(() => props.layout === 'fixed')
+const isResponsiveSized = computed(
+  () => !isFillLayout.value && !isFixedLayout.value && !!(mergedWidth.value && mergedHeight.value),
+)
+
+const loadedBoxClasses = computed(() => ({
+  'vik-box': true,
+  'vik-box--fill': isFillLayout.value,
+  'vik-box--fixed': isFixedLayout.value,
+  'vik-box--responsive': isResponsiveSized.value,
 }))
 
+const errorClasses = computed(() => ({ ...loadedBoxClasses.value, 'vik-box--error': true }))
+
+const fixedSizeStyle = computed(() => {
+  if (!isFixedLayout.value || !mergedWidth.value || !mergedHeight.value) return {}
+  return { width: `${mergedWidth.value}px`, height: `${mergedHeight.value}px` }
+})
+
+const isBoxConstrained = computed(
+  () => isFillLayout.value || isFixedLayout.value || isResponsiveSized.value,
+)
+
+const usesDefaultFit = computed(() => !props.fit && isBoxConstrained.value)
+
+const fitStyle = computed(() => (props.fit ? { objectFit: props.fit } : {}))
+
 const realImgStyle = computed(() => ({
-  ...boxStyle.value,
-  objectFit: props.fit,
+  ...fixedSizeStyle.value,
+  ...fitStyle.value,
   ...(objectPosition.value ? { objectPosition: objectPosition.value } : {}),
   ...placeholderBackgroundStyle.value,
   ...fadeStyle.value,
@@ -333,7 +355,7 @@ function handleError(e: Event): void {
 
 <template>
   <img
-    v-if="isSSR"
+    v-if="isHydrating"
     v-bind="imgAttrs"
     :alt="alt"
     :width="mergedWidth"
@@ -351,7 +373,7 @@ function handleError(e: Event): void {
     aria-hidden="true"
   />
 
-  <span v-else-if="isError" :style="errorStyle">
+  <span v-else-if="isError" :class="errorClasses">
     <slot name="error">
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5" aria-hidden="true">
         <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -361,7 +383,7 @@ function handleError(e: Event): void {
     </slot>
   </span>
 
-  <picture v-else-if="needsPicture" :style="pictureStyle">
+  <picture v-else-if="needsPicture" :class="loadedBoxClasses">
     <source
       v-for="s in mediaSources"
       :key="`${s.media}|${s.type ?? ''}`"
@@ -380,7 +402,7 @@ function handleError(e: Event): void {
       :decoding="effectiveDecoding"
       :fetchpriority="effectiveFetchpriority"
       :style="realImgStyle"
-      :class="{ 'vik-shimmer': showShimmerClass }"
+      :class="[loadedBoxClasses, { 'vik-fit': usesDefaultFit, 'vik-shimmer': showShimmerClass }]"
       @load="handleLoad"
       @error="handleError"
     />
@@ -395,11 +417,44 @@ function handleError(e: Event): void {
     :decoding="effectiveDecoding"
     :fetchpriority="effectiveFetchpriority"
     :style="realImgStyle"
-    :class="{ 'vik-shimmer': showShimmerClass }"
+    :class="[loadedBoxClasses, { 'vik-fit': usesDefaultFit, 'vik-shimmer': showShimmerClass }]"
     @load="handleLoad"
     @error="handleError"
   />
 </template>
+
+<style>
+.vik-box {
+  display: block;
+}
+
+.vik-box--responsive {
+  width: 100%;
+  height: auto;
+}
+
+.vik-box--fill {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.vik-box--fixed {
+  display: inline-block;
+}
+
+.vik-box--error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #e5e7eb;
+}
+
+.vik-fit {
+  object-fit: cover;
+}
+</style>
 
 <style scoped>
 .vik-shimmer {
