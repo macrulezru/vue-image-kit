@@ -10,6 +10,49 @@ type IOCallback = (entries: IntersectionObserverEntry[]) => void
 
 let ioCallback: IOCallback | null = null
 
+class FakeMediaQueryList {
+  matches: boolean
+  media: string
+  private listeners = new Set<() => void>()
+
+  constructor(media: string, matches: boolean) {
+    this.media = media
+    this.matches = matches
+  }
+
+  addEventListener(type: string, cb: () => void): void {
+    if (type === 'change') this.listeners.add(cb)
+  }
+
+  removeEventListener(type: string, cb: () => void): void {
+    if (type === 'change') this.listeners.delete(cb)
+  }
+
+  setMatches(matches: boolean): void {
+    this.matches = matches
+    for (const cb of this.listeners) cb()
+  }
+}
+
+let mediaQueries: Map<string, FakeMediaQueryList>
+let matchMediaSpy: ReturnType<typeof vi.fn>
+
+function stubMatchMedia(initialMatches: Record<string, boolean> = {}): void {
+  mediaQueries = new Map()
+  for (const [media, matches] of Object.entries(initialMatches)) {
+    mediaQueries.set(media, new FakeMediaQueryList(media, matches))
+  }
+  matchMediaSpy = vi.fn((media: string) => {
+    let mql = mediaQueries.get(media)
+    if (!mql) {
+      mql = new FakeMediaQueryList(media, false)
+      mediaQueries.set(media, mql)
+    }
+    return mql
+  })
+  vi.stubGlobal('matchMedia', matchMediaSpy)
+}
+
 beforeEach(() => {
   ioCallback = null
   clearObserverPool()
@@ -20,6 +63,7 @@ beforeEach(() => {
       return { observe: vi.fn(), unobserve: vi.fn(), disconnect: vi.fn() }
     }),
   )
+  stubMatchMedia()
 })
 
 afterEach(() => {
@@ -448,7 +492,7 @@ describe('VImage', () => {
         sources: { sm: '/img-sm.jpg', xl: '/img-xl.jpg' },
       })
       const sources = wrapper.findAll('source[media]')
-      const medias = sources.map(s => s.attributes('media'))
+      const medias = sources.map((s) => s.attributes('media'))
       expect(medias).toContain('(max-width: 640px)')
       expect(medias).toContain('(min-width: 1440px)')
     })
@@ -490,7 +534,7 @@ describe('VImage', () => {
         sources: { sm: '/img-sm.jpg' },
       })
       const mediaSources = wrapper.findAll('source[media]')
-      const typeSources  = wrapper.findAll('source[type]')
+      const typeSources = wrapper.findAll('source[type]')
       expect(mediaSources).toHaveLength(1)
       expect(typeSources).toHaveLength(2)
     })
@@ -513,6 +557,173 @@ describe('VImage', () => {
     it('renders no <source media> when sources prop is empty object', async () => {
       const wrapper = await mountWithSources({ sources: {} })
       expect(wrapper.findAll('source[media]')).toHaveLength(0)
+    })
+  })
+
+  describe('responsive sources — sizes (art direction with width/height)', () => {
+    const breakpoints = { tablet: '(max-width: 1024px)', mobile: '(max-width: 640px)' }
+
+    async function mountWithSizedSources(props: Record<string, unknown> = {}) {
+      const wrapper = mount(VImage, {
+        props: { src: '/img.jpg', alt: 'Test', lazy: false, ...props },
+        global: { provide: { [BREAKPOINTS_KEY as symbol]: breakpoints } },
+      })
+      await nextTick()
+      triggerIntersect()
+      await nextTick()
+      await nextTick()
+      return wrapper
+    }
+
+    it('sets width/height/sizes on <source> when the entry has both dimensions', async () => {
+      const wrapper = await mountWithSizedSources({
+        sources: { tablet: { src: '/t.jpg', width: 1400, height: 700, sizes: '100vw' } },
+      })
+      const source = wrapper.find('source[media]')
+      expect(source.attributes('width')).toBe('1400')
+      expect(source.attributes('height')).toBe('700')
+      expect(source.attributes('sizes')).toBe('100vw')
+    })
+
+    it('omits width/height on <source> when the entry sets only one of them, and warns in dev', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const wrapper = await mountWithSizedSources({
+        sources: { tablet: { src: '/t.jpg', width: 1400 } },
+      })
+      const source = wrapper.find('source[media]')
+      expect(source.attributes('width')).toBeUndefined()
+      expect(source.attributes('height')).toBeUndefined()
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('tablet'))
+      warnSpy.mockRestore()
+    })
+
+    it('omits width/height/sizes on <source> for a plain string entry — DOM unchanged from 1.1.8', async () => {
+      const wrapper = await mountWithSizedSources({ sources: { tablet: '/t.jpg' } })
+      const source = wrapper.find('source[media]')
+      expect(source.attributes('width')).toBeUndefined()
+      expect(source.attributes('height')).toBeUndefined()
+      expect(source.attributes('sizes')).toBeUndefined()
+    })
+
+    it('idle placeholder gets the active source aspect-ratio on a matching (tablet) viewport', async () => {
+      stubMatchMedia({ '(max-width: 1024px)': true })
+      const wrapper = mount(VImage, {
+        props: {
+          src: '/img.jpg',
+          alt: 'Test',
+          width: 720,
+          height: 1237,
+          sources: { tablet: { src: '/t.jpg', width: 1400, height: 700 } },
+        },
+        global: { provide: { [BREAKPOINTS_KEY as symbol]: breakpoints } },
+      })
+      await nextTick()
+      const span = wrapper.find('span[aria-hidden="true"]')
+      expect((span.element as HTMLElement).style.aspectRatio).toBe('1400 / 700')
+    })
+
+    it('idle placeholder falls back to the root aspect-ratio when no source matches (desktop)', async () => {
+      stubMatchMedia({ '(max-width: 1024px)': false })
+      const wrapper = mount(VImage, {
+        props: {
+          src: '/img.jpg',
+          alt: 'Test',
+          width: 720,
+          height: 1237,
+          sources: { tablet: { src: '/t.jpg', width: 1400, height: 700 } },
+        },
+        global: { provide: { [BREAKPOINTS_KEY as symbol]: breakpoints } },
+      })
+      await nextTick()
+      const span = wrapper.find('span[aria-hidden="true"]')
+      expect((span.element as HTMLElement).style.aspectRatio).toBe('720 / 1237')
+    })
+
+    it('reactively updates the idle aspect-ratio when the matched MediaQueryList changes', async () => {
+      stubMatchMedia({ '(max-width: 1024px)': false })
+      const wrapper = mount(VImage, {
+        props: {
+          src: '/img.jpg',
+          alt: 'Test',
+          width: 720,
+          height: 1237,
+          sources: { tablet: { src: '/t.jpg', width: 1400, height: 700 } },
+        },
+        global: { provide: { [BREAKPOINTS_KEY as symbol]: breakpoints } },
+      })
+      await nextTick()
+      expect(
+        (wrapper.find('span[aria-hidden="true"]').element as HTMLElement).style.aspectRatio,
+      ).toBe('720 / 1237')
+
+      mediaQueries.get('(max-width: 1024px)')!.setMatches(true)
+      await nextTick()
+      expect(
+        (wrapper.find('span[aria-hidden="true"]').element as HTMLElement).style.aspectRatio,
+      ).toBe('1400 / 700')
+    })
+
+    it('layout="fixed": idle block takes its inline pixel size from the active source', async () => {
+      stubMatchMedia({ '(max-width: 1024px)': true })
+      const wrapper = mount(VImage, {
+        props: {
+          src: '/img.jpg',
+          alt: 'Test',
+          width: 720,
+          height: 1237,
+          layout: 'fixed',
+          sources: { tablet: { src: '/t.jpg', width: 1400, height: 700 } },
+        },
+        global: { provide: { [BREAKPOINTS_KEY as symbol]: breakpoints } },
+      })
+      await nextTick()
+      const idleStyle = (wrapper.find('span[aria-hidden="true"]').element as HTMLElement).style
+      expect(idleStyle.width).toBe('1400px')
+      expect(idleStyle.height).toBe('700px')
+    })
+
+    it('layout="fixed": loaded <img> takes its inline pixel size from the active source', async () => {
+      stubMatchMedia({ '(max-width: 1024px)': true })
+      const wrapper = await mountWithSizedSources({
+        width: 720,
+        height: 1237,
+        layout: 'fixed',
+        sources: { tablet: { src: '/t.jpg', width: 1400, height: 700 } },
+      })
+      const img = wrapper.find('img:not([aria-hidden])')
+      expect(img.attributes('style')).toContain('width: 1400px')
+      expect(img.attributes('style')).toContain('height: 700px')
+    })
+
+    it('applies vik-box--responsive/vik-fit when root sizes are unset but the active source has them', async () => {
+      stubMatchMedia({ '(max-width: 1024px)': true })
+      const wrapper = await mountWithSizedSources({
+        sources: { tablet: { src: '/t.jpg', width: 1400, height: 700 } },
+      })
+      const img = wrapper.find('img:not([aria-hidden])')
+      expect(img.classes()).toContain('vik-box--responsive')
+      expect(img.classes()).toContain('vik-fit')
+    })
+
+    it('never calls matchMedia when sources has no dimensioned entries', async () => {
+      await mountWithSizedSources({ sources: { tablet: '/t.jpg' } })
+      expect(matchMediaSpy).not.toHaveBeenCalled()
+    })
+
+    it('never calls matchMedia when sources prop is not given', async () => {
+      await mountWithSizedSources({ width: 720, height: 1237 })
+      expect(matchMediaSpy).not.toHaveBeenCalled()
+    })
+
+    it('removes matchMedia change listeners on unmount', async () => {
+      stubMatchMedia({ '(max-width: 1024px)': true })
+      const wrapper = await mountWithSizedSources({
+        sources: { tablet: { src: '/t.jpg', width: 1400, height: 700 } },
+      })
+      const mql = mediaQueries.get('(max-width: 1024px)')!
+      const removeSpy = vi.spyOn(mql, 'removeEventListener')
+      wrapper.unmount()
+      expect(removeSpy).toHaveBeenCalledWith('change', expect.any(Function))
     })
   })
 
@@ -588,8 +799,9 @@ describe('VImage', () => {
       await nextTick()
       await nextTick()
 
-      expect(wrapper.find('img:not([aria-hidden])').attributes('srcset'))
-        .toBe('/manifest-400.jpg 400w, /manifest-800.jpg 800w')
+      expect(wrapper.find('img:not([aria-hidden])').attributes('srcset')).toBe(
+        '/manifest-400.jpg 400w, /manifest-800.jpg 800w',
+      )
     })
   })
 
@@ -608,7 +820,10 @@ describe('VImage', () => {
 
     it('does not register an IntersectionObserver when priority is set', () => {
       const observeSpy = vi.fn()
-      vi.stubGlobal('IntersectionObserver', vi.fn(() => ({ observe: observeSpy, disconnect: vi.fn() })))
+      vi.stubGlobal(
+        'IntersectionObserver',
+        vi.fn(() => ({ observe: observeSpy, disconnect: vi.fn() })),
+      )
 
       mount(VImage, {
         props: { src: '/hero.jpg', alt: 'Hero', priority: true },
@@ -624,10 +839,16 @@ describe('VImage', () => {
     })
 
     it('has no effect when saveData is off', async () => {
-      Object.defineProperty(navigator, 'connection', { value: { saveData: false }, configurable: true })
+      Object.defineProperty(navigator, 'connection', {
+        value: { saveData: false },
+        configurable: true,
+      })
 
       const observeSpy = vi.fn()
-      vi.stubGlobal('IntersectionObserver', vi.fn(() => ({ observe: observeSpy, disconnect: vi.fn() })))
+      vi.stubGlobal(
+        'IntersectionObserver',
+        vi.fn(() => ({ observe: observeSpy, disconnect: vi.fn() })),
+      )
 
       mount(VImage, {
         props: { src: '/hero.jpg', alt: 'Hero', priority: true, respectSaveData: true },
@@ -637,10 +858,16 @@ describe('VImage', () => {
     })
 
     it('neutralizes priority (stays lazy) when saveData is on', async () => {
-      Object.defineProperty(navigator, 'connection', { value: { saveData: true }, configurable: true })
+      Object.defineProperty(navigator, 'connection', {
+        value: { saveData: true },
+        configurable: true,
+      })
 
       const observeSpy = vi.fn()
-      vi.stubGlobal('IntersectionObserver', vi.fn(() => ({ observe: observeSpy, disconnect: vi.fn() })))
+      vi.stubGlobal(
+        'IntersectionObserver',
+        vi.fn(() => ({ observe: observeSpy, disconnect: vi.fn() })),
+      )
 
       mount(VImage, {
         props: { src: '/hero.jpg', alt: 'Hero', priority: true, respectSaveData: true },
@@ -651,7 +878,10 @@ describe('VImage', () => {
     })
 
     it('downgrades to the smallest density URL when saveData is on', async () => {
-      Object.defineProperty(navigator, 'connection', { value: { saveData: true }, configurable: true })
+      Object.defineProperty(navigator, 'connection', {
+        value: { saveData: true },
+        configurable: true,
+      })
 
       const wrapper = mount(VImage, {
         props: {
@@ -673,7 +903,10 @@ describe('VImage', () => {
     })
 
     it('downgrades to the smallest image.srcset URL when saveData is on', async () => {
-      Object.defineProperty(navigator, 'connection', { value: { saveData: true }, configurable: true })
+      Object.defineProperty(navigator, 'connection', {
+        value: { saveData: true },
+        configurable: true,
+      })
 
       const wrapper = mount(VImage, {
         props: {
@@ -694,7 +927,10 @@ describe('VImage', () => {
     })
 
     it('does not leave densities on the rendered img when saveData is on, even with widths also set', async () => {
-      Object.defineProperty(navigator, 'connection', { value: { saveData: true }, configurable: true })
+      Object.defineProperty(navigator, 'connection', {
+        value: { saveData: true },
+        configurable: true,
+      })
 
       const wrapper = mount(VImage, {
         props: {
@@ -770,8 +1006,13 @@ describe('VImage', () => {
     it('responsive: auto-generates sizes from width when sizes is not given', async () => {
       const wrapper = mount(VImage, {
         props: {
-          src: '/img.jpg', alt: 'Responsive', width: 640, height: 320,
-          widths: [320, 640, 960], layout: 'responsive', lazy: false,
+          src: '/img.jpg',
+          alt: 'Responsive',
+          width: 640,
+          height: 320,
+          widths: [320, 640, 960],
+          layout: 'responsive',
+          lazy: false,
         },
       })
       await nextTick()
@@ -779,14 +1020,22 @@ describe('VImage', () => {
       await nextTick()
       await nextTick()
 
-      expect(wrapper.find('img:not([aria-hidden])').attributes('sizes')).toBe('(min-width: 640px) 640px, 100vw')
+      expect(wrapper.find('img:not([aria-hidden])').attributes('sizes')).toBe(
+        '(min-width: 640px) 640px, 100vw',
+      )
     })
 
     it('responsive: explicit sizes prop wins over the auto-generated one', async () => {
       const wrapper = mount(VImage, {
         props: {
-          src: '/img.jpg', alt: 'Responsive', width: 640, height: 320,
-          widths: [320, 640, 960], layout: 'responsive', sizes: '50vw', lazy: false,
+          src: '/img.jpg',
+          alt: 'Responsive',
+          width: 640,
+          height: 320,
+          widths: [320, 640, 960],
+          layout: 'responsive',
+          sizes: '50vw',
+          lazy: false,
         },
       })
       await nextTick()
@@ -800,8 +1049,12 @@ describe('VImage', () => {
     it('unset layout auto-generates sizes too — visually identical to "responsive", so it gets the same heuristic', async () => {
       const wrapper = mount(VImage, {
         props: {
-          src: '/img.jpg', alt: 'No layout', width: 640, height: 320,
-          widths: [320, 640, 960], lazy: false,
+          src: '/img.jpg',
+          alt: 'No layout',
+          width: 640,
+          height: 320,
+          widths: [320, 640, 960],
+          lazy: false,
         },
       })
       await nextTick()
@@ -809,15 +1062,22 @@ describe('VImage', () => {
       await nextTick()
       await nextTick()
 
-      expect(wrapper.find('img:not([aria-hidden])').attributes('sizes')).toBe('(min-width: 640px) 640px, 100vw')
+      expect(wrapper.find('img:not([aria-hidden])').attributes('sizes')).toBe(
+        '(min-width: 640px) 640px, 100vw',
+      )
     })
 
     it('does not auto-generate sizes for layout="fixed"/"fill"', async () => {
       for (const layout of ['fixed', 'fill'] as const) {
         const wrapper = mount(VImage, {
           props: {
-            src: '/img.jpg', alt: 'Fixed or fill', width: 640, height: 320,
-            widths: [320, 640, 960], layout, lazy: false,
+            src: '/img.jpg',
+            alt: 'Fixed or fill',
+            width: 640,
+            height: 320,
+            widths: [320, 640, 960],
+            layout,
+            lazy: false,
           },
         })
         await nextTick()
@@ -945,13 +1205,19 @@ describe('VImage', () => {
     }
 
     it('has no effect when unset (default behavior unchanged)', async () => {
-      const wrapper = await mountCdn({ src: 'https://res.cloudinary.com/demo/image/upload/photo.jpg' })
-      expect(wrapper.find('img:not([aria-hidden])').attributes('src'))
-        .toBe('https://res.cloudinary.com/demo/image/upload/photo.jpg')
+      const wrapper = await mountCdn({
+        src: 'https://res.cloudinary.com/demo/image/upload/photo.jpg',
+      })
+      expect(wrapper.find('img:not([aria-hidden])').attributes('src')).toBe(
+        'https://res.cloudinary.com/demo/image/upload/photo.jpg',
+      )
     })
 
     it('rewrites a recognized CDN URL when cdn is true', async () => {
-      const wrapper = await mountCdn({ src: 'https://res.cloudinary.com/demo/image/upload/photo.jpg', cdn: true })
+      const wrapper = await mountCdn({
+        src: 'https://res.cloudinary.com/demo/image/upload/photo.jpg',
+        cdn: true,
+      })
       const src = wrapper.find('img:not([aria-hidden])').attributes('src')
       expect(src).toContain('res.cloudinary.com/demo/')
       expect(src).not.toBe('https://res.cloudinary.com/demo/image/upload/photo.jpg')
@@ -959,7 +1225,9 @@ describe('VImage', () => {
 
     it('passes an unrecognized host through unchanged', async () => {
       const wrapper = await mountCdn({ src: 'https://example.com/photo.jpg', cdn: true })
-      expect(wrapper.find('img:not([aria-hidden])').attributes('src')).toBe('https://example.com/photo.jpg')
+      expect(wrapper.find('img:not([aria-hidden])').attributes('src')).toBe(
+        'https://example.com/photo.jpg',
+      )
     })
 
     it('builds a real per-width srcset via the CDN adapter when combined with widths', async () => {
@@ -984,7 +1252,11 @@ describe('VImage', () => {
 
     it('does not apply to an explicit SrcSet object src', async () => {
       const wrapper = await mountCdn({
-        src: { avif: '/img.avif', webp: '/img.webp', fallback: 'https://res.cloudinary.com/demo/image/upload/photo.jpg' },
+        src: {
+          avif: '/img.avif',
+          webp: '/img.webp',
+          fallback: 'https://res.cloudinary.com/demo/image/upload/photo.jpg',
+        },
         cdn: true,
       })
       expect(wrapper.find('source[type="image/avif"]').attributes('srcset')).toBe('/img.avif')
@@ -1013,14 +1285,20 @@ describe('VImage', () => {
     })
 
     it('loaderRoute overrides the default route', async () => {
-      const wrapper = await mountLoader({ src: '/photos/cat.jpg', loader: 'server', loaderRoute: '/api/img' })
+      const wrapper = await mountLoader({
+        src: '/photos/cat.jpg',
+        loader: 'server',
+        loaderRoute: '/api/img',
+      })
       const src = wrapper.find('img:not([aria-hidden])').attributes('src')
       expect(src).toBe('/api/img?src=%2Fphotos%2Fcat.jpg')
     })
 
     it('builds a real per-width srcset when combined with widths', async () => {
       const wrapper = await mountLoader({
-        src: '/photos/cat.jpg', loader: 'server', widths: [400, 800],
+        src: '/photos/cat.jpg',
+        loader: 'server',
+        widths: [400, 800],
       })
       const srcset = wrapper.find('img:not([aria-hidden])').attributes('srcset')
       expect(srcset).toContain('w=400')

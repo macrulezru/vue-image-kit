@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useImage } from '../composables/useImage'
 import { useBreakpoints } from '../composables/useBreakpoints'
+import { useActiveMediaSource } from '../composables/useActiveMediaSource'
 import { useNetworkAware } from '../composables/useNetworkAware'
 import { decodeBlurhash } from '../utils/blurhash-decode'
 import { decodeThumbHash, thumbHashToAverageColor } from '../utils/thumbhash-decode'
@@ -11,7 +12,16 @@ import { autoLoader, autoSrcset } from '../cdn/auto'
 import type { AutoLoaderConfig } from '../cdn/auto'
 import { useServerRoute } from '../composables/useServerLoader'
 import { buildImageUrl } from '../server/url'
-import type { SrcSet, ResponsiveSrc, ObjectFit, BreakpointMap, FocalPoint, Densities, ImageMeta, Layout } from '../types'
+import type {
+  SrcSet,
+  ResponsiveSrc,
+  ObjectFit,
+  BreakpointMap,
+  FocalPoint,
+  Densities,
+  ImageMeta,
+  Layout,
+} from '../types'
 
 interface Props {
   src?: string | SrcSet
@@ -97,7 +107,8 @@ const mergedSrc = computed<string | SrcSet>(() => {
 if (isDevMode()) {
   const altIssue = checkAltText(props.alt)
   if (altIssue) {
-    const srcForMessage = typeof mergedSrc.value === 'string' ? mergedSrc.value : mergedSrc.value.fallback
+    const srcForMessage =
+      typeof mergedSrc.value === 'string' ? mergedSrc.value : mergedSrc.value.fallback
     console.warn(`[vue-image-kit] VImage: alt ${altIssue} (src: "${srcForMessage}")`)
   }
 }
@@ -117,14 +128,23 @@ const cdnSrcset = computed<string | undefined>(() => {
 const serverRoute = props.loader === 'server' ? useServerRoute(props.loaderRoute) : ''
 
 const serverSrc = computed<string | undefined>(() => {
-  if (props.cdn || props.loader !== 'server' || typeof mergedSrc.value !== 'string') return undefined
+  if (props.cdn || props.loader !== 'server' || typeof mergedSrc.value !== 'string')
+    return undefined
   return buildImageUrl(mergedSrc.value, {}, serverRoute)
 })
 
 const serverSrcset = computed<string | undefined>(() => {
-  if (props.cdn || props.loader !== 'server' || !props.widths?.length || typeof mergedSrc.value !== 'string') return undefined
+  if (
+    props.cdn ||
+    props.loader !== 'server' ||
+    !props.widths?.length ||
+    typeof mergedSrc.value !== 'string'
+  )
+    return undefined
   const src = mergedSrc.value
-  return props.widths.map((w) => `${buildImageUrl(src, { width: w }, serverRoute)} ${w}w`).join(', ')
+  return props.widths
+    .map((w) => `${buildImageUrl(src, { width: w }, serverRoute)} ${w}w`)
+    .join(', ')
 })
 
 const mergedWidth = computed(() => props.width ?? props.image?.width)
@@ -141,7 +161,9 @@ const mergedSizes = computed(() => props.sizes ?? props.image?.sizes ?? autoSize
 
 const effectivePriority = computed(() => props.priority && !isSavingData.value)
 const effectiveLazy = computed(() => (effectivePriority.value ? false : props.lazy))
-const effectiveFetchpriority = computed(() => (effectivePriority.value ? 'high' : props.fetchpriority))
+const effectiveFetchpriority = computed(() =>
+  effectivePriority.value ? 'high' : props.fetchpriority,
+)
 const effectiveDecoding = computed(() => (effectivePriority.value ? 'sync' : props.decoding))
 
 const effectiveRawSrcset = computed(() => {
@@ -154,14 +176,16 @@ const effectiveRawSrcset = computed(() => {
 
 const { status, isLoaded, isError, imgAttrs, observe, onImgLoad, onImgError } = useImage({
   src: cdnSrc.value ?? serverSrc.value ?? mergedSrc.value,
-  ...(effectiveRawSrcset.value === undefined && props.widths !== undefined ? { widths: props.widths } : {}),
+  ...(effectiveRawSrcset.value === undefined && props.widths !== undefined
+    ? { widths: props.widths }
+    : {}),
   ...(props.densities !== undefined && !isSavingData.value ? { densities: props.densities } : {}),
   ...(mergedSizes.value !== undefined ? { sizes: mergedSizes.value } : {}),
   ...(effectiveRawSrcset.value !== undefined ? { rawSrcset: effectiveRawSrcset.value } : {}),
   lazy: effectiveLazy.value,
   rootMargin: props.rootMargin,
   threshold: props.threshold,
-  fit: props.fit,
+  ...(props.fit !== undefined ? { fit: props.fit } : {}),
   ...(props.maxRetries !== undefined ? { maxRetries: props.maxRetries } : {}),
   ...(props.retryDelay !== undefined ? { retryDelay: props.retryDelay } : {}),
 })
@@ -170,6 +194,10 @@ const isIdle = computed(() => status.value === 'idle')
 
 const { resolveMediaSources } = useBreakpoints(props.breakpoints)
 const mediaSources = computed(() => resolveMediaSources(props.sources))
+
+const activeMediaSource = useActiveMediaSource(mediaSources)
+const effectiveWidth = computed(() => activeMediaSource.value?.width ?? mergedWidth.value)
+const effectiveHeight = computed(() => activeMediaSource.value?.height ?? mergedHeight.value)
 
 const srcObject = computed(() => (typeof mergedSrc.value === 'object' ? mergedSrc.value : null))
 const needsPicture = computed(() => srcObject.value !== null || mediaSources.value.length > 0)
@@ -194,7 +222,7 @@ const showShimmerClass = computed(() => isShimmer.value && !isLoaded.value && !i
 const effectivePlaceholder = computed(() => {
   if (colorPlaceholder.value) return undefined
   if (props.placeholderMode === 'color' || props.placeholderMode === 'shimmer') return undefined
-  if (mergedBlurhash.value && mergedWidth.value && mergedHeight.value) return undefined
+  if (mergedBlurhash.value && effectiveWidth.value && effectiveHeight.value) return undefined
   if (mergedPlaceholder.value) return mergedPlaceholder.value
   if (mergedThumbhash.value) return decodeThumbHash(mergedThumbhash.value)
   return undefined
@@ -219,8 +247,8 @@ function blurhashToDataUrl(hash: string, width: number, height: number): string 
 
 const blurhashDataUrl = computed<string | undefined>(() => {
   if (isSSR) return undefined
-  if (!mergedBlurhash.value || !mergedWidth.value || !mergedHeight.value) return undefined
-  return blurhashToDataUrl(mergedBlurhash.value, mergedWidth.value, mergedHeight.value)
+  if (!mergedBlurhash.value || !effectiveWidth.value || !effectiveHeight.value) return undefined
+  return blurhashToDataUrl(mergedBlurhash.value, effectiveWidth.value, effectiveHeight.value)
 })
 
 const placeholderBackgroundStyle = computed(() => {
@@ -262,12 +290,14 @@ onMounted(() => {
 })
 
 const fadeStyle = computed(() =>
-  props.fadeIn ? { opacity: mountedOpacity.value ? '1' : '0', transition: 'opacity 0.3s ease' } : {},
+  props.fadeIn
+    ? { opacity: mountedOpacity.value ? '1' : '0', transition: 'opacity 0.3s ease' }
+    : {},
 )
 
 const aspectRatio = computed(() => {
-  if (mergedWidth.value && mergedHeight.value) {
-    return `${mergedWidth.value} / ${mergedHeight.value}`
+  if (effectiveWidth.value && effectiveHeight.value) {
+    return `${effectiveWidth.value} / ${effectiveHeight.value}`
   }
   return undefined
 })
@@ -282,14 +312,14 @@ const boxStyle = computed(() => {
       height: '100%',
     }
   }
-  if (props.layout === 'fixed' && mergedWidth.value && mergedHeight.value) {
+  if (props.layout === 'fixed' && effectiveWidth.value && effectiveHeight.value) {
     return {
       display: 'inline-block' as const,
-      width: `${mergedWidth.value}px`,
-      height: `${mergedHeight.value}px`,
+      width: `${effectiveWidth.value}px`,
+      height: `${effectiveHeight.value}px`,
     }
   }
-  if (mergedWidth.value && mergedHeight.value) {
+  if (effectiveWidth.value && effectiveHeight.value) {
     return {
       display: 'block' as const,
       width: '100%',
@@ -309,7 +339,10 @@ const idleStyle = computed(() => ({
 const isFillLayout = computed(() => props.layout === 'fill')
 const isFixedLayout = computed(() => props.layout === 'fixed')
 const isResponsiveSized = computed(
-  () => !isFillLayout.value && !isFixedLayout.value && !!(mergedWidth.value && mergedHeight.value),
+  () =>
+    !isFillLayout.value &&
+    !isFixedLayout.value &&
+    !!(effectiveWidth.value && effectiveHeight.value),
 )
 
 const loadedBoxClasses = computed(() => ({
@@ -322,8 +355,8 @@ const loadedBoxClasses = computed(() => ({
 const errorClasses = computed(() => ({ ...loadedBoxClasses.value, 'vik-box--error': true }))
 
 const fixedSizeStyle = computed(() => {
-  if (!isFixedLayout.value || !mergedWidth.value || !mergedHeight.value) return {}
-  return { width: `${mergedWidth.value}px`, height: `${mergedHeight.value}px` }
+  if (!isFixedLayout.value || !effectiveWidth.value || !effectiveHeight.value) return {}
+  return { width: `${effectiveWidth.value}px`, height: `${effectiveHeight.value}px` }
 })
 
 const isBoxConstrained = computed(
@@ -375,7 +408,15 @@ function handleError(e: Event): void {
 
   <span v-else-if="isError" :class="errorClasses">
     <slot name="error">
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5" aria-hidden="true">
+      <svg
+        width="48"
+        height="48"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#9ca3af"
+        stroke-width="1.5"
+        aria-hidden="true"
+      >
         <rect x="3" y="3" width="18" height="18" rx="2" />
         <circle cx="8.5" cy="8.5" r="1.5" />
         <path d="m21 15-5-5L5 21" />
@@ -390,6 +431,9 @@ function handleError(e: Event): void {
       :media="s.media"
       :srcset="s.src"
       :type="s.type"
+      :width="s.width"
+      :height="s.height"
+      :sizes="s.sizes"
     />
     <source v-if="srcObject?.avif" :srcset="srcObject.avif" type="image/avif" />
     <source v-if="srcObject?.webp" :srcset="srcObject.webp" type="image/webp" />
@@ -458,7 +502,12 @@ function handleError(e: Event): void {
 
 <style scoped>
 .vik-shimmer {
-  background-image: linear-gradient(90deg, rgb(255, 255, 255, 0) 20%, rgb(255, 255, 255, 0.85) 50%, rgb(255, 255, 255, 0) 80%);
+  background-image: linear-gradient(
+    90deg,
+    rgb(255, 255, 255, 0) 20%,
+    rgb(255, 255, 255, 0.85) 50%,
+    rgb(255, 255, 255, 0) 80%
+  );
   background-color: #e2e5ea;
   background-repeat: no-repeat;
   background-size: 200% 100%;

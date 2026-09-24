@@ -165,6 +165,25 @@ export default defineNuxtConfig({
      breakpoint, sorted automatically, plus the fallback <img>. -->
 ```
 
+Each breakpoint can also carry its own `width`/`height` (or a full build-time `ImageMeta` object, e.g. from a `?vik` import) when its crop has a different aspect ratio than the root image:
+
+```vue
+<template>
+  <VImage
+    src="/desktop-portrait.jpg"
+    :width="720"
+    :height="1237"
+    :sources="{
+      tablet: { src: '/tablet-landscape.jpg', width: 1400, height: 700 },
+    }"
+    :breakpoints="{ tablet: '(max-width: 1024px)' }"
+    alt="Hero"
+  />
+</template>
+```
+
+Give `width`/`height` here and `VImage` reserves the box for the *active* breakpoint's own aspect ratio — not just the root image's — so the idle placeholder and blurhash decode already have the right proportions before the photo loads, and switching breakpoints never causes a layout shift. Without them, `<source>` renders with no dimensions and the placeholder falls back to the root `width`/`height`, exactly like before this existed. `width`/`height` are also both-or-nothing per entry: setting only one is ignored (with a dev warning) rather than distorting the box.
+
 #### Respects Save-Data — doesn't pull the heavy version
 
 `respect-save-data` downgrades `src` to the lightest candidate it can find and drops priority loading while the visitor has data-saving mode on — their phone decides, not the developer.

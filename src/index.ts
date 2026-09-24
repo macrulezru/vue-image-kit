@@ -25,6 +25,8 @@ export type {
   ImageStatus,
   SrcSet,
   ResponsiveSrc,
+  ResponsiveSource,
+  ResponsiveSrcEntry,
   BreakpointMap,
   VImageKitOptions,
   LazyImgOptions,
