@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 // always exercises current code, same trick demo/vite.config.ts uses for
 // the plain-Vite demo.
 const src = (p: string) => fileURLToPath(new URL(`../src/${p}`, import.meta.url))
+const dist = (p: string) => fileURLToPath(new URL(`../dist/${p}`, import.meta.url))
 
 export default defineNuxtConfig({
   compatibilityDate: '2026-01-01',
@@ -32,6 +33,8 @@ export default defineNuxtConfig({
     'vue-image-kit/cdn': src('cdn/index.ts'),
     'vue-image-kit/server': src('server/index.ts'),
     'vue-image-kit': src('index.ts'),
+    '@macrulez/vue-image-kit/style.css': dist('style.css'),
+    '@macrulez/vue-image-kit': src('index.ts'),
   },
 
   // Vite's own `server.warmup.clientFiles` (set internally to the app entry)

@@ -1,6 +1,6 @@
 {
   "name": "@macrulez/vue-image-kit",
-  "version": "1.1.7",
+  "version": "1.1.8",
   "description": "Vue 3 image optimization — lazy loading, WebP/AVIF, srcset, Blurhash/LQIP placeholders, CDN adapters and a CLI, with zero runtime dependencies.",
   "author": "macrulez <macrulezru@gmail.com> (https://macrulez.ru/en)",
   "license": "MIT",
@@ -50,7 +50,8 @@
       "types": "./dist/server/index.d.ts",
       "import": "./dist/server/index.js",
       "require": "./dist/server/index.cjs"
-    }
+    },
+    "./style.css": "./dist/style.css"
   },
   "sideEffects": false,
   "files": [

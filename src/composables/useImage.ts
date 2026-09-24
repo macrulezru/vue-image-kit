@@ -22,7 +22,7 @@ interface ImgAttrs {
   src: string
   srcset?: string
   sizes?: string
-  style: { objectFit: ObjectFit }
+  style?: { objectFit: ObjectFit }
 }
 
 interface UseImageReturn {
@@ -45,7 +45,7 @@ export function useImage(options: UseImageOptions): UseImageReturn {
     lazy = true,
     rootMargin = '200px',
     threshold = 0,
-    fit = 'cover',
+    fit,
     maxRetries = 0,
     retryDelay = 1000,
   } = options
@@ -79,7 +79,7 @@ export function useImage(options: UseImageOptions): UseImageReturn {
       src: fallbackSrc,
       ...(srcset !== undefined ? { srcset } : {}),
       ...(sizesAttr !== undefined ? { sizes: sizesAttr } : {}),
-      style: { objectFit: fit },
+      ...(fit ? { style: { objectFit: fit } } : {}),
     }
   })
 
