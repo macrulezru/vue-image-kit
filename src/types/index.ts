@@ -6,7 +6,17 @@ export interface SrcSet {
   fallback: string
 }
 
-export type ResponsiveSrc = Record<string, string | SrcSet>
+export interface ResponsiveSource {
+  src: string | SrcSet
+  width?: number
+  height?: number
+  srcset?: string
+  sizes?: string
+}
+
+export type ResponsiveSrcEntry = string | SrcSet | ResponsiveSource | ImageMeta
+
+export type ResponsiveSrc = Record<string, ResponsiveSrcEntry>
 
 export type BreakpointMap = Record<string, string>
 

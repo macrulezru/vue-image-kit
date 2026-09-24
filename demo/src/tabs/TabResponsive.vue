@@ -141,6 +141,48 @@ app.use(VImageKitPlugin, {
       </div>
     </div>
 
+    <!-- Sizes for art-direction sources -->
+    <div class="panel" style="margin-bottom: 24px">
+      <p class="panel-title">Sizes per breakpoint (no more layout shift on switch)</p>
+      <p style="font-size: 0.78rem; color: #8b949e; margin: 0 0 12px">
+        Give a breakpoint entry its own <code style="color: #e3b341">width</code>/<code
+          style="color: #e3b341"
+          >height</code
+        >
+        and the placeholder reserves exactly that box before the real photo loads — resize past
+        <code style="color: #e3b341">tablet</code>'s 1024px breakpoint and watch the box change
+        shape immediately, with no jump once the photo arrives.
+      </p>
+      <div
+        data-testid="sizes-demo-box"
+        style="max-width: 360px; border-radius: 8px; overflow: hidden; background: #0d1117"
+      >
+        <VImage
+          data-testid="sizes-demo-image"
+          src="/images/art-direction-portrait.jpg"
+          alt="Desktop portrait crop"
+          :width="720"
+          :height="1237"
+          :sources="{
+            tablet: { src: '/images/art-direction-landscape.jpg', width: 1400, height: 700 },
+          }"
+          :breakpoints="{ tablet: '(max-width: 1024px)' }"
+          style="width: 100%"
+        />
+      </div>
+      <pre class="code-block" style="margin-top: 12px">
+&lt;VImage
+  src="/desktop-portrait.jpg"
+  :width="720"
+  :height="1237"
+  :sources="{
+    tablet: { src: '/tablet-landscape.jpg', width: 1400, height: 700 },
+  }"
+  :breakpoints="{ tablet: '(max-width: 1024px)' }"
+/&gt;</pre
+      >
+    </div>
+
     <!-- Resolved sources table -->
     <div class="panel">
       <p class="panel-title">Resolved &lt;source&gt; elements (after merge &amp; sort)</p>

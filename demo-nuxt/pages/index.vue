@@ -41,13 +41,15 @@ async function checkOnDemand() {
       <p>
         <code>vueImageKit.breakpoints</code> in <code>nuxt.config.ts</code> defines
         <code>sm</code>/<code>md</code>; this <code>&lt;VImage&gt;</code> only passes the
-        breakpoint keys, no media queries.
+        breakpoint keys, no media queries. The <code>sm</code> entry also carries its own
+        <code>width</code>/<code>height</code>, exercising the sizes-per-breakpoint path on a
+        real SSR + hydration round-trip.
       </p>
       <VImage
         data-testid="breakpoints-image"
         src="/images/photo-1.jpg"
         alt="Art-directed photo"
-        :sources="{ sm: '/images/photo-2.jpg' }"
+        :sources="{ sm: { src: '/images/photo-2.jpg', width: 267, height: 400 } }"
         :width="400"
         :height="267"
         style="max-width: 300px"

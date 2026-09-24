@@ -5,7 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.2.0] - 2026-09-24
+
+### Added
+
+- `sources` entries can now carry their own `width`/`height` (and `srcset`/`sizes`) for art-direction breakpoints whose crop has a different aspect ratio than the root image — either as `{ src, width, height }` or by passing a build-time `ImageMeta` object directly (e.g. from a `?vik` import) per breakpoint. The matching `<source>` renders with real `width`/`height` attributes (only when both are given — one without the other is dropped, with a dev warning, rather than risk distorting the reserved box), and on the client, a new internal `useActiveMediaSource` composable tracks which breakpoint's media query currently matches so the idle placeholder, the blurhash decode, and `layout="fixed"` sizing all reserve the *active* breakpoint's own proportions instead of always falling back to the root `width`/`height` — no more layout shift when a differently-shaped art-directed source is the one actually showing. Reactive to viewport changes (`matchMedia` `change` events), zero overhead when no `sources` entry declares dimensions, and safe under SSR/hydration (the server-rendered branch keeps using the root size, matching prior behavior exactly). New exported types: `ResponsiveSource`, `ResponsiveSrcEntry`.
+
+### Changed
+
+- `useBreakpoints()`'s `resolveMediaSources` now warns (dev mode only) when a `sources` key doesn't match any registered breakpoint, naming the key and the breakpoints that *are* available — previously the entry was silently dropped with no indication why.
+
+### Fixed
+
+- `<VImage>` passed its `fit` prop straight through to `useImage()` even when unset, giving it the key `fit: undefined` instead of omitting the key entirely — invisible at runtime (`useImage` only ever checks `fit` with a truthy check, so an `undefined` value and an absent key behave identically there), but a real `exactOptionalPropertyTypes` violation that `tsc --noEmit` doesn't catch for `.vue` files and `vite-plugin-dts` does, printing a `TS2379` error during `npm run build` (the build itself still completed). Now uses the same conditional-spread pattern as every other optional field in that same call.
+
+## [1.1.8] - 2026-09-24
 
 ### Changed
 
