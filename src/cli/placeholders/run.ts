@@ -20,7 +20,13 @@ import {
   type ManifestEntries,
   type ProgramParser,
 } from './manifest.js'
-import { applyEdits, dirtyFiles, placeholderAttributes, type InsertEdit } from './codemod.js'
+import {
+  applyEdits,
+  dirtyFiles,
+  placeholderAttributes,
+  REPLACEABLE_PROPS,
+  type InsertEdit,
+} from './codemod.js'
 
 export interface PlaceholdersOptions {
   root: string
@@ -37,6 +43,7 @@ export interface PlaceholdersOptions {
   write: boolean
   forceWrite: boolean
   refreshRemote: boolean
+  replace: boolean
 }
 
 export interface PlaceholdersDeps {
@@ -49,6 +56,7 @@ export interface PlaceholdersDeps {
 
 export type SkipReason =
   | 'has-placeholder'
+  | 'dynamic-placeholder'
   | 'dynamic'
   | 'not-supported'
   | 'missing-file'
@@ -70,7 +78,8 @@ export interface PlaceholdersReport {
   manifestChanged: boolean
   codemodUsages: number
   codemodFiles: string[]
-  codemodPreview: { file: string; line: number; attributes: string[] }[]
+  codemodPreview: { file: string; line: number; attributes: string[]; removed: string[] }[]
+  replaced: number
   skipped: Partial<Record<SkipReason, number>>
   dirty: string[]
   registrationFound: boolean
@@ -83,6 +92,7 @@ interface Planned {
   usage: ImageUsage
   key: string
   strategy: Strategy
+  remove: string[]
 }
 
 interface SourceJob {
@@ -164,14 +174,28 @@ export async function runPlaceholders(
     dirty: [],
     registrationFound: scan.registration.found,
     fellBackToCodemod: 0,
+    replaced: 0,
   }
 
   const planned: Planned[] = []
   for (const usage of scan.usages) {
     if (usage.kind !== 'component') continue
+    let remove: string[] = []
     if (usage.hasPlaceholder) {
-      addSkip(report, 'has-placeholder')
-      continue
+      if (!options.replace || 'image' in usage.props) {
+        addSkip(report, 'has-placeholder')
+        continue
+      }
+      remove = REPLACEABLE_PROPS.filter((name) => name in usage.props)
+      const bound = usage.edit?.attributes.some(
+        (attribute) =>
+          remove.includes(attribute.name) &&
+          (attribute.raw.startsWith(':') || attribute.raw.startsWith('v-bind')),
+      )
+      if (bound || remove.some((name) => usage.props[name]!.kind === 'dynamic')) {
+        addSkip(report, 'dynamic-placeholder')
+        continue
+      }
     }
     const { kind } = usage.source
     if (kind === 'dynamic' || kind === 'vik' || 'v-bind' in usage.props || '...' in usage.props) {
@@ -187,14 +211,19 @@ export async function runPlaceholders(
       continue
     }
     const manifestCapable = MANIFEST_KINDS.has(kind) && scan.registration.found
-    if (!manifestCapable && !usage.edit) {
+    if ((!manifestCapable || remove.length > 0) && !usage.edit) {
       addSkip(report, 'not-editable')
+      continue
+    }
+    if (remove.length > 0 && !options.write) {
+      addSkip(report, 'write-disabled')
       continue
     }
     planned.push({
       usage,
       key: sourceKey(usage),
       strategy: manifestCapable ? 'manifest' : 'codemod',
+      remove,
     })
   }
 
@@ -321,13 +350,26 @@ export async function runPlaceholders(
     { absFile: string; edits: InsertEdit[]; usages: ImageUsage[] }
   >()
 
-  for (const { usage, key, strategy } of planned) {
+  const addEdit = (usage: ImageUsage, attributes: string[], remove: string[]) => {
+    const group = editsByFile.get(usage.file) ?? { absFile: usage.absFile, edits: [], usages: [] }
+    group.edits.push({ target: usage.edit!, attributes, remove })
+    group.usages.push(usage)
+    editsByFile.set(usage.file, group)
+    const removed = usage
+      .edit!.attributes.filter((attribute) => remove.includes(attribute.name))
+      .map((attribute) => attribute.raw)
+    report.codemodPreview.push({ file: usage.file, line: usage.line, attributes, removed })
+    if (remove.length > 0) report.replaced++
+  }
+
+  for (const { usage, key, strategy, remove } of planned) {
     const data = results.get(key)
     if (!data) {
       const previous = strategy === 'manifest' ? previousManifest[usage.source.value!] : undefined
       if (previous) {
         manifestEntries[usage.source.value!] = previous
         report.manifestUsages++
+        if (remove.length > 0) addEdit(usage, [], remove)
         continue
       }
       addSkip(report, blocked.get(key) ?? 'failed')
@@ -336,6 +378,7 @@ export async function runPlaceholders(
     if (strategy === 'manifest') {
       manifestEntries[usage.source.value!] = entryForMode(data, options.mode)
       report.manifestUsages++
+      if (remove.length > 0) addEdit(usage, [], remove)
       continue
     }
     const attributes = placeholderAttributes(data, options.mode, needsSize(usage))
@@ -344,11 +387,7 @@ export async function runPlaceholders(
       continue
     }
     if (MANIFEST_KINDS.has(usage.source.kind)) report.fellBackToCodemod++
-    const group = editsByFile.get(usage.file) ?? { absFile: usage.absFile, edits: [], usages: [] }
-    group.edits.push({ target: usage.edit!, attributes })
-    group.usages.push(usage)
-    editsByFile.set(usage.file, group)
-    report.codemodPreview.push({ file: usage.file, line: usage.line, attributes })
+    addEdit(usage, attributes, remove)
   }
 
   if (Object.keys(manifestEntries).length > 0) {
@@ -366,6 +405,7 @@ export async function runPlaceholders(
     if (!options.write) {
       addSkip(report, 'write-disabled', editCount)
       report.codemodPreview = []
+      report.replaced = 0
     } else if (options.dryRun) {
       report.codemodUsages = editCount
       report.codemodFiles = [...editsByFile.keys()]
@@ -375,6 +415,7 @@ export async function runPlaceholders(
         report.dirty = dirty
         addSkip(report, 'dirty', editCount)
         report.codemodPreview = []
+        report.replaced = 0
       } else {
         for (const [file, group] of editsByFile) {
           const source = readFileSync(group.absFile, 'utf8')

@@ -77,6 +77,7 @@ export interface PlaceholdersFileConfig extends ScanFileConfig {
   manifest?: string
   mode?: 'blurhash' | 'thumbhash' | 'color'
   remote?: boolean
+  replace?: boolean
   hosts?: string[]
   limit?: number
   concurrency?: number

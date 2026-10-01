@@ -47,6 +47,9 @@ ${DISCOVERY_HELP}
   --force-write        Edit source files even if they have uncommitted changes
   --no-cache           Recompute every placeholder, ignoring the cache
   --refresh-remote     Re-download remote images even if they are cached
+  --replace            Also redo usages that already have a placeholder: their static blurhash/
+                       thumbhash/placeholder/placeholder-color/placeholder-mode attributes are
+                       removed and replaced by the --mode placeholder (bound values and :image are kept)
   --help               Show this help
 
 Registering the manifest:
@@ -62,7 +65,8 @@ Examples:
 const MODES = new Set<PlaceholderMode>(['blurhash', 'thumbhash', 'color'])
 
 const SKIP_TEXT: Record<SkipReason, string> = {
-  'has-placeholder': 'already have a placeholder',
+  'has-placeholder': 'already have a placeholder (use --replace to redo static ones)',
+  'dynamic-placeholder': 'have a placeholder bound to an expression, which --replace leaves alone',
   dynamic: 'have a dynamic src',
   'not-supported': 'use a source that has no image file (data: URI, empty src)',
   'missing-file': 'point at a file that does not exist',
@@ -102,11 +106,14 @@ function printReport(report: PlaceholdersReport, dryRun: boolean): void {
   }
   if (report.codemodUsages > 0) {
     console.log(
-      `  ${prefix}Source edits: ${report.codemodUsages} usage(s) in ${report.codemodFiles.length} file(s)`,
+      `  ${prefix}Source edits: ${report.codemodUsages} usage(s) in ${report.codemodFiles.length} file(s)${report.replaced > 0 ? `, ${report.replaced} replacing an existing placeholder` : ''}`,
     )
     if (dryRun) {
       for (const item of report.codemodPreview) {
-        console.log(`    ${item.file}:${item.line}  + ${item.attributes.join(' ')}`)
+        const removed = item.removed.map((name) => `- ${name}`)
+        const added =
+          item.attributes.length > 0 ? [`+ ${item.attributes.join(' ')}`] : ['(value → manifest)']
+        console.log(`    ${item.file}:${item.line}  ${[...removed, ...added].join('  ')}`)
       }
     } else {
       for (const file of report.codemodFiles) console.log(`    ${file}`)
@@ -152,6 +159,7 @@ export async function runPlaceholdersCommand(argv: string[]): Promise<number> {
       'force-write': { type: 'boolean', default: false },
       'no-cache': { type: 'boolean', default: false },
       'refresh-remote': { type: 'boolean', default: false },
+      replace: { type: 'boolean', default: false },
       help: { type: 'boolean', default: false },
     },
   })
@@ -206,6 +214,7 @@ export async function runPlaceholdersCommand(argv: string[]): Promise<number> {
       write: !values['no-write'],
       forceWrite: values['force-write'],
       refreshRemote: values['refresh-remote'],
+      replace: values.replace || config.replace === true,
     },
     {
       sharp,

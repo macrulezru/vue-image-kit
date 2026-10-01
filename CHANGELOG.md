@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-10-01
+
+### Added
+
+- **`npx vue-image-kit placeholders --replace`** — also redoes `<VImage>` usages that already have a placeholder, instead of skipping them: their static `blurhash`, `thumbhash`, `placeholder`, `placeholder-color` and `placeholder-mode` attributes are removed and the placeholder of the chosen `--mode` takes their place — written into the template, or, for a `public/`/CDN/remote image with a registered placeholders manifest, moved into the manifest (the old attribute would otherwise override the manifest entry). Bound values (`:thumbhash="…"`) and `:image` are left alone and reported. Existing `width`/`height` are kept; multi-line tags lose the removed lines cleanly. `--dry-run` shows each removal and insertion (`- thumbhash  + blurhash="…"`); the usual guards still apply — `--no-write` skips replacements, and files with uncommitted changes aren't edited without `--force-write`. Also settable as `placeholders.replace` in `vue-image-kit.config.js`.
+
 ## [1.3.0] - 2026-10-01
 
 ### Added

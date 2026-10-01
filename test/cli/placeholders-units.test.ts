@@ -140,15 +140,56 @@ describe('codemod', () => {
     const firstEnd = source.indexOf(' />')
     const secondEnd = source.indexOf('"/b.jpg"') + '"/b.jpg"'.length
     const out = applyEdits(source, [
-      { target: { insertOffset: firstEnd, indent: null }, attributes: ['blurhash="x"'] },
       {
-        target: { insertOffset: secondEnd, indent: '  ' },
+        target: { insertOffset: firstEnd, tagEnd: 7, indent: null, attributes: [] },
+        attributes: ['blurhash="x"'],
+      },
+      {
+        target: { insertOffset: secondEnd, tagEnd: 0, indent: '  ', attributes: [] },
         attributes: [':width="1"', 'blurhash="y"'],
       },
     ])
     expect(out).toBe(
       '<VImage src="/a.jpg" blurhash="x" />\n<VImage\n  src="/b.jpg"\n  :width="1"\n  blurhash="y"\n/>',
     )
+  })
+
+  function target(source: string, indent: string | null) {
+    const attributes = [...source.matchAll(/(:?[a-z-]+)="[^"]*"/g)].map((match) => ({
+      name: match[1]!.replace(/^:/, '').replace(/-(\w)/g, (_, c: string) => c.toUpperCase()),
+      raw: match[1]!,
+      start: match.index!,
+      end: match.index! + match[0].length,
+    }))
+    return { insertOffset: attributes.at(-1)!.end, tagEnd: 7, indent, attributes }
+  }
+
+  it('removes replaced attributes and inserts after the last kept one (single line)', () => {
+    const source =
+      '<VImage src="/a.jpg" placeholder-color="#fff" alt="A" placeholder-mode="color" />'
+    const out = applyEdits(source, [
+      {
+        target: target(source, null),
+        attributes: ['blurhash="x"'],
+        remove: ['placeholderColor', 'placeholderMode'],
+      },
+    ])
+    expect(out).toBe('<VImage src="/a.jpg" alt="A" blurhash="x" />')
+  })
+
+  it('removes whole lines in a multi-line tag and keeps the indentation', () => {
+    const source = '<VImage\n  src="/a.jpg"\n  thumbhash="t"\n  alt="A"\n/>'
+    const out = applyEdits(source, [
+      { target: target(source, '  '), attributes: ['blurhash="x"'], remove: ['thumbhash'] },
+    ])
+    expect(out).toBe('<VImage\n  src="/a.jpg"\n  alt="A"\n  blurhash="x"\n/>')
+  })
+
+  it('only removes when nothing is inserted (value moved to the manifest)', () => {
+    const source = '<VImage src="/a.jpg" alt="A" blurhash="b" />'
+    expect(
+      applyEdits(source, [{ target: target(source, null), attributes: [], remove: ['blurhash'] }]),
+    ).toBe('<VImage src="/a.jpg" alt="A" />')
   })
 })
 
