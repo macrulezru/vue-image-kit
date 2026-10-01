@@ -28,6 +28,7 @@ export type {
   SrcSet,
   ResponsiveSrc,
   ResponsiveSource,
+  SourcePlaceholder,
   ResponsiveSrcEntry,
   BreakpointMap,
   VImageKitOptions,

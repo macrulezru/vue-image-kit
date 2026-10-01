@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2026-10-01
+
+### Added
+
+- **Per-breakpoint placeholders for `sources` (art direction).** A `sources` entry can now carry its own `blurhash`, `thumbhash`, `placeholder` and `placeholderColor` next to `src`/`width`/`height` — as a `{ src, … }` object or by passing a build-time `ImageMeta` (a `?vik` import) per breakpoint, which brings its placeholder along. While that entry's media query matches, `<VImage>` shows *its* placeholder at *its* proportions instead of the root image's: a vertical photo's blurhash is no longer stretched into a horizontal tablet box. The matching entry replaces the root's whole placeholder set, so a root `placeholderColor` doesn't win over a source's `blurhash`; entries without a placeholder of their own (and server rendering, where no media query is evaluated) keep using the root's. A [placeholders manifest](https://npm.vuecraft.ru/en/packages/vue-image-kit/guide/placeholders) entry for the source's `src` is used the same way, including its `width`/`height`. New exported type: `SourcePlaceholder`.
+- **`npx vue-image-kit placeholders` now fills in `sources` entries.** Every statically resolvable entry of a literal `:sources="{ … }"` — a `public/` path, a local import, a CDN or remote URL (with `--remote`) — gets a placeholder, even when the image's own `src` is dynamic. Delivery follows the usual rules: `public/`, CDN and remote sources go into the manifest when one is registered; local imports, and every source when it isn't, are written into the literal (`tablet: { src: …, width: 800, height: 400, blurhash: '…' }`; a bare string entry becomes an object). `width`/`height` are added only when the entry has neither. Entries that already carry a placeholder are left alone — `--replace` doesn't touch them. A `sources` object that reaches the template through a variable can fill the manifest but isn't edited in place.
+
 ## [1.3.1] - 2026-10-01
 
 ### Added

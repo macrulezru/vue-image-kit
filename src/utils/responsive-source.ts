@@ -1,4 +1,4 @@
-import type { ResponsiveSrcEntry, SrcSet } from '../types'
+import type { ResponsiveSrcEntry, SourcePlaceholder, SrcSet } from '../types'
 
 export interface NormalizedResponsiveEntry {
   formats: SrcSet
@@ -6,6 +6,18 @@ export interface NormalizedResponsiveEntry {
   height?: number
   srcset?: string
   sizes?: string
+  placeholder?: SourcePlaceholder
+}
+
+const PLACEHOLDER_FIELDS = ['blurhash', 'thumbhash', 'placeholder', 'placeholderColor'] as const
+
+function pickPlaceholder(entry: object): SourcePlaceholder | undefined {
+  const picked: SourcePlaceholder = {}
+  for (const field of PLACEHOLDER_FIELDS) {
+    const value = (entry as Record<string, unknown>)[field]
+    if (typeof value === 'string' && value !== '') picked[field] = value
+  }
+  return Object.keys(picked).length > 0 ? picked : undefined
 }
 
 export function normalizeResponsiveEntry(entry: ResponsiveSrcEntry): NormalizedResponsiveEntry {
@@ -18,6 +30,7 @@ export function normalizeResponsiveEntry(entry: ResponsiveSrcEntry): NormalizedR
   }
 
   const { width, height, srcset, sizes } = entry
+  const placeholder = pickPlaceholder(entry)
 
   if (typeof entry.src === 'object') {
     return {
@@ -26,6 +39,7 @@ export function normalizeResponsiveEntry(entry: ResponsiveSrcEntry): NormalizedR
       ...(height !== undefined ? { height } : {}),
       ...(srcset !== undefined ? { srcset } : {}),
       ...(sizes !== undefined ? { sizes } : {}),
+      ...(placeholder ? { placeholder } : {}),
     }
   }
 
@@ -42,5 +56,6 @@ export function normalizeResponsiveEntry(entry: ResponsiveSrcEntry): NormalizedR
     ...(height !== undefined ? { height } : {}),
     ...(srcset !== undefined ? { srcset } : {}),
     ...(sizes !== undefined ? { sizes } : {}),
+    ...(placeholder ? { placeholder } : {}),
   }
 }

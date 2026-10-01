@@ -119,7 +119,7 @@ export type Evaluated =
   | { t: 'object'; node: AstNode }
   | { t: 'array'; node: AstNode }
 
-function unwrap(node: AstNode): AstNode {
+export function unwrapNode(node: AstNode): AstNode {
   let current = node
   while (
     current.type === 'TSAsExpression' ||
@@ -141,7 +141,7 @@ export function evaluate(
   depth = 0,
 ): Evaluated | undefined {
   if (!node || depth > 8) return undefined
-  const expr = unwrap(node)
+  const expr = unwrapNode(node)
   switch (expr.type) {
     case 'StringLiteral':
       return { t: 'string', value: String(expr['value']) }

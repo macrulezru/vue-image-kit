@@ -6,7 +6,14 @@ export interface SrcSet {
   fallback: string
 }
 
-export interface ResponsiveSource {
+export interface SourcePlaceholder {
+  blurhash?: string
+  thumbhash?: string
+  placeholder?: string
+  placeholderColor?: string
+}
+
+export interface ResponsiveSource extends SourcePlaceholder {
   src: string | SrcSet
   width?: number
   height?: number

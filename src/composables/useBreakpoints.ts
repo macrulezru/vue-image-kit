@@ -1,7 +1,7 @@
 import { inject, computed } from 'vue'
 import type { ComputedRef } from 'vue'
 import type { InjectionKey } from 'vue'
-import type { BreakpointMap, ResponsiveSrc } from '../types'
+import type { BreakpointMap, ResponsiveSrc, SourcePlaceholder } from '../types'
 import { normalizeResponsiveEntry } from '../utils/responsive-source'
 import { isDevMode } from '../utils/a11y'
 
@@ -14,6 +14,8 @@ export interface MediaSource {
   width?: number
   height?: number
   sizes?: string
+  fallback: string
+  placeholder?: SourcePlaceholder
 }
 
 function sortSources(sources: MediaSource[]): MediaSource[] {
@@ -77,6 +79,7 @@ export function useBreakpoints(localBreakpoints?: BreakpointMap): UseBreakpoints
         height: rawHeight,
         srcset,
         sizes,
+        placeholder,
       } = normalizeResponsiveEntry(value)
 
       let width: number | undefined
@@ -96,6 +99,8 @@ export function useBreakpoints(localBreakpoints?: BreakpointMap): UseBreakpoints
         ...(width !== undefined ? { width } : {}),
         ...(height !== undefined ? { height } : {}),
         ...(sizes !== undefined ? { sizes } : {}),
+        fallback: formats.fallback,
+        ...(placeholder ? { placeholder } : {}),
       }
 
       if (formats.avif) result.push({ media, src: formats.avif, type: 'image/avif', ...dims })

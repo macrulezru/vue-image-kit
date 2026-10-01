@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import VImage from '../../src/components/VImage.vue'
 import { VImageKitPlugin } from '../../src/index'
+import { BREAKPOINTS_KEY } from '../../src/composables/useBreakpoints'
 import { PLACEHOLDERS_KEY } from '../../src/utils/placeholders'
 import { clearObserverPool } from '../../src/utils/observer-pool'
 import type { PlaceholderManifest } from '../../src/types'
@@ -145,5 +146,128 @@ describe('VImage — placeholders manifest', () => {
     const wrapper = mount(VImage, { props: { src: '/photo.jpg', alt: 'No manifest' } })
     await nextTick()
     expect(placeholderStyle(wrapper)).toContain('background-color: rgb(243, 244, 246)')
+  })
+})
+
+describe('VImage — per-source placeholders (art direction)', () => {
+  const BLURHASH_A = 'LEHV6nWB2yk8pyo0adR*.7kCMdnj'
+  const BLURHASH_B = 'LKO2?U%2Tw=w]~RBVZRi};RPxuwH'
+  const breakpoints = { tablet: '(max-width: 1024px)' }
+  let matching: Set<string>
+
+  beforeEach(() => {
+    matching = new Set()
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn((media: string) => ({
+        media,
+        get matches() {
+          return matching.has(media)
+        },
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    )
+  })
+
+  function mountArt(props: Record<string, unknown>, placeholders?: PlaceholderManifest) {
+    return mount(VImage, {
+      props: { src: '/vertical.jpg', alt: 'Art', width: 300, height: 400, ...props },
+      global: {
+        provide: {
+          [BREAKPOINTS_KEY as symbol]: breakpoints,
+          ...(placeholders ? { [PLACEHOLDERS_KEY as symbol]: placeholders } : {}),
+        },
+      },
+    })
+  }
+
+  it('uses the root placeholder when no source matches', async () => {
+    const wrapper = mountArt({
+      blurhash: BLURHASH_A,
+      sources: {
+        tablet: { src: '/horizontal.jpg', width: 800, height: 400, blurhash: BLURHASH_B },
+      },
+    })
+    await nextTick()
+    expect(placeholderStyle(wrapper)).toContain('aspect-ratio: 300 / 400')
+    expect(placeholderStyle(wrapper)).toContain('background-image')
+  })
+
+  it('switches to the matching source’s blurhash and proportions', async () => {
+    matching.add(breakpoints.tablet)
+    const wrapper = mountArt({
+      blurhash: BLURHASH_A,
+      sources: {
+        tablet: { src: '/horizontal.jpg', width: 800, height: 400, blurhash: BLURHASH_B },
+      },
+    })
+    await nextTick()
+    await nextTick()
+    const style = placeholderStyle(wrapper)
+    expect(style).toContain('aspect-ratio: 800 / 400')
+    expect(style).toContain('background-image')
+
+    const rootOnly = mountArt({ blurhash: BLURHASH_B, width: 800, height: 400 })
+    await nextTick()
+    expect(style).toBe(placeholderStyle(rootOnly))
+    const otherHash = mountArt({ blurhash: BLURHASH_A, width: 800, height: 400 })
+    await nextTick()
+    expect(style).not.toBe(placeholderStyle(otherHash))
+  })
+
+  it('replaces the whole root placeholder set — a root placeholderColor no longer wins over the source blurhash', async () => {
+    matching.add(breakpoints.tablet)
+    const wrapper = mountArt({
+      placeholderColor: '#201d1f',
+      sources: {
+        tablet: { src: '/horizontal.jpg', width: 800, height: 400, blurhash: BLURHASH_B },
+      },
+    })
+    await nextTick()
+    await nextTick()
+    const style = placeholderStyle(wrapper)
+    expect(style).not.toContain('background-color: rgb(32, 29, 31)')
+    expect(style).toContain('background-image')
+  })
+
+  it('applies a source-level placeholderColor even without dimensions', async () => {
+    matching.add(breakpoints.tablet)
+    const wrapper = mountArt({
+      blurhash: BLURHASH_A,
+      sources: { tablet: { src: '/horizontal.jpg', placeholderColor: '#336699' } },
+    })
+    await nextTick()
+    await nextTick()
+    expect(placeholderStyle(wrapper)).toContain('background-color: rgb(51, 102, 153)')
+  })
+
+  it('takes the active source’s entry from the placeholders manifest by its src', async () => {
+    matching.add(breakpoints.tablet)
+    const manifest: PlaceholderManifest = {
+      '/vertical.jpg': { blurhash: BLURHASH_A, width: 300, height: 400 },
+      '/horizontal.jpg': { blurhash: BLURHASH_B, width: 800, height: 400 },
+    }
+    const wrapper = mountArt(
+      { width: undefined, height: undefined, sources: { tablet: '/horizontal.jpg' } },
+      manifest,
+    )
+    await nextTick()
+    await nextTick()
+    expect(placeholderStyle(wrapper)).toContain('aspect-ratio: 800 / 400')
+  })
+
+  it('lets an explicit source field win over the manifest entry for the same source', async () => {
+    matching.add(breakpoints.tablet)
+    const manifest: PlaceholderManifest = {
+      '/horizontal.jpg': { blurhash: BLURHASH_B, color: '#abcdef', width: 800, height: 400 },
+    }
+    const wrapper = mountArt(
+      { sources: { tablet: { src: '/horizontal.jpg', placeholderColor: '#336699' } } },
+      manifest,
+    )
+    await nextTick()
+    await nextTick()
+    expect(placeholderStyle(wrapper)).toContain('background-color: rgb(51, 102, 153)')
   })
 })

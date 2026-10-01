@@ -1,11 +1,17 @@
 import { execFileSync } from 'node:child_process'
-import type { EditTarget } from '../scan/types.js'
+import type { EditTarget, SourceEntryEdit } from '../scan/types.js'
 import type { PlaceholderData, PlaceholderMode } from './compute.js'
 
+export interface SourceInsert {
+  edit: SourceEntryEdit
+  properties: string[]
+}
+
 export interface InsertEdit {
-  target: EditTarget
+  target?: EditTarget
   attributes: string[]
   remove?: string[]
+  sourceInserts?: SourceInsert[]
 }
 
 export const REPLACEABLE_PROPS = [
@@ -51,7 +57,45 @@ function removalStart(source: string, start: number): number {
   return index
 }
 
+function quoteJs(value: string, quote: string): string {
+  return `${quote}${value.replace(/\\/g, '\\\\').split(quote).join(`\\${quote}`)}${quote}`
+}
+
+export function sourceProperties(
+  data: PlaceholderData,
+  mode: PlaceholderMode,
+  addSize: boolean,
+  quote: string,
+): string[] {
+  const properties: string[] = []
+  if (addSize && data.width && data.height) {
+    properties.push(`width: ${data.width}`, `height: ${data.height}`)
+  }
+  if (mode === 'blurhash' && data.blurhash) {
+    properties.push(`blurhash: ${quoteJs(data.blurhash, quote)}`)
+  } else if (mode === 'thumbhash' && data.thumbhash) {
+    properties.push(`thumbhash: ${quoteJs(data.thumbhash, quote)}`)
+  } else if (data.color && (mode === 'color' || (!data.blurhash && !data.thumbhash))) {
+    properties.push(`placeholderColor: ${quoteJs(data.color, quote)}`)
+  }
+  return properties
+}
+
+function sourceOperations(source: string, inserts: SourceInsert[]): TextOperation[] {
+  return inserts.map(({ edit, properties }) => {
+    const list = properties.join(', ')
+    if (edit.kind === 'object') {
+      const text = edit.hasProperties ? `, ${list}` : ` ${list} `
+      return { start: edit.insertOffset, end: edit.insertOffset, text }
+    }
+    const original = source.slice(edit.start, edit.end)
+    return { start: edit.start, end: edit.end, text: `{ src: ${original}, ${list} }` }
+  })
+}
+
 function operationsFor(source: string, edit: InsertEdit): TextOperation[] {
+  const sourceOps = sourceOperations(source, edit.sourceInserts ?? [])
+  if (!edit.target) return sourceOps
   const remove = new Set(edit.remove ?? [])
   const { attributes, tagEnd, indent } = edit.target
   const removed = attributes.filter((attribute) => remove.has(attribute.name))
@@ -72,7 +116,7 @@ function operationsFor(source: string, edit: InsertEdit): TextOperation[] {
         : edit.attributes.map((attribute) => `\n${indent}${attribute}`).join('')
     operations.push({ start: insertAt, end: insertAt, text })
   }
-  return operations
+  return [...operations, ...sourceOps]
 }
 
 export function applyEdits(source: string, edits: InsertEdit[]): string {
