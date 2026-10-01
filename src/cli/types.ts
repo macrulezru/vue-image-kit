@@ -83,4 +83,11 @@ export interface PlaceholdersFileConfig extends ScanFileConfig {
   concurrency?: number
   timeout?: number
   maxBytes?: number
+  dirs?: (string | { dir: string; urlPrefix?: string })[]
+  urls?: string[]
+  tuning?: {
+    components?: [number, number]
+    sample?: number
+    color?: 'dominant' | 'average'
+  }
 }

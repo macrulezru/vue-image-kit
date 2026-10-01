@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-10-01
+
+### Added
+
+- **Placeholders for whole folders and URLs.** `placeholders --dir public/images` (repeatable; `--dir src/img=/assets/img` maps a folder served from another URL) computes every image in a folder, recursively, and adds it to the manifest under the URL it is served at — so an image whose `src` is built at runtime (`:src="category.image"`) still gets its placeholder from the manifest. `--url <url>` does the same for a single remote/CDN image without `--remote`. Config keys `dirs` and `urls`.
+- **Zero-step manifest in the Vite plugin.** `vueImageKit({ generate: false, placeholders: { dirs: ['public/images'] } })` serves the same manifest as the virtual module `virtual:vue-image-kit/placeholders` (also `urls`, `mode`, `tuning`), rebuilt when a file in those folders changes and cached between builds.
+- **Nuxt module registers it all.** `vueImageKit: { placeholders: { dirs: [...] } }` adds the Vite plugin and provides the manifest to every `<VImage>` — no CLI step, no manual `vite.plugins` entry. A `manifest` file (the old string form still works) is merged in.
+- **Placeholder-only Vite imports.** `import ph from './photo.jpg?placeholder'` gives `{ blurhash, placeholderColor, width, height }` — the exact props of `<VImage>`, so `<VImage v-bind="ph" />` works — without resizing the image or writing any file. `?placeholder=thumbhash` returns a ThumbHash instead of a BlurHash, `?placeholder=color` only the dominant color and size. `?blurhash` is the BlurHash string alone, next to the existing `?thumbhash`. They also work through `import.meta.glob(..., { query: '?placeholder' })`.
+- **`generate: false` option of the Vite plugin.** The plugin no longer processes the whole `input` folder on `buildStart` and hot updates — it only answers `?vik`, `?placeholder`, `?blurhash`, `?thumbhash` and the virtual manifest. `input` doesn't have to exist.
+- **Tuning of the hashes.** `--components 4x3` (BlurHash components), `--sample 100` (size the image is downscaled to before hashing) and `--color dominant|average` on the command, `tuning: { components, sample, color }` in the config file, in the Vite plugin's `placeholders` option and in the Nuxt module option. The cache is dropped when the tuning changes.
+- **Cache for the Vite plugin.** `?placeholder`, `?blurhash`, `?thumbhash` and the virtual manifest use the same on-disk cache as the command (`node_modules/.cache/vue-image-kit/placeholders.json`), so a repeated build doesn't re-read unchanged images.
+- **`v-lazy-img` and `useBackgroundImage()` read the placeholders manifest.** With no `placeholder` of their own, they show the entry's decoded blur and dominant color for their `src` while the image loads. `placeholders` fills the manifest for static `v-lazy-img`/`useBackgroundImage()` usages with a public/CDN/remote `src`.
+
+### Changed
+
+- `?thumbhash` and `?blurhash` now compute their values the same way as the `placeholders` command (BlurHash over a white background, ThumbHash fitted into 100×100), so the same image gets the same hash from either.
+
 ## [1.3.2] - 2026-10-01
 
 ### Added

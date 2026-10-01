@@ -38,6 +38,19 @@ describe('parseImageRequest', () => {
     expect(req?.query).toBe('foo=1&vik&bar=2')
   })
 
+  it('detects ?blurhash', () => {
+    expect(parseImageRequest('./photo.jpg?blurhash')?.type).toBe('blurhash')
+  })
+
+  it('detects ?placeholder and its mode', () => {
+    expect(parseImageRequest('./photo.jpg?placeholder')).toMatchObject({ type: 'placeholder' })
+    expect(parseImageRequest('./photo.jpg?placeholder')?.mode).toBeUndefined()
+    expect(parseImageRequest('./photo.jpg?placeholder=thumbhash')).toMatchObject({ type: 'placeholder', mode: 'thumbhash' })
+    expect(parseImageRequest('./photo.jpg?placeholder=color')).toMatchObject({ type: 'placeholder', mode: 'color' })
+    expect(parseImageRequest('./photo.jpg?placeholder=blurhash')?.mode).toBe('blurhash')
+    expect(parseImageRequest('./photo.jpg?placeholder=bogus')?.mode).toBeUndefined()
+  })
+
   it('prefers vik when both flags are present', () => {
     expect(parseImageRequest('./photo.jpg?vik&thumbhash')?.type).toBe('vik')
   })
@@ -122,5 +135,79 @@ describe('incremental auto-default', () => {
     const plugin = vueImageKit({ incremental: true })
     await runBuildStart(plugin, 'build')
     expect(vi.mocked(generate)).toHaveBeenCalledWith(expect.objectContaining({ incremental: true }))
+  })
+})
+
+describe('generate: false', () => {
+  beforeEach(() => {
+    vi.mocked(generate).mockClear()
+  })
+
+  it('skips the batch run on buildStart', async () => {
+    const plugin = vueImageKit({ generate: false })
+    ;(plugin.configResolved as (c: { command: string }) => void)({ command: 'build' })
+    await (plugin.buildStart as () => Promise<void>)()
+    expect(vi.mocked(generate)).not.toHaveBeenCalled()
+  })
+
+  it('skips regeneration on hot update', async () => {
+    const plugin = vueImageKit({ generate: false })
+    await (plugin.handleHotUpdate as (c: { file: string }) => Promise<void>)({ file: '/a/photo.jpg' })
+    expect(vi.mocked(generate)).not.toHaveBeenCalled()
+  })
+
+  it('still generates by default', async () => {
+    const plugin = vueImageKit()
+    ;(plugin.configResolved as (c: { command: string }) => void)({ command: 'build' })
+    await (plugin.buildStart as () => Promise<void>)()
+    expect(vi.mocked(generate)).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('placeholders manifest watching (dev server)', () => {
+  function devServer() {
+    const handlers: Record<string, (file: string) => void> = {}
+    const module = { id: 'virtual' }
+    const server = {
+      config: { root: '/project' },
+      middlewares: { use: vi.fn() },
+      watcher: {
+        on: vi.fn((event: string, handler: (file: string) => void) => {
+          handlers[event] = handler
+        }),
+      },
+      moduleGraph: {
+        getModuleById: vi.fn(() => module),
+        invalidateModule: vi.fn(),
+      },
+      ws: { send: vi.fn() },
+    }
+    return { server, handlers, module }
+  }
+
+  type Configure = (server: unknown) => void
+
+  it('invalidates the virtual module and reloads when an image in the watcher changes', () => {
+    const plugin = vueImageKit({ placeholders: { dirs: ['public/images'] } })
+    const { server, handlers, module } = devServer()
+    ;(plugin.configureServer as Configure)(server)
+    handlers['change']!('/project/public/images/cat.jpg')
+    expect(server.moduleGraph.invalidateModule).toHaveBeenCalledWith(module)
+    expect(server.ws.send).toHaveBeenCalledWith({ type: 'full-reload' })
+  })
+
+  it('ignores files that are not images', () => {
+    const plugin = vueImageKit({ placeholders: { dirs: ['public/images'] } })
+    const { server, handlers } = devServer()
+    ;(plugin.configureServer as Configure)(server)
+    handlers['add']!('/project/src/App.vue')
+    expect(server.ws.send).not.toHaveBeenCalled()
+  })
+
+  it('does not watch anything without dirs', () => {
+    const plugin = vueImageKit({ generate: false })
+    const { server } = devServer()
+    ;(plugin.configureServer as Configure)(server)
+    expect(server.watcher.on).not.toHaveBeenCalled()
   })
 })

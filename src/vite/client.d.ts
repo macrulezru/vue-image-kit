@@ -20,3 +20,56 @@ declare module '*?thumbhash' {
   const hash: string
   export default hash
 }
+
+declare module '*?blurhash' {
+  const hash: string
+  export default hash
+}
+
+declare module '*?placeholder' {
+  const props: {
+    blurhash?: string
+    thumbhash?: string
+    placeholderColor?: string
+    width?: number
+    height?: number
+  }
+  export default props
+}
+
+declare module '*?placeholder=thumbhash' {
+  const props: {
+    thumbhash?: string
+    placeholderColor?: string
+    width?: number
+    height?: number
+  }
+  export default props
+}
+
+declare module '*?placeholder=color' {
+  const props: {
+    placeholderColor?: string
+    width?: number
+    height?: number
+  }
+  export default props
+}
+
+declare module '*?placeholder=blurhash' {
+  const props: {
+    blurhash?: string
+    placeholderColor?: string
+    width?: number
+    height?: number
+  }
+  export default props
+}
+
+declare module 'virtual:vue-image-kit/placeholders' {
+  const placeholders: Record<
+    string,
+    { blurhash?: string; thumbhash?: string; color?: string; width?: number; height?: number }
+  >
+  export default placeholders
+}

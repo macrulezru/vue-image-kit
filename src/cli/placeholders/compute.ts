@@ -11,8 +11,46 @@ export interface PlaceholderData {
   height?: number
 }
 
+export type ColorStrategy = 'dominant' | 'average'
+
+export interface PlaceholderTuning {
+  components?: [number, number]
+  sample?: number
+  color?: ColorStrategy
+}
+
+export interface ResolvedTuning {
+  components: [number, number]
+  sample: number
+  color: ColorStrategy
+}
+
+export const DEFAULT_TUNING: ResolvedTuning = { components: [4, 3], sample: 100, color: 'dominant' }
+
+function clampInt(value: number | undefined, min: number, max: number, fallback: number): number {
+  if (value === undefined || !Number.isFinite(value)) return fallback
+  return Math.max(min, Math.min(max, Math.round(value)))
+}
+
+export function resolveTuning(tuning: PlaceholderTuning = {}): ResolvedTuning {
+  return {
+    components: [
+      clampInt(tuning.components?.[0], 1, 9, DEFAULT_TUNING.components[0]),
+      clampInt(tuning.components?.[1], 1, 9, DEFAULT_TUNING.components[1]),
+    ],
+    sample: clampInt(tuning.sample, 8, 256, DEFAULT_TUNING.sample),
+    color: tuning.color === 'average' ? 'average' : 'dominant',
+  }
+}
+
+export function tuningKey(tuning: PlaceholderTuning = {}): string {
+  const resolved = resolveTuning(tuning)
+  return `${resolved.components.join('x')}|${resolved.sample}|${resolved.color}`
+}
+
 export interface ComputeOptions {
   mode: PlaceholderMode
+  tuning?: PlaceholderTuning
   sharp: SharpFactory
   rgbaToThumbHash?: RgbaToThumbHash
   includeSize: boolean
@@ -44,6 +82,22 @@ export function dominantColor(rgba: Uint8Array, alphaThreshold = 128): string | 
   return `#${toHex(sums[best * 3]! / count)}${toHex(sums[best * 3 + 1]! / count)}${toHex(sums[best * 3 + 2]! / count)}`
 }
 
+export function averageColor(rgba: Uint8Array, alphaThreshold = 128): string | undefined {
+  let r = 0
+  let g = 0
+  let b = 0
+  let count = 0
+  for (let i = 0; i < rgba.length; i += 4) {
+    if (rgba[i + 3]! < alphaThreshold) continue
+    r += rgba[i]!
+    g += rgba[i + 1]!
+    b += rgba[i + 2]!
+    count++
+  }
+  if (count === 0) return undefined
+  return `#${toHex(r / count)}${toHex(g / count)}${toHex(b / count)}`
+}
+
 export function rgbaToRgbOverWhite(rgba: Uint8Array): Buffer {
   const rgb = Buffer.alloc((rgba.length / 4) * 3)
   for (let i = 0, j = 0; i < rgba.length; i += 4, j += 3) {
@@ -60,6 +114,7 @@ export async function computePlaceholder(
   options: ComputeOptions,
 ): Promise<PlaceholderData> {
   const image = options.sharp(input)
+  const tuning = resolveTuning(options.tuning)
   const data: PlaceholderData = {}
 
   if (options.includeSize) {
@@ -70,20 +125,27 @@ export async function computePlaceholder(
     }
   }
 
+  const side = options.mode === 'thumbhash' ? Math.min(100, tuning.sample) : tuning.sample
   const { data: raw, info } = await image
     .clone()
-    .resize(100, 100, { fit: 'inside', withoutEnlargement: true })
+    .resize(side, side, { fit: 'inside', withoutEnlargement: true })
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true })
   const rgba = new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength)
 
-  const color = dominantColor(rgba)
+  const color = tuning.color === 'average' ? averageColor(rgba) : dominantColor(rgba)
   if (color) data.color = color
   if (options.colorOnly) return data
 
   if (options.mode === 'blurhash') {
-    data.blurhash = encodeBlurhash(rgbaToRgbOverWhite(rgba), info.width, info.height)
+    data.blurhash = encodeBlurhash(
+      rgbaToRgbOverWhite(rgba),
+      info.width,
+      info.height,
+      tuning.components[0],
+      tuning.components[1],
+    )
   } else if (options.mode === 'thumbhash' && options.rgbaToThumbHash) {
     data.thumbhash = Buffer.from(options.rgbaToThumbHash(info.width, info.height, rgba)).toString(
       'base64',

@@ -1,6 +1,9 @@
 import type { Directive, DirectiveBinding } from 'vue'
 import type { LazyImgOptions } from '../types'
 import { observeShared } from '../utils/observer-pool'
+import { PLACEHOLDERS_KEY } from '../utils/placeholders'
+import { entryToImageUrl, lookupManifestEntry } from '../utils/manifest-placeholder'
+import type { PlaceholderManifest } from '../types'
 
 interface LazyImgState {
   unsubscribe: (() => void) | null
@@ -14,6 +17,33 @@ function resolveOptions(binding: DirectiveBinding<string | LazyImgOptions>): Laz
     return { src: binding.value }
   }
   return binding.value
+}
+
+interface InstanceWithContext {
+  $?: { appContext?: { provides?: Record<symbol, unknown> } }
+}
+
+function manifestFor(binding: DirectiveBinding<string | LazyImgOptions>): PlaceholderManifest | null {
+  const instance = binding.instance as InstanceWithContext | null
+  const provided = instance?.$?.appContext?.provides?.[PLACEHOLDERS_KEY as symbol]
+  return (provided as PlaceholderManifest | undefined) ?? null
+}
+
+function paintManifestPlaceholder(
+  el: HTMLElement,
+  options: LazyImgOptions,
+  manifest: PlaceholderManifest | null,
+): void {
+  if (options.placeholder) return
+  const entry = lookupManifestEntry(manifest, options.src)
+  if (!entry) return
+  const url = entryToImageUrl(entry)
+  if (url) {
+    el.style.backgroundImage = `url(${url})`
+    el.style.backgroundSize = 'cover'
+    el.style.backgroundPosition = 'center'
+  }
+  if (entry.color) el.style.backgroundColor = entry.color
 }
 
 function applyImage(el: HTMLElement, options: LazyImgOptions): void {
@@ -34,6 +64,7 @@ function applyImage(el: HTMLElement, options: LazyImgOptions): void {
     el.style.backgroundImage = `url(${src})`
     el.style.backgroundSize = 'cover'
     el.style.backgroundPosition = 'center'
+    el.style.backgroundColor = ''
     el.style.filter = ''
     el.style.transform = ''
     onLoad?.()
@@ -64,6 +95,7 @@ function watchIntersection(el: HTMLElement, options: LazyImgOptions): (() => voi
 export const vLazyImg: Directive<HTMLElement, string | LazyImgOptions> = {
   mounted(el, binding) {
     const options = resolveOptions(binding)
+    paintManifestPlaceholder(el, options, manifestFor(binding))
     const unsubscribe = watchIntersection(el, options)
     stateMap.set(el, { unsubscribe, src: options.src })
   },
@@ -75,6 +107,7 @@ export const vLazyImg: Directive<HTMLElement, string | LazyImgOptions> = {
     if (state?.src === options.src) return
 
     state?.unsubscribe?.()
+    paintManifestPlaceholder(el, options, manifestFor(binding))
     const unsubscribe = watchIntersection(el, options)
     stateMap.set(el, { unsubscribe, src: options.src })
   },
