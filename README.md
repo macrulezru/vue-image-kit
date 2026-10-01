@@ -236,7 +236,7 @@ export default defineNuxtConfig({
 })
 ```
 
-Images imported from the source tree (`import hero from './hero.jpg'`) end up under a hashed build URL, so a lookup by `src` can't find them — for those, and for the whole project if no registration is found, the values are written into the template as `blurhash`/`placeholder-color` and `:width`/`:height` props instead. Files with uncommitted changes are never edited (`--force-write` overrides), `--no-write` keeps sources untouched entirely.
+Images imported from the source tree (`import hero from './hero.jpg'`) end up under a hashed build URL, so a lookup by `src` can't find them — for those, and for the whole project if no registration is found, the values are written into the template as `blurhash`/`placeholder-color` and `:width`/`:height` props instead. Files with uncommitted changes are never edited (`--force-write` overrides), `--no-write` keeps sources untouched entirely. Usages that already have a placeholder are skipped; `--replace` redoes their static `blurhash`/`thumbhash`/`placeholder`/`placeholder-color` attributes with the chosen `--mode` (bound values and `:image` are left alone).
 
 ## Documentation & links
 

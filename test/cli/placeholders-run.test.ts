@@ -52,6 +52,7 @@ function options(overrides: Partial<PlaceholdersOptions> = {}): PlaceholdersOpti
     write: true,
     forceWrite: true,
     refreshRemote: false,
+    replace: false,
     ...overrides,
   }
 }
@@ -360,5 +361,107 @@ describe('download helpers', () => {
     fetchMock.mockImplementation(async () => imageResponse(Buffer.alloc(1000, 7)))
     const head = await downloadHead('https://x/a', 1000, 64)
     expect(head.byteLength).toBe(64)
+  })
+})
+
+describe('runPlaceholders — replace', () => {
+  const REPLACE_APP = `<script setup lang="ts">
+import local from './assets/local.png'
+import meta from './assets/local.png?vik'
+const hash = 'abc'
+</script>
+
+<template>
+  <VImage
+    :src="local"
+    alt="Multi"
+    thumbhash="3OcRJYB4d3h"
+    :width="64"
+  />
+  <VImage :src="local" alt="Single" placeholder-color="#ffffff" placeholder-mode="color" />
+  <VImage :src="local" alt="Bound" :thumbhash="hash" />
+  <VImage :image="meta" alt="Vik" />
+  <VImage src="/images/hero.jpg" alt="Public" placeholder-color="#000000" />
+</template>
+`
+
+  beforeEach(() => {
+    rmSync(join(root, 'src', 'App.vue'))
+    write('src/Replace.vue', REPLACE_APP)
+  })
+
+  it('leaves existing placeholders alone without --replace', async () => {
+    const report = await runPlaceholders(await scan(), options(), {
+      sharp,
+      cdn: cdnModule,
+      cache: emptyCache(),
+    })
+    expect(report.skipped['has-placeholder']).toBe(5)
+    expect(readFileSync(join(root, 'src', 'Replace.vue'), 'utf8')).toBe(REPLACE_APP)
+  })
+
+  it('replaces static placeholder attributes but keeps bound values and :image', async () => {
+    const report = await runPlaceholders(await scan(), options({ replace: true }), {
+      sharp,
+      cdn: cdnModule,
+      cache: emptyCache(),
+    })
+    expect(report.replaced).toBe(3)
+    expect(report.skipped).toEqual({ 'dynamic-placeholder': 1, 'has-placeholder': 1 })
+
+    const out = readFileSync(join(root, 'src', 'Replace.vue'), 'utf8')
+    expect(out).toMatch(/alt="Multi"\n {4}:width="64"\n {4}blurhash="[^"]+"\n {2}\/>/)
+    expect(out).not.toContain('thumbhash="3OcRJYB4d3h"')
+    expect(out).toMatch(
+      /<VImage :src="local" alt="Single" :width="64" :height="32" blurhash="[^"]+" \/>/,
+    )
+    expect(out).toContain('<VImage :src="local" alt="Bound" :thumbhash="hash" />')
+    expect(out).toContain('<VImage :image="meta" alt="Vik" />')
+    expect(out).toMatch(
+      /<VImage src="\/images\/hero\.jpg" alt="Public" :width="640" :height="480" blurhash="[^"]+" \/>/,
+    )
+  })
+
+  it('moves the value into the manifest and only removes the attribute when a manifest is registered', async () => {
+    write(
+      'src/main.ts',
+      "import { VImageKitPlugin } from '@macrulez/vue-image-kit'\napp.use(VImageKitPlugin, { placeholders })\n",
+    )
+    const report = await runPlaceholders(await scan(), options({ replace: true, dryRun: true }), {
+      sharp,
+      cdn: cdnModule,
+      cache: emptyCache(),
+    })
+    const publicPreview = report.codemodPreview.find((item) => item.line === 17)!
+    expect(publicPreview).toEqual({
+      file: 'src/Replace.vue',
+      line: 17,
+      attributes: [],
+      removed: ['placeholder-color'],
+    })
+    expect(report.manifestUsages).toBe(1)
+
+    await runPlaceholders(await scan(), options({ replace: true }), {
+      sharp,
+      cdn: cdnModule,
+      cache: emptyCache(),
+    })
+    expect(readFileSync(join(root, 'src', 'Replace.vue'), 'utf8')).toContain(
+      '<VImage src="/images/hero.jpg" alt="Public" />',
+    )
+    expect(readFileSync(join(root, 'src', 'image-placeholders.ts'), 'utf8')).toContain(
+      '"/images/hero.jpg": {"blurhash":',
+    )
+  })
+
+  it('skips replacements under --no-write', async () => {
+    const report = await runPlaceholders(await scan(), options({ replace: true, write: false }), {
+      sharp,
+      cdn: cdnModule,
+      cache: emptyCache(),
+    })
+    expect(report.skipped['write-disabled']).toBe(3)
+    expect(report.replaced).toBe(0)
+    expect(readFileSync(join(root, 'src', 'Replace.vue'), 'utf8')).toBe(REPLACE_APP)
   })
 })

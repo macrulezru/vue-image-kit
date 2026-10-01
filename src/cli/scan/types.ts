@@ -24,9 +24,18 @@ export interface ImageSource {
   expression?: string
 }
 
+export interface EditAttribute {
+  name: string
+  raw: string
+  start: number
+  end: number
+}
+
 export interface EditTarget {
   insertOffset: number
+  tagEnd: number
   indent: string | null
+  attributes: EditAttribute[]
 }
 
 export interface ImageUsage {

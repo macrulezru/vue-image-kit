@@ -193,7 +193,16 @@ function editTarget(node: TemplateNode, source: string): EditTarget {
     const leading = source.slice(lineStart, last.loc.start.offset)
     if (/^[ \t]*$/.test(leading)) indent = leading
   }
-  return { insertOffset, indent }
+  const attributes = props.map((prop) => {
+    const text = source.slice(prop.loc.start.offset, prop.loc.end.offset)
+    const raw = text.split('=')[0]!.trim()
+    const name =
+      prop.type === NODE_DIRECTIVE && prop.name === 'bind' && prop.arg
+        ? camelize(prop.arg.content)
+        : camelize(prop.name)
+    return { name, raw, start: prop.loc.start.offset, end: prop.loc.end.offset }
+  })
+  return { insertOffset, tagEnd, indent, attributes }
 }
 
 function pushUsage(ctx: FileContext, usage: Omit<ImageUsage, 'file' | 'absFile'>): void {
