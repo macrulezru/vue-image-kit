@@ -1,8 +1,11 @@
 import { existsSync } from 'node:fs'
 import { resolve, join } from 'node:path'
-import type { CliConfig } from './types.js'
+import type { CliConfig, PlaceholdersFileConfig, ScanFileConfig } from './types.js'
 
-type PartialCliConfig = Partial<Omit<CliConfig, 'quality'> & { quality: Partial<CliConfig['quality']> }>
+type PartialCliConfig = Partial<Omit<CliConfig, 'quality'> & { quality: Partial<CliConfig['quality']> }> & {
+  scan?: ScanFileConfig
+  placeholders?: PlaceholdersFileConfig
+}
 
 const CONFIG_FILES = [
   'vue-image-kit.config.js',

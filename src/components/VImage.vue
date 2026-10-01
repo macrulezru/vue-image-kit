@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, inject } from 'vue'
 import { useImage } from '../composables/useImage'
 import { useBreakpoints } from '../composables/useBreakpoints'
 import { useActiveMediaSource } from '../composables/useActiveMediaSource'
@@ -12,6 +12,7 @@ import { autoLoader, autoSrcset } from '../cdn/auto'
 import type { AutoLoaderConfig } from '../cdn/auto'
 import { useServerRoute } from '../composables/useServerLoader'
 import { buildImageUrl } from '../server/url'
+import { PLACEHOLDERS_KEY } from '../utils/placeholders'
 import type {
   SrcSet,
   ResponsiveSrc,
@@ -147,10 +148,24 @@ const serverSrcset = computed<string | undefined>(() => {
     .join(', ')
 })
 
-const mergedWidth = computed(() => props.width ?? props.image?.width)
-const mergedHeight = computed(() => props.height ?? props.image?.height)
-const mergedBlurhash = computed(() => props.blurhash ?? props.image?.blurhash)
-const mergedThumbhash = computed(() => props.thumbhash ?? props.image?.thumbhash)
+const placeholderManifest = inject(PLACEHOLDERS_KEY, null)
+const manifestEntry = computed(() => {
+  if (!placeholderManifest) return undefined
+  const key =
+    typeof props.src === 'string' ? props.src : (props.src?.fallback ?? props.image?.src)
+  return key ? placeholderManifest[key] : undefined
+})
+
+const mergedWidth = computed(() => props.width ?? props.image?.width ?? manifestEntry.value?.width)
+const mergedHeight = computed(
+  () => props.height ?? props.image?.height ?? manifestEntry.value?.height,
+)
+const mergedBlurhash = computed(
+  () => props.blurhash ?? props.image?.blurhash ?? manifestEntry.value?.blurhash,
+)
+const mergedThumbhash = computed(
+  () => props.thumbhash ?? props.image?.thumbhash ?? manifestEntry.value?.thumbhash,
+)
 const mergedPlaceholder = computed(() => props.placeholder ?? props.image?.placeholder)
 
 const autoSizes = computed(() => {
@@ -210,8 +225,19 @@ const objectPosition = computed(() => {
 
 const colorPlaceholder = computed(() => {
   if (props.placeholderColor) return props.placeholderColor
-  if (props.placeholderMode === 'color' && mergedThumbhash.value) {
-    return thumbHashToAverageColor(mergedThumbhash.value)
+  const manifestColor = manifestEntry.value?.color
+  if (props.placeholderMode === 'color') {
+    if (manifestColor) return manifestColor
+    if (mergedThumbhash.value) return thumbHashToAverageColor(mergedThumbhash.value)
+  }
+  if (
+    manifestColor &&
+    !props.placeholderMode &&
+    !mergedBlurhash.value &&
+    !mergedThumbhash.value &&
+    !mergedPlaceholder.value
+  ) {
+    return manifestColor
   }
   return undefined
 })

@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { resolve } from 'node:path'
-import { resolveModuleConfig, DEFAULT_SERVER_ROUTE, AUTO_IMPORT_NAMES } from '../../src/nuxt/module'
+import {
+  resolveModuleConfig,
+  DEFAULT_SERVER_ROUTE,
+  AUTO_IMPORT_NAMES,
+  placeholdersPluginContents,
+} from '../../src/nuxt/module'
 import * as indexExports from '../../src/index'
 
 describe('resolveModuleConfig', () => {
@@ -67,6 +72,7 @@ describe('AUTO_IMPORT_NAMES', () => {
     'default',
     'BREAKPOINTS_KEY',
     'SERVER_ROUTE_KEY',
+    'PLACEHOLDERS_KEY',
   ])
 
   it('covers every real value export from the package root except the intentionally-excluded ones', () => {
@@ -83,5 +89,14 @@ describe('AUTO_IMPORT_NAMES', () => {
     const realExports = new Set(Object.keys(indexExports))
     const stale = AUTO_IMPORT_NAMES.filter((name) => !realExports.has(name))
     expect(stale).toEqual([])
+  })
+})
+
+describe('placeholdersPluginContents', () => {
+  it('generates a plugin that provides the manifest under PLACEHOLDERS_KEY', () => {
+    const contents = placeholdersPluginContents(String.raw`C:\project\app\image-placeholders.ts`)
+    expect(contents).toContain("import { PLACEHOLDERS_KEY } from '@macrulez/vue-image-kit'")
+    expect(contents).toContain('import placeholders from "C:/project/app/image-placeholders.ts"')
+    expect(contents).toContain('nuxtApp.vueApp.provide(PLACEHOLDERS_KEY, placeholders)')
   })
 })
