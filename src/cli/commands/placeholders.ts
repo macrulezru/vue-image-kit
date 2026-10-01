@@ -104,6 +104,11 @@ function printReport(report: PlaceholdersReport, dryRun: boolean): void {
     const state = dryRun ? 'would be written' : report.manifestChanged ? 'written' : 'unchanged'
     console.log(`  Manifest: ${report.manifestUsages} usage(s) → ${report.manifestPath} (${state})`)
   }
+  if (report.sourceEntries > 0) {
+    console.log(
+      `  Art-direction sources: ${report.sourceEntries} of the usages above are \`sources\` entries`,
+    )
+  }
   if (report.codemodUsages > 0) {
     console.log(
       `  ${prefix}Source edits: ${report.codemodUsages} usage(s) in ${report.codemodFiles.length} file(s)${report.replaced > 0 ? `, ${report.replaced} replacing an existing placeholder` : ''}`,

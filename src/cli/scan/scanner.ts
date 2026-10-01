@@ -10,7 +10,9 @@ import {
   objectHasSpread,
   objectKeys,
   objectProperty,
+  propertyKey,
   str,
+  unwrapNode,
   walk,
   type AstNode,
   type Evaluated,
@@ -25,6 +27,7 @@ import type {
   PropValue,
   ScanOptions,
   ScanResult,
+  SourceEntry,
 } from './types.js'
 import { loadCdnModule, type CdnModule } from '../cdn-bridge.js'
 
@@ -58,7 +61,7 @@ interface TemplateProp {
   name: string
   value?: { content: string }
   arg?: { content: string; isStatic?: boolean }
-  exp?: { content: string }
+  exp?: { content: string; loc: { start: { offset: number } } }
   loc: { start: { offset: number; line: number }; end: { offset: number } }
 }
 
@@ -209,6 +212,70 @@ function pushUsage(ctx: FileContext, usage: Omit<ImageUsage, 'file' | 'absFile'>
   ctx.usages.push({ file: ctx.relFile, absFile: ctx.absFile, ...usage })
 }
 
+const SOURCE_PLACEHOLDER_KEYS = ['blurhash', 'thumbhash', 'placeholder', 'placeholderColor']
+
+function jsQuote(attributeQuote: string): string {
+  return attributeQuote === "'" ? '"' : "'"
+}
+
+function collectSourceEntries(
+  sourcesNode: AstNode,
+  ctx: FileContext,
+  expressionOffset: number | null,
+  attributeQuote: string,
+  serverLoader: boolean,
+): SourceEntry[] {
+  const entries: SourceEntry[] = []
+  const absolute = (offset: number | null | undefined) =>
+    expressionOffset === null || offset === null || offset === undefined
+      ? null
+      : expressionOffset + offset - 1
+  const quote = jsQuote(attributeQuote)
+
+  for (const property of children(sourcesNode, 'properties')) {
+    const key = propertyKey(property)
+    const valueNode = child(property, 'value')
+    if (key === undefined || !valueNode) continue
+    const inner = unwrapNode(valueNode)
+    const expression = `sources.${key}`
+
+    if (inner.type === 'ObjectExpression') {
+      const keys = objectKeys(inner)
+      const src = objectProperty(inner, 'src')
+      const source = src
+        ? classifyEvaluated(evaluate(src, ctx.bindings), expression, ctx.classify, serverLoader)
+        : ({ kind: 'dynamic', expression } as ImageSource)
+      const properties = children(inner, 'properties')
+      const last = properties[properties.length - 1]
+      const insertOffset = absolute(last ? last.end : (inner.start ?? 0) + 1)
+      entries.push({
+        key,
+        source,
+        hasPlaceholder: SOURCE_PLACEHOLDER_KEYS.some((name) => keys.includes(name)),
+        hasSize: keys.includes('width') || keys.includes('height'),
+        ...(insertOffset !== null && !objectHasSpread(inner)
+          ? { edit: { kind: 'object', insertOffset, hasProperties: properties.length > 0, quote } }
+          : {}),
+      })
+      continue
+    }
+
+    const result = evaluate(valueNode, ctx.bindings)
+    const start = absolute(inner.start)
+    const end = absolute(inner.end)
+    entries.push({
+      key,
+      source: classifyEvaluated(result, expression, ctx.classify, serverLoader),
+      hasPlaceholder: false,
+      hasSize: false,
+      ...(inner.type === 'StringLiteral' && start !== null && end !== null
+        ? { edit: { kind: 'string', start, end, quote } }
+        : {}),
+    })
+  }
+  return entries
+}
+
 function handleTemplateComponent(
   node: TemplateNode,
   ctx: FileContext,
@@ -217,6 +284,7 @@ function handleTemplateComponent(
 ): void {
   const props: Record<string, PropValue> = {}
   const evaluated = new Map<string, { evaluated: Evaluated | undefined; expression: string }>()
+  let sources: SourceEntry[] | undefined
 
   for (const prop of node.props ?? []) {
     if (prop.type === NODE_ATTRIBUTE) {
@@ -238,6 +306,17 @@ function handleTemplateComponent(
         : { t: 'boolean' as const, value: true }
       props[name] = toPropValue(result, expression)
       evaluated.set(name, { evaluated: result, expression })
+      if (name === 'sources' && result?.t === 'object') {
+        const literal = unwrapNode(parseExpression(compiler, expression) ?? result.node)
+        const direct = literal.type === 'ObjectExpression' && prop.exp
+        sources = collectSourceEntries(
+          direct ? literal : result.node,
+          ctx,
+          direct ? prop.exp!.loc.start.offset : null,
+          direct ? (ctx.source[prop.exp!.loc.start.offset - 1] ?? '"') : '"',
+          isServerLoader(props),
+        )
+      }
     }
   }
 
@@ -250,6 +329,7 @@ function handleTemplateComponent(
     source: componentSource(props, evaluated, ctx),
     hasPlaceholder: hasPlaceholder(props),
     ...(editable ? { edit: editTarget(node, ctx.source) } : {}),
+    ...(sources && sources.length > 0 ? { sources } : {}),
   })
 }
 

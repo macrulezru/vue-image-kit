@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { scanProject } from '../../src/cli/scan/scanner'
@@ -275,5 +275,113 @@ describe('scanProject — registration variants', () => {
     } finally {
       rmSync(project, { recursive: true, force: true })
     }
+  })
+})
+
+describe('scanProject — art-direction sources', () => {
+  let project: string
+
+  beforeAll(() => {
+    project = mkdtempSync(join(tmpdir(), 'vik-scan-src-'))
+    mkdirSync(join(project, 'public', 'images'), { recursive: true })
+    writeFileSync(join(project, 'public', 'images', 'h.jpg'), 'x')
+    writeFileSync(
+      join(project, 'App.vue'),
+      [
+        '<script setup lang="ts">',
+        "import local from './l.png'",
+        'const shared = { tablet: "/images/h.jpg" }',
+        '</script>',
+        '<template>',
+        '  <VImage',
+        '    src="/images/h.jpg"',
+        '    alt="A"',
+        '    :sources="{',
+        "      tablet: { src: '/images/h.jpg', width: 10, height: 5 },",
+        "      mobile: '/images/h.jpg',",
+        '      local: { src: local },',
+        "      ready: { src: '/images/h.jpg', blurhash: 'abc' },",
+        '      dyn: { src: item.src },',
+        '      empty: {},',
+        '    }"',
+        '  />',
+        '  <VImage src="/images/h.jpg" alt="B" :sources="shared" />',
+        '</template>',
+        '',
+      ].join('\n'),
+    )
+    writeFileSync(join(project, 'l.png'), 'x')
+  })
+
+  afterAll(() => {
+    rmSync(project, { recursive: true, force: true })
+  })
+
+  async function scanned() {
+    return scanProject(
+      {
+        root: project,
+        include: DEFAULT_INCLUDE,
+        exclude: DEFAULT_EXCLUDE,
+        publicDir: join(project, 'public'),
+        aliases: {},
+        packageNames: ['@macrulez/vue-image-kit'],
+      },
+      { cdn },
+    )
+  }
+
+  it('lists every entry of a literal sources prop with its source, size and placeholder state', async () => {
+    const [literal] = (await scanned()).usages
+    const entries = literal!.sources!
+    expect(entries.map((entry) => entry.key)).toEqual([
+      'tablet',
+      'mobile',
+      'local',
+      'ready',
+      'dyn',
+      'empty',
+    ])
+    expect(entries.map((entry) => entry.source.kind)).toEqual([
+      'public',
+      'public',
+      'local-import',
+      'public',
+      'dynamic',
+      'dynamic',
+    ])
+    expect(entries.map((entry) => entry.hasSize)).toEqual([true, false, false, false, false, false])
+    expect(entries.map((entry) => entry.hasPlaceholder)).toEqual([
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+    ])
+  })
+
+  it('computes edit spans that point at the right text inside the attribute', async () => {
+    const [literal] = (await scanned()).usages
+    const source = readFileSync(join(project, 'App.vue'), 'utf8')
+    const byKey = Object.fromEntries(literal!.sources!.map((entry) => [entry.key, entry]))
+
+    const tablet = byKey['tablet']!.edit!
+    expect(tablet.kind).toBe('object')
+    if (tablet.kind === 'object')
+      expect(source.slice(tablet.insertOffset - 9, tablet.insertOffset)).toBe('height: 5')
+
+    const mobile = byKey['mobile']!.edit!
+    expect(mobile.kind).toBe('string')
+    if (mobile.kind === 'string')
+      expect(source.slice(mobile.start, mobile.end)).toBe("'/images/h.jpg'")
+    expect(mobile.quote).toBe("'")
+  })
+
+  it('records sources reached through a const, without edit spans', async () => {
+    const usages = (await scanned()).usages
+    const second = usages[1]!
+    expect(second.sources!.map((entry) => entry.key)).toEqual(['tablet'])
+    expect(second.sources![0]!.edit).toBeUndefined()
   })
 })

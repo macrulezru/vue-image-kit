@@ -38,6 +38,18 @@ export interface EditTarget {
   attributes: EditAttribute[]
 }
 
+export type SourceEntryEdit =
+  | { kind: 'object'; insertOffset: number; hasProperties: boolean; quote: string }
+  | { kind: 'string'; start: number; end: number; quote: string }
+
+export interface SourceEntry {
+  key: string
+  source: ImageSource
+  hasPlaceholder: boolean
+  hasSize: boolean
+  edit?: SourceEntryEdit
+}
+
 export interface ImageUsage {
   file: string
   absFile: string
@@ -49,6 +61,7 @@ export interface ImageUsage {
   source: ImageSource
   hasPlaceholder: boolean
   edit?: EditTarget
+  sources?: SourceEntry[]
 }
 
 export interface RegistrationInfo {

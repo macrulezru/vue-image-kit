@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { relative } from 'node:path'
-import type { ImageUsage, ScanResult } from '../scan/types.js'
+import type { ImageSource, ImageUsage, ScanResult, SourceEntry } from '../scan/types.js'
 import { toPosix } from '../scan/files.js'
 import type { RgbaToThumbHash, SharpFactory } from '../deps.js'
 import type { CdnModule } from '../cdn-bridge.js'
@@ -25,6 +25,7 @@ import {
   dirtyFiles,
   placeholderAttributes,
   REPLACEABLE_PROPS,
+  sourceProperties,
   type InsertEdit,
 } from './codemod.js'
 
@@ -80,6 +81,7 @@ export interface PlaceholdersReport {
   codemodFiles: string[]
   codemodPreview: { file: string; line: number; attributes: string[]; removed: string[] }[]
   replaced: number
+  sourceEntries: number
   skipped: Partial<Record<SkipReason, number>>
   dirty: string[]
   registrationFound: boolean
@@ -90,9 +92,11 @@ type Strategy = 'manifest' | 'codemod'
 
 interface Planned {
   usage: ImageUsage
+  source: ImageSource
   key: string
   strategy: Strategy
   remove: string[]
+  entry?: SourceEntry
 }
 
 interface SourceJob {
@@ -139,9 +143,9 @@ async function runPool<T>(
   await Promise.all(workers)
 }
 
-function sourceKey(usage: ImageUsage): string {
-  if (REMOTE_KINDS.has(usage.source.kind)) return `url:${usage.source.value}`
-  return `file:${usage.source.filePath}`
+function sourceKey(source: ImageSource): string {
+  if (REMOTE_KINDS.has(source.kind)) return `url:${source.value}`
+  return `file:${source.filePath}`
 }
 
 function addSkip(report: PlaceholdersReport, reason: SkipReason, count = 1): void {
@@ -175,6 +179,7 @@ export async function runPlaceholders(
     registrationFound: scan.registration.found,
     fellBackToCodemod: 0,
     replaced: 0,
+    sourceEntries: 0,
   }
 
   const planned: Planned[] = []
@@ -221,28 +226,61 @@ export async function runPlaceholders(
     }
     planned.push({
       usage,
-      key: sourceKey(usage),
+      source: usage.source,
+      key: sourceKey(usage.source),
       strategy: manifestCapable ? 'manifest' : 'codemod',
       remove,
     })
   }
 
+  for (const usage of scan.usages) {
+    if (usage.kind !== 'component' || !usage.sources) continue
+    for (const entry of usage.sources) {
+      const { source } = entry
+      if (entry.hasPlaceholder) {
+        addSkip(report, 'has-placeholder')
+        continue
+      }
+      if (source.kind === 'dynamic' || source.kind === 'vik') {
+        addSkip(report, 'dynamic')
+        continue
+      }
+      if (source.kind !== 'local-import' && !MANIFEST_KINDS.has(source.kind)) {
+        addSkip(report, 'not-supported')
+        continue
+      }
+      if (source.fileExists === false) {
+        addSkip(report, 'missing-file')
+        continue
+      }
+      const manifestCapable = MANIFEST_KINDS.has(source.kind) && scan.registration.found
+      if (!manifestCapable && !entry.edit) {
+        addSkip(report, 'not-editable')
+        continue
+      }
+      planned.push({
+        usage,
+        source,
+        key: sourceKey(source),
+        strategy: manifestCapable ? 'manifest' : 'codemod',
+        remove: [],
+        entry,
+      })
+    }
+  }
+
   const jobs = new Map<string, SourceJob>()
-  for (const { usage, key } of planned) {
+  for (const { source, key } of planned) {
     if (jobs.has(key)) continue
-    const remote = REMOTE_KINDS.has(usage.source.kind)
-    const location = remote ? usage.source.value! : usage.source.filePath!
+    const remote = REMOTE_KINDS.has(source.kind)
+    const location = remote ? source.value! : source.filePath!
     jobs.set(key, {
       key,
       remote,
       ...(remote
-        ? {
-            url: usage.source.value!.startsWith('//')
-              ? `https:${usage.source.value}`
-              : usage.source.value!,
-          }
+        ? { url: source.value!.startsWith('//') ? `https:${source.value}` : source.value! }
         : { filePath: location }),
-      ...(usage.source.provider ? { provider: usage.source.provider } : {}),
+      ...(source.provider ? { provider: source.provider } : {}),
       colorOnly: isSvg(location),
     })
   }
@@ -350,35 +388,65 @@ export async function runPlaceholders(
     { absFile: string; edits: InsertEdit[]; usages: ImageUsage[] }
   >()
 
-  const addEdit = (usage: ImageUsage, attributes: string[], remove: string[]) => {
+  const addEdit = (
+    usage: ImageUsage,
+    edit: InsertEdit,
+    preview: string[],
+    removedNames: string[],
+  ) => {
     const group = editsByFile.get(usage.file) ?? { absFile: usage.absFile, edits: [], usages: [] }
-    group.edits.push({ target: usage.edit!, attributes, remove })
+    group.edits.push(edit)
     group.usages.push(usage)
     editsByFile.set(usage.file, group)
-    const removed = usage
-      .edit!.attributes.filter((attribute) => remove.includes(attribute.name))
+    const removed = (usage.edit?.attributes ?? [])
+      .filter((attribute) => removedNames.includes(attribute.name))
       .map((attribute) => attribute.raw)
-    report.codemodPreview.push({ file: usage.file, line: usage.line, attributes, removed })
-    if (remove.length > 0) report.replaced++
+    report.codemodPreview.push({
+      file: usage.file,
+      line: usage.line,
+      attributes: preview,
+      removed,
+    })
+    if (removedNames.length > 0) report.replaced++
   }
 
-  for (const { usage, key, strategy, remove } of planned) {
+  for (const { usage, source, key, strategy, remove, entry } of planned) {
     const data = results.get(key)
     if (!data) {
-      const previous = strategy === 'manifest' ? previousManifest[usage.source.value!] : undefined
+      const previous = strategy === 'manifest' ? previousManifest[source.value!] : undefined
       if (previous) {
-        manifestEntries[usage.source.value!] = previous
+        manifestEntries[source.value!] = previous
         report.manifestUsages++
-        if (remove.length > 0) addEdit(usage, [], remove)
+        if (entry) report.sourceEntries++
+        if (remove.length > 0)
+          addEdit(usage, { target: usage.edit, attributes: [], remove }, [], remove)
         continue
       }
       addSkip(report, blocked.get(key) ?? 'failed')
       continue
     }
     if (strategy === 'manifest') {
-      manifestEntries[usage.source.value!] = entryForMode(data, options.mode)
+      manifestEntries[source.value!] = entryForMode(data, options.mode)
       report.manifestUsages++
-      if (remove.length > 0) addEdit(usage, [], remove)
+      if (entry) report.sourceEntries++
+      if (remove.length > 0)
+        addEdit(usage, { target: usage.edit, attributes: [], remove }, [], remove)
+      continue
+    }
+    if (entry) {
+      const properties = sourceProperties(data, options.mode, !entry.hasSize, entry.edit!.quote)
+      if (properties.length === 0) {
+        addSkip(report, 'failed')
+        continue
+      }
+      if (MANIFEST_KINDS.has(source.kind)) report.fellBackToCodemod++
+      report.sourceEntries++
+      addEdit(
+        usage,
+        { attributes: [], sourceInserts: [{ edit: entry.edit!, properties }] },
+        [`sources.${entry.key}: { ${properties.join(', ')} }`],
+        [],
+      )
       continue
     }
     const attributes = placeholderAttributes(data, options.mode, needsSize(usage))
@@ -386,8 +454,8 @@ export async function runPlaceholders(
       addSkip(report, 'failed')
       continue
     }
-    if (MANIFEST_KINDS.has(usage.source.kind)) report.fellBackToCodemod++
-    addEdit(usage, attributes, remove)
+    if (MANIFEST_KINDS.has(source.kind)) report.fellBackToCodemod++
+    addEdit(usage, { target: usage.edit, attributes, remove }, attributes, remove)
   }
 
   if (Object.keys(manifestEntries).length > 0) {

@@ -160,13 +160,6 @@ const mergedWidth = computed(() => props.width ?? props.image?.width ?? manifest
 const mergedHeight = computed(
   () => props.height ?? props.image?.height ?? manifestEntry.value?.height,
 )
-const mergedBlurhash = computed(
-  () => props.blurhash ?? props.image?.blurhash ?? manifestEntry.value?.blurhash,
-)
-const mergedThumbhash = computed(
-  () => props.thumbhash ?? props.image?.thumbhash ?? manifestEntry.value?.thumbhash,
-)
-const mergedPlaceholder = computed(() => props.placeholder ?? props.image?.placeholder)
 
 const autoSizes = computed(() => {
   if (props.layout === 'fill' || props.layout === 'fixed' || !mergedWidth.value) return undefined
@@ -210,9 +203,60 @@ const isIdle = computed(() => status.value === 'idle')
 const { resolveMediaSources } = useBreakpoints(props.breakpoints)
 const mediaSources = computed(() => resolveMediaSources(props.sources))
 
-const activeMediaSource = useActiveMediaSource(mediaSources)
-const effectiveWidth = computed(() => activeMediaSource.value?.width ?? mergedWidth.value)
-const effectiveHeight = computed(() => activeMediaSource.value?.height ?? mergedHeight.value)
+const activeMediaSource = useActiveMediaSource(
+  mediaSources,
+  (source) =>
+    (source.width !== undefined && source.height !== undefined) ||
+    source.placeholder !== undefined ||
+    placeholderManifest?.[source.fallback] !== undefined,
+)
+
+const sourceManifestEntry = computed(() => {
+  const active = activeMediaSource.value
+  return active && placeholderManifest ? placeholderManifest[active.fallback] : undefined
+})
+
+const sourcePlaceholder = computed(() => {
+  const own = activeMediaSource.value?.placeholder
+  const entry = sourceManifestEntry.value
+  if (!own && !entry) return undefined
+  return {
+    blurhash: own?.blurhash ?? entry?.blurhash,
+    thumbhash: own?.thumbhash ?? entry?.thumbhash,
+    placeholder: own?.placeholder,
+    placeholderColor: own?.placeholderColor,
+    manifestColor: entry?.color,
+  }
+})
+
+const mergedBlurhash = computed(() =>
+  sourcePlaceholder.value
+    ? sourcePlaceholder.value.blurhash
+    : (props.blurhash ?? props.image?.blurhash ?? manifestEntry.value?.blurhash),
+)
+const mergedThumbhash = computed(() =>
+  sourcePlaceholder.value
+    ? sourcePlaceholder.value.thumbhash
+    : (props.thumbhash ?? props.image?.thumbhash ?? manifestEntry.value?.thumbhash),
+)
+const mergedPlaceholder = computed(() =>
+  sourcePlaceholder.value
+    ? sourcePlaceholder.value.placeholder
+    : (props.placeholder ?? props.image?.placeholder),
+)
+const explicitColor = computed(() =>
+  sourcePlaceholder.value ? sourcePlaceholder.value.placeholderColor : props.placeholderColor,
+)
+const effectiveManifestColor = computed(() =>
+  sourcePlaceholder.value ? sourcePlaceholder.value.manifestColor : manifestEntry.value?.color,
+)
+
+const effectiveWidth = computed(
+  () => activeMediaSource.value?.width ?? sourceManifestEntry.value?.width ?? mergedWidth.value,
+)
+const effectiveHeight = computed(
+  () => activeMediaSource.value?.height ?? sourceManifestEntry.value?.height ?? mergedHeight.value,
+)
 
 const srcObject = computed(() => (typeof mergedSrc.value === 'object' ? mergedSrc.value : null))
 const needsPicture = computed(() => srcObject.value !== null || mediaSources.value.length > 0)
@@ -224,8 +268,8 @@ const objectPosition = computed(() => {
 })
 
 const colorPlaceholder = computed(() => {
-  if (props.placeholderColor) return props.placeholderColor
-  const manifestColor = manifestEntry.value?.color
+  if (explicitColor.value) return explicitColor.value
+  const manifestColor = effectiveManifestColor.value
   if (props.placeholderMode === 'color') {
     if (manifestColor) return manifestColor
     if (mergedThumbhash.value) return thumbHashToAverageColor(mergedThumbhash.value)

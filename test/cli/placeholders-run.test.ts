@@ -465,3 +465,105 @@ const hash = 'abc'
     expect(readFileSync(join(root, 'src', 'Replace.vue'), 'utf8')).toBe(REPLACE_APP)
   })
 })
+
+describe('runPlaceholders — art-direction sources', () => {
+  const ART_APP = `<script setup lang="ts">
+import local from './assets/local.png'
+</script>
+
+<template>
+  <VImage
+    src="/images/hero.jpg"
+    alt="Art"
+    placeholderColor="#201D1F"
+    :sources="{
+      tablet: { src: '/images/hero.jpg', width: 640, height: 480 },
+      mobile: '/logo.svg',
+      local: { src: local },
+      done: { src: '/images/hero.jpg', blurhash: 'abc' },
+      remote: 'https://example.com/remote.jpg',
+    }"
+  />
+  <VImage :src="dyn" alt="Dyn" :sources="{ tablet: '/images/hero.jpg' }" />
+</template>
+`
+
+  beforeEach(() => {
+    rmSync(join(root, 'src', 'App.vue'))
+    write('src/Art.vue', ART_APP)
+  })
+
+  it('writes the properties into the sources literal when no manifest is registered', async () => {
+    const report = await runPlaceholders(await scan(), options({ remote: true }), {
+      sharp,
+      cdn: cdnModule,
+      cache: emptyCache(),
+    })
+    expect(report.sourceEntries).toBe(5)
+    expect(report.skipped['has-placeholder']).toBe(2)
+
+    const out = readFileSync(join(root, 'src', 'Art.vue'), 'utf8')
+    expect(out).toMatch(
+      /tablet: \{ src: '\/images\/hero\.jpg', width: 640, height: 480, blurhash: '[^']+' \}/,
+    )
+    expect(out).toMatch(
+      /mobile: \{ src: '\/logo\.svg', width: 20, height: 10, placeholderColor: '#0000ff' \}/,
+    )
+    expect(out).toMatch(/local: \{ src: local, width: 64, height: 32, blurhash: '[^']+' \}/)
+    expect(out).toMatch(
+      /remote: \{ src: 'https:\/\/example\.com\/remote\.jpg', width: 300, height: 150, blurhash: '[^']+' \}/,
+    )
+    expect(out).toContain("done: { src: '/images/hero.jpg', blurhash: 'abc' }")
+    expect(out).toContain('placeholderColor="#201D1F"')
+    expect(out).toMatch(
+      /:sources="\{ tablet: \{ src: '\/images\/hero\.jpg', width: 640, height: 480, blurhash: '[^']+' \} \}"/,
+    )
+  })
+
+  it('uses the manifest for public/remote sources and edits only the local one when registered', async () => {
+    write(
+      'src/main.ts',
+      "import { VImageKitPlugin } from '@macrulez/vue-image-kit'\napp.use(VImageKitPlugin, { placeholders })\n",
+    )
+    const report = await runPlaceholders(await scan(), options({ remote: true }), {
+      sharp,
+      cdn: cdnModule,
+      cache: emptyCache(),
+    })
+    expect(report.manifestUsages).toBe(4)
+    expect(report.codemodUsages).toBe(1)
+
+    const out = readFileSync(join(root, 'src', 'Art.vue'), 'utf8')
+    expect(out).toMatch(/local: \{ src: local, width: 64, height: 32, blurhash: '[^']+' \}/)
+    expect(out).toContain("mobile: '/logo.svg',")
+    expect(out).toContain("remote: 'https://example.com/remote.jpg',")
+    const manifest = readFileSync(join(root, 'src', 'image-placeholders.ts'), 'utf8')
+    expect(manifest).toContain('"/logo.svg": {"color":"#0000ff","width":20,"height":10}')
+    expect(manifest).toContain('"https://example.com/remote.jpg": {"blurhash":')
+  })
+
+  it('previews source edits and leaves existing source placeholders alone even with --replace', async () => {
+    const report = await runPlaceholders(await scan(), options({ dryRun: true, replace: true }), {
+      sharp,
+      cdn: cdnModule,
+      cache: emptyCache(),
+    })
+    expect(
+      report.codemodPreview.some((item) => item.attributes[0]?.startsWith('sources.local: {')),
+    ).toBe(true)
+    expect(report.skipped['has-placeholder']).toBe(1)
+    expect(report.replaced).toBe(1)
+    expect(readFileSync(join(root, 'src', 'Art.vue'), 'utf8')).toBe(ART_APP)
+  })
+
+  it('handles an attribute delimited by single quotes with double-quoted JS strings', async () => {
+    write(
+      'src/Art.vue',
+      `<template>\n  <VImage src="/images/hero.jpg" alt="A" :sources='{ tablet: "/logo.svg" }' />\n</template>\n`,
+    )
+    await runPlaceholders(await scan(), options(), { sharp, cdn: cdnModule, cache: emptyCache() })
+    expect(readFileSync(join(root, 'src', 'Art.vue'), 'utf8')).toContain(
+      `:sources='{ tablet: { src: "/logo.svg", width: 20, height: 10, placeholderColor: "#0000ff" } }'`,
+    )
+  })
+})
