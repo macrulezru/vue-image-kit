@@ -5,6 +5,7 @@ import {
   DEFAULT_SERVER_ROUTE,
   AUTO_IMPORT_NAMES,
   placeholdersPluginContents,
+  resolvePlaceholdersSetup,
 } from '../../src/nuxt/module'
 import * as indexExports from '../../src/index'
 
@@ -98,5 +99,62 @@ describe('placeholdersPluginContents', () => {
     expect(contents).toContain("import { PLACEHOLDERS_KEY } from '@macrulez/vue-image-kit'")
     expect(contents).toContain('import placeholders from "C:/project/app/image-placeholders.ts"')
     expect(contents).toContain('nuxtApp.vueApp.provide(PLACEHOLDERS_KEY, placeholders)')
+  })
+})
+
+describe('placeholdersPluginContents with folders', () => {
+  it('imports the virtual module and merges it with a manifest file', () => {
+    const contents = placeholdersPluginContents('/project/image-placeholders.ts', true)
+    expect(contents).toContain("import folderPlaceholders from 'virtual:vue-image-kit/placeholders'")
+    expect(contents).toContain('import manifestPlaceholders from "/project/image-placeholders.ts"')
+    expect(contents).toContain(
+      'provide(PLACEHOLDERS_KEY, { ...folderPlaceholders, ...manifestPlaceholders })',
+    )
+  })
+
+  it('provides just the virtual module when there is no manifest file', () => {
+    const contents = placeholdersPluginContents(null, true)
+    expect(contents).not.toContain('manifestPlaceholders')
+    expect(contents).toContain('provide(PLACEHOLDERS_KEY, { ...folderPlaceholders })')
+  })
+})
+
+describe('resolvePlaceholdersSetup', () => {
+  it('returns nothing when unset', () => {
+    expect(resolvePlaceholdersSetup(undefined, '/project')).toEqual({
+      manifestPath: null,
+      viteOptions: null,
+    })
+  })
+
+  it('treats a string as a manifest file, as before', () => {
+    const setup = resolvePlaceholdersSetup('./image-placeholders.ts', '/project')
+    expect(setup.manifestPath).toMatch(/image-placeholders\.ts$/)
+    expect(setup.viteOptions).toBeNull()
+  })
+
+  it('an object with only a manifest does not register the Vite plugin', () => {
+    const setup = resolvePlaceholdersSetup({ manifest: './m.ts' }, '/project')
+    expect(setup.manifestPath).toMatch(/m\.ts$/)
+    expect(setup.viteOptions).toBeNull()
+  })
+
+  it('resolves dirs against the project root and sets the root and public dir', () => {
+    const setup = resolvePlaceholdersSetup(
+      { dirs: ['src/img', { dir: 'public/x', urlPrefix: '/cdn' }], mode: 'thumbhash' },
+      '/project',
+    )
+    expect(setup.manifestPath).toBeNull()
+    const options = setup.viteOptions!
+    expect(options.mode).toBe('thumbhash')
+    expect(options.root).toBe('/project')
+    expect(options.publicDir).toBe(resolve('/project', 'public'))
+    expect(options.dirs).toHaveLength(2)
+    expect((options.dirs![0] as { dir: string }).dir).toBe(resolve('/project', 'src/img'))
+    expect(options.dirs![1]).toMatchObject({ urlPrefix: '/cdn' })
+  })
+
+  it('registers the plugin for urls only', () => {
+    expect(resolvePlaceholdersSetup({ urls: ['https://x/y.jpg'] }, '/project').viteOptions).not.toBeNull()
   })
 })

@@ -64,7 +64,7 @@ Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe —
 **Ecosystem**
 
 - **Nuxt module** — `@macrulez/vue-image-kit/nuxt`; auto-registers `<VImage>` and `v-lazy-img`; auto-imports every composable and utility
-- **Vite plugin** — `@macrulez/vue-image-kit/vite`; runs the CLI processor on `buildStart`; build-time imports via `?vik` / `?thumbhash` query suffixes; optional on-demand dev serving
+- **Vite plugin** — `@macrulez/vue-image-kit/vite`; runs the CLI processor on `buildStart`; build-time imports via `?vik` (variants + placeholders), `?placeholder` / `?blurhash` / `?thumbhash` (placeholders only, no files written); `generate: false` skips the batch run; `placeholders: { dirs, urls }` serves a placeholders manifest for whole folders as `virtual:vue-image-kit/placeholders`; optional on-demand dev serving
 - **Self-hosted on-demand server** — `@macrulez/vue-image-kit/server`; a small framework-agnostic Node request handler for when there's no CDN and a build step isn't wanted
 - **Zero external runtime dependencies** — only Vue 3 as peer dep; full ESM + CJS, tree-shakeable, `sideEffects: false`
 
@@ -87,7 +87,7 @@ An image is almost always the heaviest thing on a page — and almost always wha
 | ------------------ | ------------ | -------------------------------------------------------------------------------------------------------- |
 | `vue`           | `^3.0.0`   | yes                                                                                                    |
 | `sharp`         | `>=0.33.0` | only for the CLI (`generate`, `placeholders`) / Vite plugin / self-hosted server                        |
-| `thumbhash`     | `>=0.1.0`  | only for `generate --thumbhash`, `placeholders --mode thumbhash` and the Vite plugin's `?thumbhash`/`?vik` build-time imports |
+| `thumbhash`     | `>=0.1.0`  | only for `generate --thumbhash`, `placeholders --mode thumbhash` and the Vite plugin's `?thumbhash`/`?placeholder=thumbhash`/`?vik` build-time imports |
 
 ```bash
 npm install @macrulez/vue-image-kit
@@ -237,6 +237,35 @@ export default defineNuxtConfig({
 ```
 
 Images imported from the source tree (`import hero from './hero.jpg'`) end up under a hashed build URL, so a lookup by `src` can't find them — for those, and for the whole project if no registration is found, the values are written into the template as `blurhash`/`placeholder-color` and `:width`/`:height` props instead. Files with uncommitted changes are never edited (`--force-write` overrides), `--no-write` keeps sources untouched entirely. Usages that already have a placeholder are skipped; `--replace` redoes their static `blurhash`/`thumbhash`/`placeholder`/`placeholder-color` attributes with the chosen `--mode` (bound values and `:image` are left alone). Entries of a literal `:sources` prop (art direction) get their own placeholder too — and `<VImage>` shows the matching entry's placeholder at that breakpoint instead of the root image's.
+
+**Images whose `src` is built at runtime** (`:src="category.image"`) can't be found in a template, so give the manifest whole folders instead:
+
+```bash
+npx vue-image-kit placeholders --dir public/images --dir src/img=/assets/img --url https://cdn.example.com/hero.jpg
+```
+
+Or skip the command and let the Vite plugin build the same manifest on every build — in Nuxt it's one option, with no `vite.plugins` entry and no registration:
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  modules: ['@macrulez/vue-image-kit/nuxt'],
+  vueImageKit: {
+    placeholders: { dirs: ['public/images'], tuning: { components: [4, 3] } },
+  },
+})
+```
+
+```ts
+// plain Vite
+import { vueImageKit } from '@macrulez/vue-image-kit/vite'
+import placeholders from 'virtual:vue-image-kit/placeholders'
+
+vueImageKit({ generate: false, placeholders: { dirs: ['public/images'] } })
+app.use(VImageKitPlugin, { placeholders })
+```
+
+For a handful of imported files, `import ph from './photo.jpg?placeholder'` returns the `<VImage>` props directly (`<VImage v-bind="ph" />`); `generate: false` keeps the plugin from resizing anything. `?placeholder=thumbhash`, `?placeholder=color`, `?blurhash` and `?thumbhash` pick the kind. `v-lazy-img` and `useBackgroundImage()` read the manifest too.
 
 ## Documentation & links
 

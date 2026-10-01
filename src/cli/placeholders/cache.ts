@@ -10,6 +10,7 @@ export interface CacheEntry {
 
 export interface PlaceholderCache {
   version: 1
+  tuning?: string
   entries: Record<string, CacheEntry>
 }
 
@@ -17,14 +18,16 @@ export function cachePath(root: string): string {
   return join(root, 'node_modules', '.cache', 'vue-image-kit', 'placeholders.json')
 }
 
-export function loadCache(root: string): PlaceholderCache {
+export function loadCache(root: string, tuning = ''): PlaceholderCache {
+  const fresh: PlaceholderCache = { version: 1, tuning, entries: {} }
   const path = cachePath(root)
-  if (!existsSync(path)) return { version: 1, entries: {} }
+  if (!existsSync(path)) return fresh
   try {
     const parsed = JSON.parse(readFileSync(path, 'utf8')) as PlaceholderCache
-    return parsed.version === 1 && parsed.entries ? parsed : { version: 1, entries: {} }
+    if (parsed.version !== 1 || !parsed.entries) return fresh
+    return (parsed.tuning ?? '') === tuning ? parsed : fresh
   } catch {
-    return { version: 1, entries: {} }
+    return fresh
   }
 }
 

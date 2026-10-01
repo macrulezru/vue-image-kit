@@ -7,7 +7,8 @@ import { loadCdnModule } from '../cdn-bridge.js'
 import { createProgramParser, loadCompiler, scanProject } from '../scan/scanner.js'
 import { findNuxtConfig, nuxtSrcDir } from '../scan/aliases.js'
 import { loadCache, saveCache } from '../placeholders/cache.js'
-import type { PlaceholderMode } from '../placeholders/compute.js'
+import { tuningKey, type ColorStrategy, type PlaceholderMode, type PlaceholderTuning } from '../placeholders/compute.js'
+import type { FolderInput } from '../placeholders/folders.js'
 import { runPlaceholders, type PlaceholdersReport, type SkipReason } from '../placeholders/run.js'
 import {
   DEFAULT_PACKAGE_NAME,
@@ -36,6 +37,13 @@ Options:
 ${DISCOVERY_HELP}
   --manifest <path>    Placeholders manifest, .ts or .json (default: src/image-placeholders.ts)
   --mode <mode>        blurhash (default), thumbhash or color (the image's dominant color)
+  --dir <path>         Also compute every image in this folder (recursive), repeatable. Entries are keyed by
+                       the URL the file is served at: relative to the public dir, or <path>=<urlPrefix>
+                       for folders served from elsewhere. Covers images whose src is built at runtime
+  --url <url>          Also compute this remote/CDN image, repeatable (no --remote needed)
+  --components <XxY>   BlurHash components, 1-9 each (default: 4x3)
+  --sample <px>        Size the image is downscaled to before hashing (default: 100, max 256)
+  --color <strategy>   dominant (default) or average — how the placeholder color is chosen
   --remote             Also download CDN/remote images (off by default — a project may reference thousands)
   --hosts <list>       With --remote: only these hosts (comma-separated; subdomains included)
   --limit <n>          With --remote: download at most n images in this run
@@ -59,6 +67,7 @@ Registering the manifest:
 Examples:
   npx vue-image-kit placeholders --dry-run
   npx vue-image-kit placeholders --mode color
+  npx vue-image-kit placeholders --dir public/images --dir src/assets/img=/assets/img
   npx vue-image-kit placeholders --remote --hosts res.cloudinary.com --limit 200
 `
 
@@ -77,6 +86,8 @@ const SKIP_TEXT: Record<SkipReason, string> = {
   failed: 'failed to process',
   'write-disabled': 'need a source edit, skipped by --no-write',
   dirty: 'are in files with uncommitted changes (commit/stash, or use --force-write)',
+  'manifest-required':
+    'are v-lazy-img/useBackgroundImage usages — they read the manifest, so they need a registered manifest and a public/CDN/remote src',
 }
 
 function positiveInt(value: string | undefined, flag: string): number | undefined {
@@ -84,6 +95,38 @@ function positiveInt(value: string | undefined, flag: string): number | undefine
   const parsed = parseInt(value, 10)
   if (isNaN(parsed) || parsed < 1) throw new Error(`${flag} must be a positive integer`)
   return parsed
+}
+
+export function parseDirs(
+  flags: string[] | undefined,
+  fromConfig: FolderInput[] | undefined,
+): FolderInput[] {
+  const dirs: FolderInput[] = [...(fromConfig ?? [])]
+  for (const flag of flags ?? []) {
+    const index = flag.indexOf('=')
+    dirs.push(index > 0 ? { dir: flag.slice(0, index), urlPrefix: flag.slice(index + 1) } : flag)
+  }
+  return dirs
+}
+
+export function resolveTuningFlags(
+  values: { components?: string | undefined; sample?: string | undefined; color?: string | undefined },
+  config: PlaceholderTuning | undefined,
+): PlaceholderTuning {
+  const tuning: PlaceholderTuning = { ...(config ?? {}) }
+  if (values.components !== undefined) {
+    const match = /^([1-9])x([1-9])$/i.exec(values.components)
+    if (!match) throw new Error(`--components must look like 4x3 (1-9 each), got "${values.components}"`)
+    tuning.components = [Number(match[1]), Number(match[2])]
+  }
+  const sample = positiveInt(values.sample, '--sample')
+  if (sample !== undefined) tuning.sample = sample
+  if (values.color !== undefined) {
+    if (values.color !== 'dominant' && values.color !== 'average')
+      throw new Error(`--color must be dominant or average (got "${values.color}")`)
+    tuning.color = values.color as ColorStrategy
+  }
+  return tuning
 }
 
 export function defaultManifestPath(root: string): string {
@@ -104,6 +147,10 @@ function printReport(report: PlaceholdersReport, dryRun: boolean): void {
     const state = dryRun ? 'would be written' : report.manifestChanged ? 'written' : 'unchanged'
     console.log(`  Manifest: ${report.manifestUsages} usage(s) → ${report.manifestPath} (${state})`)
   }
+  if (report.folderEntries > 0) {
+    console.log(`  Folders/URLs: ${report.folderEntries} image(s) added to the manifest`)
+  }
+  for (const warning of report.warnings) console.log(`  ! ${warning}`)
   if (report.sourceEntries > 0) {
     console.log(
       `  Art-direction sources: ${report.sourceEntries} of the usages above are \`sources\` entries`,
@@ -153,6 +200,11 @@ export async function runPlaceholdersCommand(argv: string[]): Promise<number> {
       ...DISCOVERY_OPTIONS,
       manifest: { type: 'string' },
       mode: { type: 'string' },
+      dir: { type: 'string', multiple: true },
+      url: { type: 'string', multiple: true },
+      components: { type: 'string' },
+      sample: { type: 'string' },
+      color: { type: 'string' },
       remote: { type: 'boolean', default: false },
       hosts: { type: 'string' },
       limit: { type: 'string' },
@@ -180,6 +232,10 @@ export async function runPlaceholdersCommand(argv: string[]): Promise<number> {
   if (!MODES.has(mode))
     throw new Error(`--mode must be blurhash, thumbhash or color (got "${values.mode}")`)
 
+  const tuning = resolveTuningFlags(values, config.tuning)
+  const dirs = parseDirs(values.dir, config.dirs)
+  const urls = [...(config.urls ?? []), ...(values.url ?? [])]
+
   const scanOptions = await resolveDiscovery(values, { ...(fileConfig.scan ?? {}), ...config })
   const manifestSetting = values.manifest ?? config.manifest
   const manifest = manifestSetting
@@ -197,7 +253,7 @@ export async function runPlaceholdersCommand(argv: string[]): Promise<number> {
   const scan = await scanProject(scanOptions, { cdn, compiler })
   const cache = values['no-cache']
     ? { version: 1 as const, entries: {} }
-    : loadCache(scanOptions.root)
+    : loadCache(scanOptions.root, tuningKey(tuning))
 
   const report = await runPlaceholders(
     scan,
@@ -220,6 +276,10 @@ export async function runPlaceholdersCommand(argv: string[]): Promise<number> {
       forceWrite: values['force-write'],
       refreshRemote: values['refresh-remote'],
       replace: values.replace || config.replace === true,
+      tuning,
+      dirs,
+      urls,
+      publicDir: scanOptions.publicDir,
     },
     {
       sharp,

@@ -25,11 +25,13 @@ const mockCtx = {
   drawImage: vi.fn(),
 }
 
-HTMLCanvasElement.prototype.getContext = vi.fn(() => mockCtx) as unknown as typeof HTMLCanvasElement.prototype.getContext
+if (typeof HTMLCanvasElement !== 'undefined') {
+  HTMLCanvasElement.prototype.getContext = vi.fn(() => mockCtx) as unknown as typeof HTMLCanvasElement.prototype.getContext
 
-HTMLCanvasElement.prototype.toDataURL = vi.fn(() => {
-  const bytes = lastPutImageData?.data ?? new Uint8ClampedArray(0)
-  let sum = 0
-  for (let i = 0; i < bytes.length; i++) sum = (sum + bytes[i] * (i + 1)) % 100000
-  return `data:image/png;base64,MOCK${sum}`
-}) as unknown as typeof HTMLCanvasElement.prototype.toDataURL
+  HTMLCanvasElement.prototype.toDataURL = vi.fn(() => {
+    const bytes = lastPutImageData?.data ?? new Uint8ClampedArray(0)
+    let sum = 0
+    for (let i = 0; i < bytes.length; i++) sum = (sum + bytes[i] * (i + 1)) % 100000
+    return `data:image/png;base64,MOCK${sum}`
+  }) as unknown as typeof HTMLCanvasElement.prototype.toDataURL
+}

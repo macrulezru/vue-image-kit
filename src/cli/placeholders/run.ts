@@ -1,16 +1,12 @@
 import { readFileSync, writeFileSync } from 'node:fs'
-import { relative } from 'node:path'
+import { join, relative } from 'node:path'
 import type { ImageSource, ImageUsage, ScanResult, SourceEntry } from '../scan/types.js'
 import { toPosix } from '../scan/files.js'
 import type { RgbaToThumbHash, SharpFactory } from '../deps.js'
 import type { CdnModule } from '../cdn-bridge.js'
-import {
-  computePlaceholder,
-  probeSize,
-  type PlaceholderData,
-  type PlaceholderMode,
-} from './compute.js'
-import { downloadHead, downloadImage } from './fetch.js'
+import type { PlaceholderData, PlaceholderMode, PlaceholderTuning } from './compute.js'
+import { computeJob, isSvg, type SourceJob } from './job.js'
+import { buildFolderManifest, type FolderInput } from './folders.js'
 import { fileStamp, hasModeData, type PlaceholderCache } from './cache.js'
 import {
   entryForMode,
@@ -45,6 +41,10 @@ export interface PlaceholdersOptions {
   forceWrite: boolean
   refreshRemote: boolean
   replace: boolean
+  tuning?: PlaceholderTuning
+  dirs?: FolderInput[]
+  urls?: string[]
+  publicDir?: string
 }
 
 export interface PlaceholdersDeps {
@@ -68,6 +68,7 @@ export type SkipReason =
   | 'failed'
   | 'write-disabled'
   | 'dirty'
+  | 'manifest-required'
 
 export interface PlaceholdersReport {
   mode: PlaceholderMode
@@ -86,6 +87,8 @@ export interface PlaceholdersReport {
   dirty: string[]
   registrationFound: boolean
   fellBackToCodemod: number
+  folderEntries: number
+  warnings: string[]
 }
 
 type Strategy = 'manifest' | 'codemod'
@@ -99,21 +102,8 @@ interface Planned {
   entry?: SourceEntry
 }
 
-interface SourceJob {
-  key: string
-  remote: boolean
-  url?: string
-  provider?: string
-  filePath?: string
-  colorOnly: boolean
-}
-
 const MANIFEST_KINDS = new Set(['public', 'server', 'cdn', 'remote'])
 const REMOTE_KINDS = new Set(['cdn', 'remote'])
-
-function isSvg(path: string): boolean {
-  return /\.svg(?:[?#].*)?$/i.test(path)
-}
 
 function hostAllowed(url: string, hosts: string[]): boolean {
   if (hosts.length === 0) return true
@@ -180,11 +170,39 @@ export async function runPlaceholders(
     fellBackToCodemod: 0,
     replaced: 0,
     sourceEntries: 0,
+    folderEntries: 0,
+    warnings: [],
   }
 
   const planned: Planned[] = []
   for (const usage of scan.usages) {
-    if (usage.kind !== 'component') continue
+    if (usage.kind !== 'component') {
+      if (usage.hasPlaceholder) {
+        addSkip(report, 'has-placeholder')
+        continue
+      }
+      const { kind: sourceKind } = usage.source
+      if (sourceKind === 'dynamic' || sourceKind === 'vik' || sourceKind === 'none') {
+        addSkip(report, 'dynamic')
+        continue
+      }
+      if (!MANIFEST_KINDS.has(sourceKind) || !scan.registration.found) {
+        addSkip(report, 'manifest-required')
+        continue
+      }
+      if (usage.source.fileExists === false) {
+        addSkip(report, 'missing-file')
+        continue
+      }
+      planned.push({
+        usage,
+        source: usage.source,
+        key: sourceKey(usage.source),
+        strategy: 'manifest',
+        remove: [],
+      })
+      continue
+    }
     let remove: string[] = []
     if (usage.hasPlaceholder) {
       if (!options.replace || 'image' in usage.props) {
@@ -333,45 +351,19 @@ export async function runPlaceholders(
   }
 
   await runPool(toCompute, options.concurrency, async (job) => {
-    const computeOptions = {
-      mode: options.mode,
-      sharp: deps.sharp,
-      ...(deps.rgbaToThumbHash ? { rgbaToThumbHash: deps.rgbaToThumbHash } : {}),
-      colorOnly: job.colorOnly,
-    }
     try {
-      let data: PlaceholderData
-      if (!job.remote) {
-        data = await computePlaceholder(job.filePath!, { ...computeOptions, includeSize: true })
-        const stamp = fileStamp(job.filePath!)
-        const previous = deps.cache.entries[job.key]
-        const sameFile = previous?.mtimeMs === stamp.mtimeMs && previous?.size === stamp.size
-        data = sameFile ? { ...previous!.data, ...data } : data
-        deps.cache.entries[job.key] = { ...stamp, data }
-        report.computed.local++
-      } else if (job.provider && deps.cdn) {
-        const rendition = deps.cdn.autoLoader(job.url!, { width: 128 })
-        const buffer = await downloadImage(rendition, {
+      const data = await computeJob(
+        job,
+        {
+          mode: options.mode,
+          tuning: options.tuning,
           timeout: options.timeout,
           maxBytes: options.maxBytes,
-        })
-        data = await computePlaceholder(buffer, { ...computeOptions, includeSize: false })
-        const head = await downloadHead(job.url!, options.timeout).catch(() => null)
-        const size = head ? await probeSize(deps.sharp, head) : null
-        if (size) Object.assign(data, size)
-        data = { ...deps.cache.entries[job.key]?.data, ...data }
-        deps.cache.entries[job.key] = { data }
-        report.computed.remote++
-      } else {
-        const buffer = await downloadImage(job.url!, {
-          timeout: options.timeout,
-          maxBytes: options.maxBytes,
-        })
-        data = await computePlaceholder(buffer, { ...computeOptions, includeSize: true })
-        data = { ...deps.cache.entries[job.key]?.data, ...data }
-        deps.cache.entries[job.key] = { data }
-        report.computed.remote++
-      }
+        },
+        { sharp: deps.sharp, rgbaToThumbHash: deps.rgbaToThumbHash, cdn: deps.cdn, cache: deps.cache },
+      )
+      if (job.remote) report.computed.remote++
+      else report.computed.local++
       results.set(job.key, data)
     } catch (err) {
       blocked.set(job.key, 'failed')
@@ -456,6 +448,31 @@ export async function runPlaceholders(
     }
     if (MANIFEST_KINDS.has(source.kind)) report.fellBackToCodemod++
     addEdit(usage, { target: usage.edit, attributes, remove }, attributes, remove)
+  }
+
+  if ((options.dirs?.length ?? 0) > 0 || (options.urls?.length ?? 0) > 0) {
+    const folders = await buildFolderManifest(
+      {
+        root: options.root,
+        publicDir: options.publicDir ?? join(options.root, 'public'),
+        dirs: options.dirs ?? [],
+        urls: options.urls ?? [],
+        mode: options.mode,
+        tuning: options.tuning,
+        concurrency: options.concurrency,
+        timeout: options.timeout,
+        maxBytes: options.maxBytes,
+        refreshRemote: options.refreshRemote,
+      },
+      { sharp: deps.sharp, rgbaToThumbHash: deps.rgbaToThumbHash, cdn: deps.cdn, cache: deps.cache },
+    )
+    Object.assign(manifestEntries, folders.entries)
+    report.folderEntries = Object.keys(folders.entries).length
+    report.computed.local += folders.computed.local
+    report.computed.remote += folders.computed.remote
+    report.cached += folders.cached
+    report.failures.push(...folders.failures)
+    report.warnings.push(...folders.warnings)
   }
 
   if (Object.keys(manifestEntries).length > 0) {

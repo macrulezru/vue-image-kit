@@ -1,7 +1,9 @@
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, getCurrentInstance, inject, onMounted, watch } from 'vue'
 import type { Ref, ComputedRef, StyleValue } from 'vue'
 import { useLazyLoad } from './useLazyLoad'
 import type { ImageStatus } from '../types'
+import { PLACEHOLDERS_KEY } from '../utils/placeholders'
+import { entryToImageUrl, lookupManifestEntry } from '../utils/manifest-placeholder'
 
 export interface UseBackgroundImageOptions {
   placeholder?: string
@@ -47,6 +49,11 @@ export function useBackgroundImage(
     backgroundPosition = 'center',
   } = options
 
+  const manifestEntry = placeholder
+    ? undefined
+    : lookupManifestEntry(getCurrentInstance() ? inject(PLACEHOLDERS_KEY, null) : null, src)
+  const manifestImage = ref<string | undefined>(undefined)
+
   const target = ref<HTMLElement | null>(null)
   const status = ref<ImageStatus>('idle')
   const isLoaded = computed(() => status.value === 'loaded')
@@ -71,6 +78,7 @@ export function useBackgroundImage(
   const { isIntersecting, observe } = useLazyLoad({ rootMargin, threshold })
 
   onMounted(() => {
+    manifestImage.value = entryToImageUrl(manifestEntry)
     if (lazy) {
       observe(target)
     } else {
@@ -105,6 +113,13 @@ export function useBackgroundImage(
         filter: 'blur(8px)',
         transform: 'scale(1.05)',
         transition: `filter ${transition}, transform ${transition}`,
+      }
+    }
+    if (manifestEntry && (manifestImage.value || manifestEntry.color)) {
+      return {
+        ...baseStyle,
+        ...(manifestImage.value ? { backgroundImage: `url("${manifestImage.value}")` } : {}),
+        ...(manifestEntry.color ? { backgroundColor: manifestEntry.color } : {}),
       }
     }
     return baseStyle
