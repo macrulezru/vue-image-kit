@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-10-01
+
+### Added
+
+- **`npx vue-image-kit scan`** — a usage report for the whole project. Finds every `<VImage>` (in templates as `VImage`/`v-image` or under a local import alias, in JSX and in `h()` calls), every `v-lazy-img` directive and every `useImage()`/`useBackgroundImage()` call, works out where each image comes from — a local import (resolved through tsconfig `paths`, `vite.config` `resolve.alias` and Vue/Nuxt defaults), a `public/` path (checking that the file exists), a CDN URL with its provider, a remote URL, a `?vik` import, the `loader="server"` route, or a dynamic value — and prints a summary: usages per source, per file, which `VImage` props are used, and warnings (`missing-alt`, `empty-alt`, `no-dimensions`, `no-placeholder`, `missing-file`, `multiple-priority`, `widths-without-sizes`, `local-without-vik`). `--details` lists every usage, `--format json|md|csv` with `--out` writes a report file, `--fail-on <codes>` makes it usable as a CI check. Parsing uses the project's own `vue/compiler-sfc` — no new dependencies.
+- **`npx vue-image-kit placeholders`** — computes a BlurHash (default), a ThumbHash (`--mode thumbhash`) or the image's dominant color (`--mode color`), plus the original width/height, for every `<VImage>` that has no placeholder yet and whose image can be resolved: local imports and `public/` files are read from disk, CDN and remote URLs are downloaded only with `--remote` (with `--hosts`, `--limit`, `--timeout`, `--max-bytes`; CDN images are fetched as a small rendition through the matching adapter, with the original size read from just the first 64 KB). Results are cached in `node_modules/.cache/vue-image-kit/`. Delivery is chosen per usage: `public/`, CDN and remote images go into a placeholders manifest (`src/image-placeholders.ts` by default, `.json` also supported) when the project registers one; local imports — whose runtime URL is a hashed build URL — and everything else when no registration is found are written straight into the template as `blurhash`/`thumbhash`/`placeholder-color` and `:width`/`:height` props, matching the surrounding attribute layout. Files with uncommitted git changes are never edited (`--force-write` overrides), `--dry-run` previews the edits, `--no-write` restricts the command to the manifest.
+- **Placeholders manifest support at runtime** — `VImageKitPlugin`'s new `placeholders` option (a `PlaceholderManifest`, i.e. `Record<src, PlaceholderEntry>`) is provided under the new `PLACEHOLDERS_KEY`; `<VImage>` looks its `src` (or `SrcSet.fallback`) up there and uses the entry's `blurhash`/`thumbhash`/`width`/`height` wherever the matching prop isn't set — exactly as if they had been passed as props, the same precedence `image` already has. The entry's `color` is used with `placeholderMode="color"`, or on its own when the entry has no hash (e.g. an SVG). Nothing changes when no manifest is provided. New exported types: `PlaceholderEntry`, `PlaceholderManifest`.
+- **Nuxt module `placeholders` option** — a path to the manifest file (relative to the project root); the module registers a plugin that provides it.
+- **`detectCdnProvider(url, config?)`** in `@macrulez/vue-image-kit/cdn` — returns which auto-detected provider a URL belongs to (`'cloudinary'`, `'imgix'`, `'bunny'`, `'imagekit'`, `'sanity'`, `'storyblok'`, `'contentful'`, `'gumlet'`, or `'custom'` for a `hosts` entry), or `null`.
+
+### Changed
+
+- The CLI is now split into subcommands: `generate` (still the default when no command is given), `scan` and `placeholders`, each with its own `--help`; `npx vue-image-kit --help` lists them.
+- When `sharp` or `thumbhash` is missing, the CLI now prints the install command for npm, pnpm and yarn.
+
+### Fixed
+
+- ThumbHash generation (`generate --thumbhash` and `?thumbhash`/`?vik` imports in the Vite plugin) threw `doesn't fit in 100x100` for any image taller than it is wide: the image was downscaled to 100px *width* only, so a portrait photo stayed taller than the 100px ThumbHash allows. It's now fitted inside 100×100.
+
 ## [1.2.0] - 2026-09-24
 
 ### Added

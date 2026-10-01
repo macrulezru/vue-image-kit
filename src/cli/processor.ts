@@ -21,6 +21,8 @@ import {
   buildIncrementalEntry,
 } from './incremental.js'
 import type { IncrementalState } from './incremental.js'
+import { loadSharp, loadThumbhash } from './deps.js'
+import type { RgbaToThumbHash } from './deps.js'
 
 function fileSize(path: string): number {
   try {
@@ -36,37 +38,18 @@ type SharpFactory = Awaited<ReturnType<typeof getSharp>>
 type SharpImage = ReturnType<SharpFactory>
 
 async function getSharp() {
-  try {
-    const sharp = (await import('sharp')).default
-    return sharp
-  } catch {
-    console.error(
-      '\n[vue-image-kit] sharp is not installed.\n' +
-        'Install it as a dev dependency:\n\n' +
-        '  npm install sharp --save-dev\n',
-    )
-    process.exit(1)
-  }
+  return loadSharp('generate')
 }
 
-async function getRgbaToThumbHash(): Promise<(w: number, h: number, rgba: Uint8Array) => Uint8Array> {
-  try {
-    return (await import('thumbhash')).rgbaToThumbHash
-  } catch {
-    console.error(
-      '\n[vue-image-kit] thumbhash is not installed.\n' +
-        'Install it as a dev dependency:\n\n' +
-        '  npm install thumbhash --save-dev\n',
-    )
-    process.exit(1)
-  }
+async function getRgbaToThumbHash(): Promise<RgbaToThumbHash> {
+  return loadThumbhash('generate')
 }
 
 async function thumbhashFromImage(image: SharpImage): Promise<string> {
   const rgbaToThumbHash = await getRgbaToThumbHash()
   const { data, info } = await image
     .clone()
-    .resize(100, null, { withoutEnlargement: true })
+    .resize(100, 100, { fit: 'inside', withoutEnlargement: true })
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true })

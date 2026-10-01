@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { autoLoader, autoSrcset, netlify } from '../../src/cdn/index'
+import { autoLoader, autoSrcset, detectCdnProvider, imgix, netlify } from '../../src/cdn/index'
 
 describe('autoLoader', () => {
   it('detects Cloudinary from res.cloudinary.com', () => {
@@ -126,5 +126,22 @@ describe('autoSrcset', () => {
     expect(srcset).toContain('400w')
     expect(srcset).toContain('800w')
     expect(srcset).toContain('/.netlify/images')
+  })
+})
+
+describe('detectCdnProvider', () => {
+  it('names the provider of a recognized CDN URL', () => {
+    expect(detectCdnProvider('https://res.cloudinary.com/demo/image/upload/sample.jpg')).toBe('cloudinary')
+    expect(detectCdnProvider('https://demo.imgix.net/a.jpg')).toBe('imgix')
+    expect(detectCdnProvider('https://cdn.sanity.io/images/p/d/a.jpg')).toBe('sanity')
+  })
+
+  it('returns null for unknown hosts, invalid URLs and relative paths', () => {
+    expect(detectCdnProvider('https://example.com/a.jpg')).toBeNull()
+    expect(detectCdnProvider('/images/a.jpg')).toBeNull()
+  })
+
+  it('reports custom hosts from the config', () => {
+    expect(detectCdnProvider('https://img.my.app/a.jpg', { hosts: { 'img.my.app': imgix('https://img.my.app') } })).toBe('custom')
   })
 })

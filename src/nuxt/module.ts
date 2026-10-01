@@ -4,6 +4,7 @@ import {
   addServerHandler,
   createResolver,
   addImports,
+  addPluginTemplate,
 } from '@nuxt/kit'
 import { resolve } from 'node:path'
 import type { BreakpointMap } from '../types'
@@ -47,6 +48,7 @@ export interface ModuleOptions {
   breakpoints?: BreakpointMap
   serverRoute?: string
   onDemandServer?: OnDemandServerOptions | boolean
+  placeholders?: string
 }
 
 export interface ResolvedModuleConfig {
@@ -78,6 +80,19 @@ export function resolveModuleConfig(options: ModuleOptions, rootDir: string): Re
   }
 }
 
+export function placeholdersPluginContents(manifestPath: string): string {
+  return [
+    `import { defineNuxtPlugin } from '#app'`,
+    `import { PLACEHOLDERS_KEY } from '@macrulez/vue-image-kit'`,
+    `import placeholders from ${JSON.stringify(manifestPath.replace(/\\/g, '/'))}`,
+    ``,
+    `export default defineNuxtPlugin((nuxtApp) => {`,
+    `  nuxtApp.vueApp.provide(PLACEHOLDERS_KEY, placeholders)`,
+    `})`,
+    ``,
+  ].join('\n')
+}
+
 export default defineNuxtModule<ModuleOptions>({
   meta: {
     name: 'vue-image-kit',
@@ -105,6 +120,14 @@ export default defineNuxtModule<ModuleOptions>({
     }
 
     addPlugin(resolver.resolve('./runtime/plugin'))
+
+    if (options.placeholders) {
+      const manifestPath = resolve(nuxt.options.rootDir, options.placeholders)
+      addPluginTemplate({
+        filename: 'vue-image-kit-placeholders.mjs',
+        getContents: () => placeholdersPluginContents(manifestPath),
+      })
+    }
 
     addImports(AUTO_IMPORT_NAMES.map((name) => ({ name, from: '@macrulez/vue-image-kit' })))
 

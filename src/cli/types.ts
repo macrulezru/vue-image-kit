@@ -62,3 +62,24 @@ export interface ProcessedImage {
   blurhash: string
   thumbhash: string
 }
+
+export interface ScanFileConfig {
+  root?: string
+  include?: string[]
+  exclude?: string[]
+  publicDir?: string
+  aliases?: Record<string, string>
+  packageNames?: string[]
+  viteConfig?: boolean
+}
+
+export interface PlaceholdersFileConfig extends ScanFileConfig {
+  manifest?: string
+  mode?: 'blurhash' | 'thumbhash' | 'color'
+  remote?: boolean
+  hosts?: string[]
+  limit?: number
+  concurrency?: number
+  timeout?: number
+  maxBytes?: number
+}

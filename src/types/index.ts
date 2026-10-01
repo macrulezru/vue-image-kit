@@ -20,9 +20,20 @@ export type ResponsiveSrc = Record<string, ResponsiveSrcEntry>
 
 export type BreakpointMap = Record<string, string>
 
+export interface PlaceholderEntry {
+  blurhash?: string
+  thumbhash?: string
+  color?: string
+  width?: number
+  height?: number
+}
+
+export type PlaceholderManifest = Record<string, PlaceholderEntry>
+
 export interface VImageKitOptions {
   breakpoints?: BreakpointMap
   serverRoute?: string
+  placeholders?: PlaceholderManifest
 }
 
 export interface LazyImgOptions {

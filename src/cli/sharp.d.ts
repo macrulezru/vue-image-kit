@@ -15,7 +15,11 @@ declare module 'sharp' {
   interface Sharp {
     metadata(): Promise<Metadata>
     clone(): Sharp
-    resize(width: number, height?: number | null, options?: { withoutEnlargement?: boolean }): Sharp
+    resize(
+      width: number,
+      height?: number | null,
+      options?: { withoutEnlargement?: boolean; fit?: 'cover' | 'contain' | 'fill' | 'inside' | 'outside' },
+    ): Sharp
     ensureAlpha(alpha?: number): Sharp
     jpeg(options?: { quality?: number; mozjpeg?: boolean }): Sharp
     webp(options?: { quality?: number; loop?: number }): Sharp
@@ -27,6 +31,6 @@ declare module 'sharp' {
     toBuffer(options: { resolveWithObject: true }): Promise<{ data: Buffer; info: OutputInfo }>
   }
 
-  function sharp(input: string, options?: { animated?: boolean }): Sharp
+  function sharp(input: string | Buffer, options?: { animated?: boolean }): Sharp
   export = sharp
 }
