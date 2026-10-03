@@ -49,7 +49,13 @@ export interface PlaceholderProps {
   height?: number
 }
 
+export interface ImportPlaceholdersOptions {
+  extensions?: string[]
+  exclude?: string[]
+}
+
 export interface PlaceholdersPluginOptions {
+  imports?: boolean | ImportPlaceholdersOptions
   root?: string
   dirs?: FolderInput[]
   urls?: string[]

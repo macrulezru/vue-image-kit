@@ -265,7 +265,7 @@ vueImageKit({ generate: false, placeholders: { dirs: ['public/images'] } })
 app.use(VImageKitPlugin, { placeholders })
 ```
 
-For a handful of imported files, `import ph from './photo.jpg?placeholder'` returns the `<VImage>` props directly (`<VImage v-bind="ph" />`); `generate: false` keeps the plugin from resizing anything. `?placeholder=color,blurhash` picks any fields (`blurhash`, `thumbhash`, `color`, `size`, `preview`, `aspect`, `all`; `&shape=raw` keeps the names as listed), `?color`, `?size`, `?aspect`, `?preview`, `?blurhash` and `?thumbhash` return a single value, and `&components=6x4&sample=64&strategy=average` tune one import. `vueImageKit({ types: true })` writes typings for list imports. `v-lazy-img` and `useBackgroundImage()` read the manifest too.
+For a handful of imported files, `import ph from './photo.jpg?placeholder'` returns the `<VImage>` props directly (`<VImage v-bind="ph" />`); `generate: false` keeps the plugin from resizing anything. `?placeholder=color,blurhash` picks any fields (`blurhash`, `thumbhash`, `color`, `size`, `preview`, `aspect`, `all`; `&shape=raw` keeps the names as listed), `?color`, `?size`, `?aspect`, `?preview`, `?blurhash` and `?thumbhash` return a single value, and `&components=6x4&sample=64&strategy=average` tune one import. `vueImageKit({ types: true })` writes typings for list imports. `placeholders: { imports: true }` computes a placeholder for every statically imported image on its own, with no query and no template edits. `v-lazy-img` and `useBackgroundImage()` read the manifest too.
 
 ## Documentation & links
 

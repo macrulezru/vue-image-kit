@@ -13,6 +13,7 @@ import type { AutoLoaderConfig } from '../cdn/auto'
 import { useServerRoute } from '../composables/useServerLoader'
 import { buildImageUrl } from '../server/url'
 import { PLACEHOLDERS_KEY } from '../utils/placeholders'
+import { lookupManifestEntry } from '../utils/manifest-placeholder'
 import type {
   SrcSet,
   ResponsiveSrc,
@@ -150,10 +151,9 @@ const serverSrcset = computed<string | undefined>(() => {
 
 const placeholderManifest = inject(PLACEHOLDERS_KEY, null)
 const manifestEntry = computed(() => {
-  if (!placeholderManifest) return undefined
   const key =
     typeof props.src === 'string' ? props.src : (props.src?.fallback ?? props.image?.src)
-  return key ? placeholderManifest[key] : undefined
+  return lookupManifestEntry(placeholderManifest, key)
 })
 
 const mergedWidth = computed(() => props.width ?? props.image?.width ?? manifestEntry.value?.width)
@@ -208,12 +208,12 @@ const activeMediaSource = useActiveMediaSource(
   (source) =>
     (source.width !== undefined && source.height !== undefined) ||
     source.placeholder !== undefined ||
-    placeholderManifest?.[source.fallback] !== undefined,
+    lookupManifestEntry(placeholderManifest, source.fallback) !== undefined,
 )
 
 const sourceManifestEntry = computed(() => {
   const active = activeMediaSource.value
-  return active && placeholderManifest ? placeholderManifest[active.fallback] : undefined
+  return active ? lookupManifestEntry(placeholderManifest, active.fallback) : undefined
 })
 
 const sourcePlaceholder = computed(() => {

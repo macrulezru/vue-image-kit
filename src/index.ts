@@ -18,6 +18,8 @@ export type { UseBackgroundImageOptions, UseBackgroundImageReturn } from './comp
 export { useNetworkAware, isSaveDataEnabled } from './composables/useNetworkAware'
 export { useServerRoute, SERVER_ROUTE_KEY } from './composables/useServerLoader'
 export { PLACEHOLDERS_KEY } from './utils/placeholders'
+export { registerPlaceholder } from './utils/placeholder-registry'
+export type { RegisteredPlaceholder } from './utils/placeholder-registry'
 export { decodeBlurhash } from './utils/blurhash-decode'
 export { decodeThumbHash, thumbHashToAverageRGBA, thumbHashToAverageColor } from './utils/thumbhash-decode'
 export { encodeBlurhash, encodeThumbHash } from './utils/encode'
