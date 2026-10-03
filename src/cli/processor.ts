@@ -22,6 +22,7 @@ import {
 } from './incremental.js'
 import type { IncrementalState } from './incremental.js'
 import { loadSharp, loadThumbhash } from './deps.js'
+import { readSvgSize } from './placeholders/svg.js'
 import type { RgbaToThumbHash } from './deps.js'
 
 function fileSize(path: string): number {
@@ -62,8 +63,9 @@ async function thumbhashFromImage(image: SharpImage): Promise<string> {
   return Buffer.from(hash).toString('base64')
 }
 
-function findImages(inputDir: string): string[] {
+function findImages(inputDir: string, excludeDir?: string): string[] {
   const abs = resolve(inputDir)
+  const excluded = excludeDir ? resolve(excludeDir) : null
   if (!existsSync(abs)) {
     throw new Error(`Input directory not found: ${abs}`)
   }
@@ -74,7 +76,7 @@ function findImages(inputDir: string): string[] {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = join(dir, entry.name)
       if (entry.isDirectory()) {
-        walk(full)
+        if (resolve(full) !== excluded) walk(full)
       } else if (SUPPORTED_EXTS.has(parse(entry.name).ext.toLowerCase())) {
         results.push(full)
       }
@@ -113,15 +115,18 @@ async function processSvg(
   const skipped = config.skipExisting && existsSync(outPath)
   copyThrough(srcPath, outPath, config)
 
-  let width: number
-  let height: number
-  try {
-    const meta = await sharp(srcPath).metadata()
-    width = meta.width ?? 0
-    height = meta.height ?? 0
-  } catch {
-    width = 0
-    height = 0
+  const declared = readSvgSize(srcPath)
+  let width = declared?.width ?? 0
+  let height = declared?.height ?? 0
+  if (!declared) {
+    try {
+      const meta = await sharp(srcPath).metadata()
+      width = meta.width ?? 0
+      height = meta.height ?? 0
+    } catch {
+      width = 0
+      height = 0
+    }
   }
 
   const sizeBytes = fileSize(srcPath)
@@ -346,7 +351,7 @@ export async function generate(config: CliConfig): Promise<void> {
     console.log(`[vue-image-kit] Cleaned ${config.output}`)
   }
 
-  const srcFiles = findImages(config.input)
+  const srcFiles = findImages(config.input, config.output)
 
   if (srcFiles.length === 0) {
     console.warn(`[vue-image-kit] No images found in ${config.input}`)

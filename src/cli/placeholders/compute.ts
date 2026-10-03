@@ -1,5 +1,6 @@
 import { encodeBlurhash } from '../blurhash-encode.js'
 import type { RgbaToThumbHash, SharpFactory } from '../deps.js'
+import { readSvgSize, svgDensity } from './svg.js'
 
 export type PlaceholderMode = 'blurhash' | 'thumbhash' | 'color'
 
@@ -113,15 +114,26 @@ export async function computePlaceholder(
   input: string | Buffer,
   options: ComputeOptions,
 ): Promise<PlaceholderData> {
-  const image = options.sharp(input)
+  const svgSize = options.colorOnly ? readSvgSize(input) : null
+  const density = svgDensity(svgSize)
+  const open = options.sharp as (
+    input: string | Buffer,
+    settings?: { density: number },
+  ) => ReturnType<SharpFactory>
+  const image = density === undefined ? open(input) : open(input, { density })
   const tuning = resolveTuning(options.tuning)
   const data: PlaceholderData = {}
 
   if (options.includeSize) {
-    const meta = await image.metadata()
-    if (meta.width && meta.height) {
-      data.width = meta.width
-      data.height = meta.height
+    if (svgSize) {
+      data.width = svgSize.width
+      data.height = svgSize.height
+    } else {
+      const meta = await image.metadata()
+      if (meta.width && meta.height) {
+        data.width = meta.width
+        data.height = meta.height
+      }
     }
   }
 

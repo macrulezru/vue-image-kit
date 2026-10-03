@@ -58,6 +58,13 @@ function inside(parent: string, child: string): boolean {
   return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
 }
 
+export function placeholderDirs(inputs: FolderInput[], root: string): string[] {
+  return inputs.map((input) => {
+    const { dir } = normalizeSpec(input)
+    return isAbsolute(dir) ? dir : resolve(root, dir)
+  })
+}
+
 export interface FolderImage {
   abs: string
   url: string

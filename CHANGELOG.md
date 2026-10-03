@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-10-03
+
+### Fixed
+
+- **Endless regeneration loop in `vite dev`.** `handleHotUpdate` ran `generate()` for any changed image file, including the files `generate()` itself had just written to `output`; with `incremental: false` every run rewrote them, which started the next run (hundreds of runs a second). It now runs only for an image inside `input` and never for one inside `output`, and runs are serialized — changes arriving during a run collapse into one follow-up run.
+- An `output` folder inside `input` is skipped when `input` is scanned, instead of being processed as source images.
+- The dev server no longer reloads the page for every generated file: the placeholders manifest only watches the folders in `placeholders.dirs`.
+- A huge SVG (e.g. 30000×30000) made `?placeholder` fail with sharp's pixel limit. The size is now read from the file's own `width`/`height`/`viewBox` and the color is computed from a small render.
+- A corrupt SVG no longer fails the build on `?placeholder`: it warns and returns the declared size (or `{}`). A corrupt raster image still fails.
+
+### Changed
+
+- `?blurhash` / `?thumbhash` on an SVG warn that a vector has only a color (use `?placeholder`) instead of silently returning an empty string.
+
 ## [1.4.0] - 2026-10-01
 
 ### Added
