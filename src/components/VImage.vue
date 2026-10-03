@@ -34,6 +34,7 @@ interface Props {
   blurhash?: string
   thumbhash?: string
   placeholder?: string
+  ssrPlaceholder?: boolean
   placeholderMode?: 'blur' | 'color' | 'shimmer'
   placeholderColor?: string
   widths?: number[]
@@ -67,6 +68,7 @@ const props = withDefaults(defineProps<Props>(), {
   priority: false,
   respectSaveData: false,
   fadeIn: false,
+  ssrPlaceholder: false,
 })
 
 const emit = defineEmits<{
@@ -242,7 +244,7 @@ const mergedThumbhash = computed(() =>
 const mergedPlaceholder = computed(() =>
   sourcePlaceholder.value
     ? sourcePlaceholder.value.placeholder
-    : (props.placeholder ?? props.image?.placeholder),
+    : (props.placeholder ?? props.image?.placeholder ?? manifestEntry.value?.placeholder),
 )
 const explicitColor = computed(() =>
   sourcePlaceholder.value ? sourcePlaceholder.value.placeholderColor : props.placeholderColor,
@@ -321,6 +323,55 @@ const blurhashDataUrl = computed<string | undefined>(() => {
   return blurhashToDataUrl(mergedBlurhash.value, effectiveWidth.value, effectiveHeight.value)
 })
 
+function previewBackground(url: string) {
+  return {
+    backgroundImage: `url(${url})`,
+    backgroundSize: 'cover',
+    backgroundPosition: objectPosition.value ?? 'center',
+  }
+}
+
+const usesSsrPreview = computed(
+  () =>
+    props.ssrPlaceholder &&
+    !!mergedPlaceholder.value &&
+    !colorPlaceholder.value &&
+    !isShimmer.value,
+)
+
+const hydratingStyle = computed(() =>
+  usesSsrPreview.value ? previewBackground(mergedPlaceholder.value as string) : undefined,
+)
+
+const defersSsrImage = computed(() => usesSsrPreview.value && effectiveLazy.value)
+
+const TRANSPARENT_PIXEL =
+  'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
+
+const hydratingAttrs = computed(() =>
+  defersSsrImage.value
+    ? { ...imgAttrs.value, src: TRANSPARENT_PIXEL, srcset: undefined, sizes: undefined }
+    : imgAttrs.value,
+)
+
+function escapeAttr(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+const noscriptHtml = computed(() => {
+  const attrs = imgAttrs.value
+  const parts = [`src="${escapeAttr(attrs.src)}"`, `alt="${escapeAttr(props.alt)}"`]
+  if (attrs.srcset) parts.push(`srcset="${escapeAttr(attrs.srcset)}"`)
+  if (attrs.sizes) parts.push(`sizes="${escapeAttr(attrs.sizes)}"`)
+  if (mergedWidth.value) parts.push(`width="${mergedWidth.value}"`)
+  if (mergedHeight.value) parts.push(`height="${mergedHeight.value}"`)
+  return `<img ${parts.join(' ')}>`
+})
+
 const placeholderBackgroundStyle = computed(() => {
   if (isLoaded.value) return {}
   if (colorPlaceholder.value) {
@@ -328,6 +379,9 @@ const placeholderBackgroundStyle = computed(() => {
   }
   if (isShimmer.value) {
     return {}
+  }
+  if (props.ssrPlaceholder && mergedPlaceholder.value) {
+    return previewBackground(mergedPlaceholder.value)
   }
   if (blurhashDataUrl.value) {
     return {
@@ -457,16 +511,19 @@ function handleError(e: Event): void {
 </script>
 
 <template>
-  <img
-    v-if="isHydrating"
-    v-bind="imgAttrs"
-    :alt="alt"
-    :width="mergedWidth"
-    :height="mergedHeight"
-    :decoding="effectiveDecoding"
-    :fetchpriority="effectiveFetchpriority"
-    :loading="effectiveLazy ? 'lazy' : 'eager'"
-  />
+  <template v-if="isHydrating">
+    <img
+      v-bind="hydratingAttrs"
+      :alt="alt"
+      :width="mergedWidth"
+      :height="mergedHeight"
+      :decoding="effectiveDecoding"
+      :fetchpriority="effectiveFetchpriority"
+      :loading="effectiveLazy ? 'lazy' : 'eager'"
+      :style="hydratingStyle"
+    />
+    <noscript v-if="defersSsrImage" v-html="noscriptHtml" />
+  </template>
 
   <span
     v-else-if="isIdle"

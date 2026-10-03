@@ -52,6 +52,7 @@ export interface PlaceholderProps {
 export interface ImportPlaceholdersOptions {
   extensions?: string[]
   exclude?: string[]
+  preview?: boolean | string[]
 }
 
 export interface PlaceholdersPluginOptions {

@@ -31,6 +31,7 @@ export interface PlaceholderEntry {
   blurhash?: string
   thumbhash?: string
   color?: string
+  placeholder?: string
   width?: number
   height?: number
 }

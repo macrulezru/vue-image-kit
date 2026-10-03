@@ -72,6 +72,12 @@ export default tseslint.config(
     },
   },
 
+  // VImage puts an escaped <img> into <noscript>, which only v-html can do
+  {
+    files: ['src/components/VImage.vue'],
+    rules: { 'vue/no-v-html': 'off' },
+  },
+
   // CLI: console output is the product, not debug noise — must come after the
   // project-wide override above so it wins for files under src/cli/**
   {

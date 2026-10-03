@@ -6,10 +6,17 @@ import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import sharp from 'sharp'
 import { build } from 'vite'
-import { parseImageRequest, resolveImageImports, rewriteImageImports, vueImageKit } from '../../src/vite/plugin'
+import {
+  importPathMatches,
+  parseImageRequest,
+  resolveImageImports,
+  rewriteImageImports,
+  vueImageKit,
+} from '../../src/vite/plugin'
 
 const dirs: string[] = []
 afterEach(() => {
+  delete (globalThis as Record<string, unknown>)['__VIK_PLACEHOLDERS__']
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
@@ -24,7 +31,7 @@ describe('resolveImageImports', () => {
   it('uses the common raster extensions by default and takes custom ones and exclusions', () => {
     expect(defaults.extensions).toEqual(['.png', '.jpg', '.jpeg', '.webp', '.avif', '.gif', '.tif', '.tiff'])
     const custom = resolveImageImports({ extensions: ['.PNG'], exclude: ['sprites/'] }, 'thumbhash')!
-    expect(custom).toEqual({ mode: 'thumbhash', extensions: ['.png'], exclude: ['sprites/'] })
+    expect(custom).toEqual({ mode: 'thumbhash', extensions: ['.png'], exclude: ['sprites/'], preview: false })
   })
 })
 
@@ -36,17 +43,44 @@ describe('rewriteImageImports', () => {
       'console.log(hero, logo)',
     ].join('\n')
     const out = rewriteImageImports(code, defaults)!
-    expect(out).toContain("import { registerPlaceholder as __vikRegister } from '@macrulez/vue-image-kit'")
+    expect(out).toContain('globalThis.__VIK_PLACEHOLDERS__')
     expect(out).toContain('import __vikPlaceholder0 from "@/assets/hero.webp?placeholder=blurhash&lenient"')
     expect(out).toContain('import __vikPlaceholder1 from "./logo.png?placeholder=blurhash&lenient"')
-    expect(out).toContain('__vikRegister(hero, __vikPlaceholder0)')
-    expect(out).toContain('__vikRegister(logo, __vikPlaceholder1)')
+    expect(out).toContain('__vikStore.set(hero, __vikPlaceholder0)')
+    expect(out).toContain('__vikStore.set(logo, __vikPlaceholder1)')
     expect(out.endsWith(`${code}\n`)).toBe(true)
   })
 
   it('puts the registration before the module body, so a module-level lookup already sees it', () => {
     const out = rewriteImageImports("import a from './a.png'\nconst x = a", defaults)!
-    expect(out.indexOf('__vikRegister(a,')).toBeLessThan(out.indexOf('const x = a'))
+    expect(out.indexOf('__vikStore.set(a,')).toBeLessThan(out.indexOf('const x = a'))
+  })
+
+  it('asks for a ready preview as well when the preview option is on', () => {
+    const on = resolveImageImports({ preview: true }, 'blurhash')!
+    expect(rewriteImageImports("import a from './a.png'", on)).toContain(
+      '?placeholder=blurhash,color,size,preview&lenient',
+    )
+    const thumb = resolveImageImports({ preview: true }, 'thumbhash')!
+    expect(rewriteImageImports("import a from './a.png'", thumb)).toContain(
+      '?placeholder=thumbhash,color,size,preview&lenient',
+    )
+  })
+
+  it('limits the preview to the listed paths', () => {
+    const some = resolveImageImports({ preview: ['/hero/'] }, 'blurhash')!
+    const code = ["import a from './hero/a.png'", "import b from './b.png'"].join('\n')
+    const out = rewriteImageImports(code, some)!
+    expect(out).toContain('./hero/a.png?placeholder=blurhash,color,size,preview&lenient')
+    expect(out).toContain('./b.png?placeholder=blurhash&lenient')
+  })
+
+  it('follows an import that the dev server has already analyzed', () => {
+    const code = 'import hero from "/_nuxt/src/assets/hero.webp?import"\nimport b from "/_nuxt/src/b.png?import&t=170"'
+    const out = rewriteImageImports(code, defaults)!
+    expect(out).toContain('import __vikPlaceholder0 from "/_nuxt/src/assets/hero.webp?placeholder=blurhash&lenient&import"')
+    expect(out).toContain('import __vikPlaceholder1 from "/_nuxt/src/b.png?placeholder=blurhash&lenient&import"')
+    expect(out).toContain('__vikStore.set(hero, __vikPlaceholder0)')
   })
 
   it('uses the configured mode', () => {
@@ -78,7 +112,7 @@ describe('rewriteImageImports', () => {
 
   it('finds the imports Vue generates from template src attributes', () => {
     const code = 'import { createElementVNode as _createElementVNode } from "vue"\nimport _imports_0 from "@/img/a.webp"\nexport default {}'
-    expect(rewriteImageImports(code, defaults)).toContain('__vikRegister(_imports_0, __vikPlaceholder0)')
+    expect(rewriteImageImports(code, defaults)).toContain('__vikStore.set(_imports_0, __vikPlaceholder0)')
   })
 })
 
@@ -90,34 +124,100 @@ describe('the lenient flag', () => {
 })
 
 describe('imports through the plugin', () => {
-  type Transform = { handler(this: unknown, code: string, id: string): { code: string } | null }
+  type Transform = { handler(this: unknown, code: string, id: string): Promise<{ code: string } | null> }
 
   function transformer(options: Parameters<typeof vueImageKit>[0]) {
     const plugin = vueImageKit({ generate: false, ...options })
     const hook = plugin.transform as unknown as Transform
-    return (code: string, id: string) => hook.handler.call({}, code, id)
+    return (code: string, id: string, context: unknown = {}) => hook.handler.call(context, code, id)
   }
 
-  it('does nothing unless placeholders.imports is on', () => {
-    expect(transformer({})("import a from './a.png'", '/p/src/x.ts')).toBeNull()
-    expect(transformer({ placeholders: {} })("import a from './a.png'", '/p/src/x.ts')).toBeNull()
+  it('does nothing unless placeholders.imports is on', async () => {
+    expect(await transformer({})("import a from './a.png'", '/p/src/x.ts')).toBeNull()
+    expect(await transformer({ placeholders: {} })("import a from './a.png'", '/p/src/x.ts')).toBeNull()
   })
 
-  it('rewrites project scripts and single-file components, and only those', () => {
+  it('rewrites project scripts and single-file components, and only those', async () => {
     const run = transformer({ placeholders: { imports: true } })
     const code = "import a from './a.png'"
-    expect(run(code, '/p/src/x.ts')).not.toBeNull()
-    expect(run(code, '/p/src/Comp.vue')).not.toBeNull()
-    expect(run(code, '/p/src/x.mjs')).not.toBeNull()
-    expect(run(code, '/p/node_modules/lib/x.js')).toBeNull()
-    expect(run(code, '\0virtual:thing')).toBeNull()
-    expect(run(code, '/p/src/Comp.vue?vue&type=style&index=0&lang.css')).toBeNull()
-    expect(run(code, '/p/src/styles.css')).toBeNull()
+    expect(await run(code, '/p/src/x.ts')).not.toBeNull()
+    expect(await run(code, '/p/src/Comp.vue')).not.toBeNull()
+    expect(await run(code, '/p/src/x.mjs')).not.toBeNull()
+    expect(await run(code, '/p/node_modules/lib/x.js')).toBeNull()
+    expect(await run(code, '\0virtual:thing')).toBeNull()
+    expect(await run(code, '/p/src/Comp.vue?vue&type=style&index=0&lang.css')).toBeNull()
+    expect(await run(code, '/p/src/styles.css')).toBeNull()
+    expect(await run(code, '/p/src/Comp.vue?vue&type=script&setup=true&lang.ts')).not.toBeNull()
+    expect(await run(code, '/p/src/Comp.vue?vue&type=template&lang.js')).not.toBeNull()
+    expect(await run(code, '/p/src/x.ts?raw')).toBeNull()
   })
 
-  it('honors the mode of the placeholders option', () => {
+  it('honors the mode of the placeholders option', async () => {
     const run = transformer({ placeholders: { imports: true, mode: 'thumbhash' } })
-    expect(run("import a from './a.png'", '/p/x.ts')!.code).toContain('?placeholder=thumbhash&lenient')
+    expect((await run("import a from './a.png'", '/p/x.ts'))!.code).toContain('?placeholder=thumbhash&lenient')
+  })
+
+  it('matches a preview list against the real path of an aliased import', async () => {
+    const run = transformer({ placeholders: { imports: { preview: ['src/assets/hero/'] } } })
+    const context = {
+      resolve: async (source: string) => ({ id: source.replace('@/', '/p/src/') }),
+    }
+    const code = ["import a from '@/assets/hero/a.png'", "import b from '@/assets/b.png'"].join('\n')
+    const out = (await run(code, '/p/src/x.ts', context))!.code
+    expect(out).toContain('@/assets/hero/a.png?placeholder=blurhash,color,size,preview&lenient')
+    expect(out).toContain('@/assets/b.png?placeholder=blurhash&lenient')
+  })
+
+  it('matches a dev-server URL that is already analyzed, after cutting the base', async () => {
+    const plugin = vueImageKit({ generate: false, placeholders: { imports: { preview: ['src/assets/hero/'] } } })
+    const configure = plugin.configResolved as unknown as (config: unknown) => void
+    configure({ command: 'serve', root: '/p', base: '/_nuxt/', publicDir: false })
+    const hook = plugin.transform as unknown as Transform
+    const code = [
+      'import a from "/_nuxt/src/assets/hero/a.png?import"',
+      'import b from "/_nuxt/src/assets/b.png?import"',
+    ].join('\n')
+    const out = (await hook.handler.call({}, code, '/p/src/x.ts'))!.code
+    expect(out).toContain('/_nuxt/src/assets/hero/a.png?placeholder=blurhash,color,size,preview&lenient&import')
+    expect(out).toContain('/_nuxt/src/assets/b.png?placeholder=blurhash&lenient&import')
+  })
+})
+
+describe('importPathMatches', () => {
+  it('takes a part of the path, a directory or an exact file', () => {
+    expect(importPathMatches(['hero'], '@/a/hero.png', 'src/a/hero.png')).toBe(true)
+    expect(importPathMatches(['src/a/hero/'], '@/a/hero/x.png', 'src/a/hero/x.png')).toBe(true)
+    expect(importPathMatches(['src/a/hero/'], '@/a/hero/x.png', 'src/a/other/x.png')).toBe(false)
+    expect(importPathMatches(['src/a/hero.png'], '@/a/hero.png', 'src/a/hero.png')).toBe(true)
+    expect(importPathMatches(['./src/a/hero.png'], '@/a/hero.png', 'src/a/hero.png')).toBe(true)
+  })
+
+  it('takes glob patterns over the root-relative path', () => {
+    expect(importPathMatches(['src/assets/*.png'], 'x', 'src/assets/a.png')).toBe(true)
+    expect(importPathMatches(['src/assets/*.png'], 'x', 'src/assets/deep/a.png')).toBe(false)
+    expect(importPathMatches(['src/assets/**/*.png'], 'x', 'src/assets/deep/er/a.png')).toBe(true)
+    expect(importPathMatches(['src/assets/**/*.png'], 'x', 'src/assets/a.png')).toBe(true)
+    expect(importPathMatches(['**/hero-*.webp'], 'x', 'src/img/hero-1.webp')).toBe(true)
+    expect(importPathMatches(['src/**'], 'x', 'lib/a.png')).toBe(false)
+  })
+
+  it('falls back to the import specifier when the real path is unknown', () => {
+    expect(importPathMatches(['hero'], './hero.png', undefined)).toBe(true)
+    expect(importPathMatches(['./img/*.png'], './img/a.png', undefined)).toBe(true)
+  })
+})
+
+describe('exclude with real paths', () => {
+  it('excludes by a resolved path', () => {
+    const rewrite = resolveImageImports({ exclude: ['src/sprites/**'] }, 'blurhash')!
+    const code = ["import s from '@/sprites/s.png'", "import p from '@/p.png'"].join('\n')
+    const paths = new Map([
+      ['@/sprites/s.png', 'src/sprites/s.png'],
+      ['@/p.png', 'src/p.png'],
+    ])
+    const out = rewriteImageImports(code, rewrite, paths)!
+    expect(out).not.toContain('sprites/s.png?placeholder')
+    expect(out).toContain('@/p.png?placeholder=blurhash&lenient')
   })
 })
 
