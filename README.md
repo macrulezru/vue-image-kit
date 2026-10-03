@@ -64,7 +64,7 @@ Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe —
 **Ecosystem**
 
 - **Nuxt module** — `@macrulez/vue-image-kit/nuxt`; auto-registers `<VImage>` and `v-lazy-img`; auto-imports every composable and utility
-- **Vite plugin** — `@macrulez/vue-image-kit/vite`; runs the CLI processor on `buildStart`; build-time imports via `?vik` (variants + placeholders), `?placeholder` / `?blurhash` / `?thumbhash` (placeholders only, no files written); `generate: false` skips the batch run; `placeholders: { dirs, urls }` serves a placeholders manifest for whole folders as `virtual:vue-image-kit/placeholders`; optional on-demand dev serving
+- **Vite plugin** — `@macrulez/vue-image-kit/vite`; runs the CLI processor on `buildStart`; build-time imports via `?vik` (variants + placeholders), `?placeholder` (a list of fields: `?placeholder=color,blurhash`), `?blurhash` / `?thumbhash` / `?color` / `?size` / `?aspect` / `?preview` (placeholders only, no files written); `generate: false` skips the batch run; `placeholders: { dirs, urls }` serves a placeholders manifest for whole folders as `virtual:vue-image-kit/placeholders`; optional on-demand dev serving
 - **Self-hosted on-demand server** — `@macrulez/vue-image-kit/server`; a small framework-agnostic Node request handler for when there's no CDN and a build step isn't wanted
 - **Zero external runtime dependencies** — only Vue 3 as peer dep; full ESM + CJS, tree-shakeable, `sideEffects: false`
 
@@ -265,7 +265,7 @@ vueImageKit({ generate: false, placeholders: { dirs: ['public/images'] } })
 app.use(VImageKitPlugin, { placeholders })
 ```
 
-For a handful of imported files, `import ph from './photo.jpg?placeholder'` returns the `<VImage>` props directly (`<VImage v-bind="ph" />`); `generate: false` keeps the plugin from resizing anything. `?placeholder=thumbhash`, `?placeholder=color`, `?blurhash` and `?thumbhash` pick the kind. `v-lazy-img` and `useBackgroundImage()` read the manifest too.
+For a handful of imported files, `import ph from './photo.jpg?placeholder'` returns the `<VImage>` props directly (`<VImage v-bind="ph" />`); `generate: false` keeps the plugin from resizing anything. `?placeholder=color,blurhash` picks any fields (`blurhash`, `thumbhash`, `color`, `size`, `preview`, `aspect`, `all`; `&shape=raw` keeps the names as listed), `?color`, `?size`, `?aspect`, `?preview`, `?blurhash` and `?thumbhash` return a single value, and `&components=6x4&sample=64&strategy=average` tune one import. `vueImageKit({ types: true })` writes typings for list imports. `v-lazy-img` and `useBackgroundImage()` read the manifest too.
 
 ## Documentation & links
 

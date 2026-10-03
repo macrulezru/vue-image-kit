@@ -66,6 +66,26 @@ declare module '*?placeholder=blurhash' {
   export default props
 }
 
+declare module '*?color' {
+  const color: string
+  export default color
+}
+
+declare module '*?size' {
+  const size: { width: number; height: number }
+  export default size
+}
+
+declare module '*?preview' {
+  const preview: string
+  export default preview
+}
+
+declare module '*?aspect' {
+  const aspect: number
+  export default aspect
+}
+
 declare module 'virtual:vue-image-kit/placeholders' {
   const placeholders: Record<
     string,
