@@ -91,22 +91,26 @@ export function resolveModuleConfig(options: ModuleOptions, rootDir: string): Re
 export interface PlaceholdersSetup {
   manifestPath: string | null
   viteOptions: PlaceholdersPluginOptions | null
+  virtualManifest: boolean
 }
 
 export function resolvePlaceholdersSetup(
   setting: string | NuxtPlaceholdersOptions | undefined,
   rootDir: string,
 ): PlaceholdersSetup {
-  if (!setting) return { manifestPath: null, viteOptions: null }
+  if (!setting) return { manifestPath: null, viteOptions: null, virtualManifest: false }
   if (typeof setting === 'string') {
-    return { manifestPath: resolve(rootDir, setting), viteOptions: null }
+    return { manifestPath: resolve(rootDir, setting), viteOptions: null, virtualManifest: false }
   }
   const { manifest, ...rest } = setting
   const manifestPath = manifest ? resolve(rootDir, manifest) : null
   const hasSources = (rest.dirs?.length ?? 0) > 0 || (rest.urls?.length ?? 0) > 0
-  if (!hasSources) return { manifestPath, viteOptions: null }
+  if (!hasSources && !rest.imports) {
+    return { manifestPath, viteOptions: null, virtualManifest: false }
+  }
   return {
     manifestPath,
+    virtualManifest: hasSources,
     viteOptions: {
       ...rest,
       root: rootDir,
@@ -180,7 +184,7 @@ export default defineNuxtModule<ModuleOptions>({
 
     addPlugin(resolver.resolve('./runtime/plugin'))
 
-    const { manifestPath, viteOptions } = resolvePlaceholdersSetup(
+    const { manifestPath, viteOptions, virtualManifest } = resolvePlaceholdersSetup(
       options.placeholders,
       nuxt.options.rootDir,
     )
@@ -191,10 +195,10 @@ export default defineNuxtModule<ModuleOptions>({
       )) as typeof import('../vite/plugin')
       addVitePlugin(vueImageKit({ generate: false, placeholders: viteOptions }))
     }
-    if (manifestPath || viteOptions) {
+    if (manifestPath || virtualManifest) {
       addPluginTemplate({
         filename: 'vue-image-kit-placeholders.mjs',
-        getContents: () => placeholdersPluginContents(manifestPath, viteOptions !== null),
+        getContents: () => placeholdersPluginContents(manifestPath, virtualManifest),
       })
     }
 

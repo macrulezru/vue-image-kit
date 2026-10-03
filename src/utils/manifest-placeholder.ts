@@ -1,13 +1,14 @@
 import type { PlaceholderEntry, PlaceholderManifest } from '../types'
 import { decodeBlurhash } from './blurhash-decode'
 import { decodeThumbHash } from './thumbhash-decode'
+import { lookupRegisteredPlaceholder } from './placeholder-registry'
 
 export function lookupManifestEntry(
   manifest: PlaceholderManifest | null | undefined,
   src: string | undefined,
 ): PlaceholderEntry | undefined {
-  if (!manifest || !src) return undefined
-  return manifest[src]
+  if (!src) return undefined
+  return manifest?.[src] ?? lookupRegisteredPlaceholder(src)
 }
 
 function blurhashToDataUrl(hash: string, width?: number, height?: number): string | undefined {

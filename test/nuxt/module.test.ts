@@ -74,6 +74,7 @@ describe('AUTO_IMPORT_NAMES', () => {
     'BREAKPOINTS_KEY',
     'SERVER_ROUTE_KEY',
     'PLACEHOLDERS_KEY',
+    'registerPlaceholder',
   ])
 
   it('covers every real value export from the package root except the intentionally-excluded ones', () => {
@@ -124,6 +125,7 @@ describe('resolvePlaceholdersSetup', () => {
     expect(resolvePlaceholdersSetup(undefined, '/project')).toEqual({
       manifestPath: null,
       viteOptions: null,
+      virtualManifest: false,
     })
   })
 
@@ -152,6 +154,19 @@ describe('resolvePlaceholdersSetup', () => {
     expect(options.dirs).toHaveLength(2)
     expect((options.dirs![0] as { dir: string }).dir).toBe(resolve('/project', 'src/img'))
     expect(options.dirs![1]).toMatchObject({ urlPrefix: '/cdn' })
+  })
+
+  it('registers the plugin for imports only, without a virtual manifest', () => {
+    const setup = resolvePlaceholdersSetup({ imports: true }, '/project')
+    expect(setup.viteOptions).not.toBeNull()
+    expect(setup.viteOptions!.imports).toBe(true)
+    expect(setup.viteOptions!.dirs).toEqual([])
+    expect(setup.virtualManifest).toBe(false)
+  })
+
+  it('keeps the virtual manifest when folders are given next to imports', () => {
+    const setup = resolvePlaceholdersSetup({ imports: true, dirs: ['public/images'] }, '/project')
+    expect(setup.virtualManifest).toBe(true)
   })
 
   it('registers the plugin for urls only', () => {

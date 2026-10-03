@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-10-03
+
+### Added
+
+- **Automatic placeholders for imported images.** `vueImageKit({ generate: false, placeholders: { imports: true } })` (in Nuxt: `vueImageKit: { placeholders: { imports: true } }`) computes a placeholder at build time for every image a project script or single-file component imports with a default `import`, including the imports Vue generates from `src="…"` in a template and the ones `import.meta.glob(…, { eager: true })` expands to — no `?placeholder` query, no template edits. The placeholder is registered under the imported value itself (the dev URL or the hashed build URL), so `<VImage :src="hero" />` finds its blur and size on its own, in dev, in the build and during SSR. `mode` picks BlurHash or ThumbHash; `imports: { extensions, exclude }` narrows it. SVG images, imports with a query and lazy globs are left alone.
+- `registerPlaceholder(src, data)` is exported for the registry the rewritten imports feed; `VImage`, `v-lazy-img` and `useBackgroundImage()` look a `src` up there after the `placeholders` manifest, so no manifest has to be provided.
+- **`ssrPlaceholder` prop on `<VImage>`** (opt-in, default `false`). The server-rendered `<img>` gets a ready preview — a `data:` URL from `placeholder`, `image.placeholder` or the registry — as its CSS background, so the picture has a blur before any JavaScript runs; a BlurHash/ThumbHash alone can't be decoded on the server, so without a ready preview the prop does nothing. Ignored with `placeholderColor` and `placeholderMode` `color`/`shimmer`. A lazy image is held back as well: the server sends a transparent pixel instead of the real `src` and the real `<img>` goes into a `<noscript>` (crawlers and no-JS visitors still get it), so the heavy file is downloaded only when the image nears the viewport instead of by the browser's native lazy loading before hydration; an eager image (`lazy="false"`, `priority`) keeps its `src`. Server and first client render produce the same output (no hydration mismatch), and the preview keeps showing after hydration until the image loads.
+- **`placeholders.imports.preview`** (`true` or a list of path patterns — a directory, an exact file, a part of a path or a glob like `src/**/hero-*.webp`, matched against the file's real path from the project root so aliased imports work; `exclude` takes the same patterns) also renders a ready preview (a small PNG, from a ThumbHash) for the imported images and registers it, so `<VImage :src="hero" ssr-placeholder />` needs nothing else. Off by default; needs the `thumbhash` package at build time even in `blurhash` mode. A preview adds about 3–5 KB per image to the HTML of a page that uses it and to the bundle.
+- Registry entries and `registerPlaceholder()` accept `placeholder`/`preview` (a ready data URL). The registry is `globalThis.__VIK_PLACEHOLDERS__`, one store for the server and client copies of the package; the rewritten imports no longer import the package themselves.
+- A `lenient` flag on the `?placeholder` query (used by the rewritten imports): a corrupt raster image logs a warning and gets no placeholder instead of failing the build.
+
 ## [1.5.0] - 2026-10-03
 
 ### Added

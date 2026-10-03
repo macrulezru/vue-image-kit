@@ -14,7 +14,7 @@ Fully typed with TypeScript. Tree-shakeable (`sideEffects: false`). SSR-safe —
 
 **Placeholders**
 
-- **Blurhash placeholder** — custom in-house decoder (no external packages); decodes to a small data URL applied as a CSS background on the image itself, swapped out once the real image loads; SSR renders the `<img>` directly, sized via `width`/`height` to preserve aspect-ratio
+- **Blurhash placeholder** — custom in-house decoder (no external packages); decodes to a small data URL applied as a CSS background on the image itself, swapped out once the real image loads; SSR renders the `<img>` directly, sized via `width`/`height` to preserve aspect-ratio (opt-in `ssrPlaceholder` adds a ready preview as its background, so there is a blur even before hydration)
 - **ThumbHash placeholder** — `thumbhash` prop on VImage auto-decodes to PNG data URL; supports alpha channel; better quality than BlurHash; `--thumbhash` flag in CLI generates hashes at build time
 - **LQIP blur-up** — `data:image/…;base64,…` string as `placeholder`; low-res preview applied as a background image behind the real image, swapped out once it loads; optional `fadeIn` prop cross-fades the swap via CSS `opacity` transition
 - **Average-color placeholder** — `placeholderMode="color"` derives a solid background color from the ThumbHash header (0 bytes, no canvas); or set `placeholderColor` directly
@@ -265,7 +265,7 @@ vueImageKit({ generate: false, placeholders: { dirs: ['public/images'] } })
 app.use(VImageKitPlugin, { placeholders })
 ```
 
-For a handful of imported files, `import ph from './photo.jpg?placeholder'` returns the `<VImage>` props directly (`<VImage v-bind="ph" />`); `generate: false` keeps the plugin from resizing anything. `?placeholder=color,blurhash` picks any fields (`blurhash`, `thumbhash`, `color`, `size`, `preview`, `aspect`, `all`; `&shape=raw` keeps the names as listed), `?color`, `?size`, `?aspect`, `?preview`, `?blurhash` and `?thumbhash` return a single value, and `&components=6x4&sample=64&strategy=average` tune one import. `vueImageKit({ types: true })` writes typings for list imports. `v-lazy-img` and `useBackgroundImage()` read the manifest too.
+For a handful of imported files, `import ph from './photo.jpg?placeholder'` returns the `<VImage>` props directly (`<VImage v-bind="ph" />`); `generate: false` keeps the plugin from resizing anything. `?placeholder=color,blurhash` picks any fields (`blurhash`, `thumbhash`, `color`, `size`, `preview`, `aspect`, `all`; `&shape=raw` keeps the names as listed), `?color`, `?size`, `?aspect`, `?preview`, `?blurhash` and `?thumbhash` return a single value, and `&components=6x4&sample=64&strategy=average` tune one import. `vueImageKit({ types: true })` writes typings for list imports. `placeholders: { imports: true }` computes a placeholder for every statically imported image on its own, with no query and no template edits; `imports: { preview: true | ['/hero/'] }` also renders a ready data-URL preview, and `<VImage ssr-placeholder>` puts it into the server-rendered HTML so the blur shows before any JavaScript runs. `v-lazy-img` and `useBackgroundImage()` read the manifest too.
 
 ## Documentation & links
 
