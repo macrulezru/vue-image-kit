@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-10-03
+
+### Added
+
+- **Field lists for placeholder imports.** `?placeholder=color,blurhash` returns exactly the listed fields — `blurhash`, `thumbhash`, `color`, `size`, `preview` (a tiny PNG as a `data:image/png;base64,…` URI decoded from the ThumbHash), `aspect` (`width / height`) and `all` — in any order, separated by commas or spaces. `&shape=props` (default) uses `<VImage>` prop names (`color` → `placeholderColor`, `preview` → `placeholder`, `size` → `width`/`height`; `aspect` is not a prop and is skipped with a warning); `&shape=raw` keeps the listed names, with `size` as an object and `aspect` included. The older single values (`?placeholder`, `=blurhash`, `=thumbhash`, `=color`) keep their shape.
+- **One value at a time:** `?color`, `?size`, `?aspect` and `?preview`, next to `?blurhash` and `?thumbhash`. A value that could not be computed is `''` (`0` for `?aspect`, `0×0` for `?size`). The new names are taken only as bare flags, so another plugin's `?size=large` is left alone.
+- **Settings for one import:** `&components=6x4`, `&sample=64`, `&strategy=average` on any of these imports. They are computed for that file only and never touch the shared cache or the manifest; an invalid value warns and falls back to the default.
+- **`types` option of the Vite plugin.** A TypeScript module pattern allows a single `*`, so an import with a list or with settings can't be declared by the bundled `vite/client` types. `vueImageKit({ types: true })` (or a path) writes a `.d.ts` with a loosely typed `declare module '*?…'` for every such import it sees; entries are only added, never removed.
+- `vite/client` declarations for `?color`, `?size`, `?preview` and `?aspect`.
+
 ## [1.4.1] - 2026-10-03
 
 ### Fixed

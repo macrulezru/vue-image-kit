@@ -10,6 +10,7 @@ export interface PlaceholderData {
   color?: string
   width?: number
   height?: number
+  preview?: string
 }
 
 export type ColorStrategy = 'dominant' | 'average'
