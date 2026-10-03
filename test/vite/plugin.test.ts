@@ -211,3 +211,98 @@ describe('placeholders manifest watching (dev server)', () => {
     expect(server.watcher.on).not.toHaveBeenCalled()
   })
 })
+
+describe('hot update regeneration', () => {
+  type HotUpdate = (c: { file: string }) => Promise<void>
+
+  async function setup(overrides: Parameters<typeof vueImageKit>[0] = {}) {
+    const plugin = vueImageKit({ input: '/p/src/images', output: '/p/public/images', ...overrides })
+    ;(plugin.configResolved as (c: { command: string; root: string }) => void)({
+      command: 'serve',
+      root: '/p',
+    })
+    return plugin.handleHotUpdate as HotUpdate
+  }
+
+  beforeEach(() => {
+    vi.mocked(generate).mockReset()
+    vi.mocked(generate).mockImplementation(async () => {})
+  })
+
+  it('regenerates when an image inside the input directory changes', async () => {
+    const hot = await setup()
+    await hot({ file: '/p/src/images/photo.jpg' })
+    expect(vi.mocked(generate)).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores a change inside the output directory, so its own writes cannot retrigger it', async () => {
+    const hot = await setup()
+    await hot({ file: '/p/public/images/photo-400.webp' })
+    await hot({ file: '/p/public/images/logo.svg' })
+    expect(vi.mocked(generate)).not.toHaveBeenCalled()
+  })
+
+  it('ignores images outside the input directory and files that are not images', async () => {
+    const hot = await setup()
+    await hot({ file: '/p/src/assets/icon.svg' })
+    await hot({ file: '/p/src/images/readme.md' })
+    expect(vi.mocked(generate)).not.toHaveBeenCalled()
+  })
+
+  it('ignores the output even when it sits inside the input directory', async () => {
+    const hot = await setup({ input: '/p/src/images', output: '/p/src/images/optimized' })
+    await hot({ file: '/p/src/images/optimized/photo.webp' })
+    expect(vi.mocked(generate)).not.toHaveBeenCalled()
+    await hot({ file: '/p/src/images/photo.jpg' })
+    expect(vi.mocked(generate)).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not loop with incremental: false when generate writes the output and the watcher reports it', async () => {
+    const hot = await setup({ incremental: false })
+    vi.mocked(generate).mockImplementation(async () => {
+      await hot({ file: '/p/public/images/photo-400.webp' })
+      await hot({ file: '/p/public/images/logo.svg' })
+    })
+    await hot({ file: '/p/src/images/photo.jpg' })
+    expect(vi.mocked(generate)).toHaveBeenCalledTimes(1)
+  })
+
+  it('never runs generate twice at the same time', async () => {
+    const hot = await setup()
+    let active = 0
+    let maxActive = 0
+    vi.mocked(generate).mockImplementation(async () => {
+      active++
+      maxActive = Math.max(maxActive, active)
+      await new Promise((r) => setTimeout(r, 15))
+      active--
+    })
+    await Promise.all([
+      hot({ file: '/p/src/images/a.jpg' }),
+      hot({ file: '/p/src/images/b.jpg' }),
+      hot({ file: '/p/src/images/c.jpg' }),
+    ])
+    expect(maxActive).toBe(1)
+    expect(vi.mocked(generate).mock.calls.length).toBeLessThanOrEqual(2)
+  })
+})
+
+describe('placeholders watching ignores generated output', () => {
+  it('does not reload for an image written outside the watched placeholder directories', () => {
+    const handlers: Record<string, (file: string) => void> = {}
+    const server = {
+      config: { root: '/project' },
+      middlewares: { use: vi.fn() },
+      watcher: { on: vi.fn((event: string, h: (file: string) => void) => (handlers[event] = h)) },
+      moduleGraph: { getModuleById: vi.fn(() => ({})), invalidateModule: vi.fn() },
+      ws: { send: vi.fn() },
+    }
+    const plugin = vueImageKit({ generate: false, placeholders: { dirs: ['src/images'] } })
+    ;(plugin.configureServer as (s: unknown) => void)(server)
+    handlers['add']!('/project/public/images/photo-400.webp')
+    handlers['change']!('/project/public/images/logo.svg')
+    expect(server.ws.send).not.toHaveBeenCalled()
+    handlers['change']!('/project/src/images/cat.jpg')
+    expect(server.ws.send).toHaveBeenCalledTimes(1)
+  })
+})
