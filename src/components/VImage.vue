@@ -355,6 +355,10 @@ const hydratingAttrs = computed(() =>
     : imgAttrs.value,
 )
 
+function deferredImgBindings() {
+  return mergeProps({ ...hydratingAttrs.value }, attrs)
+}
+
 function escapeAttr(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -516,7 +520,7 @@ function handleError(e: Event): void {
 <template>
   <template v-if="isHydrating && defersSsrImage">
     <img
-      v-bind="mergeProps(hydratingAttrs, $attrs)"
+      v-bind="deferredImgBindings()"
       :alt="alt"
       :width="mergedWidth"
       :height="mergedHeight"
