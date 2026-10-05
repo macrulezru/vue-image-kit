@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, inject } from 'vue'
+import { ref, computed, onMounted, inject, mergeProps, normalizeClass, useAttrs } from 'vue'
 import { useImage } from '../composables/useImage'
 import { useBreakpoints } from '../composables/useBreakpoints'
 import { useActiveMediaSource } from '../composables/useActiveMediaSource'
@@ -76,6 +76,7 @@ const emit = defineEmits<{
   error: [e: Event]
 }>()
 
+const attrs = useAttrs()
 const isSSR = typeof window === 'undefined'
 const isHydrating = ref(true)
 
@@ -363,10 +364,12 @@ function escapeAttr(value: string): string {
 }
 
 const noscriptHtml = computed(() => {
-  const attrs = imgAttrs.value
-  const parts = [`src="${escapeAttr(attrs.src)}"`, `alt="${escapeAttr(props.alt)}"`]
-  if (attrs.srcset) parts.push(`srcset="${escapeAttr(attrs.srcset)}"`)
-  if (attrs.sizes) parts.push(`sizes="${escapeAttr(attrs.sizes)}"`)
+  const img = imgAttrs.value
+  const parts = [`src="${escapeAttr(img.src)}"`, `alt="${escapeAttr(props.alt)}"`]
+  if (img.srcset) parts.push(`srcset="${escapeAttr(img.srcset)}"`)
+  if (img.sizes) parts.push(`sizes="${escapeAttr(img.sizes)}"`)
+  const className = normalizeClass(attrs.class)
+  if (className) parts.push(`class="${escapeAttr(className)}"`)
   if (mergedWidth.value) parts.push(`width="${mergedWidth.value}"`)
   if (mergedHeight.value) parts.push(`height="${mergedHeight.value}"`)
   return `<img ${parts.join(' ')}>`
@@ -511,19 +514,31 @@ function handleError(e: Event): void {
 </script>
 
 <template>
-  <template v-if="isHydrating">
+  <template v-if="isHydrating && defersSsrImage">
     <img
-      v-bind="hydratingAttrs"
+      v-bind="mergeProps(hydratingAttrs, $attrs)"
       :alt="alt"
       :width="mergedWidth"
       :height="mergedHeight"
       :decoding="effectiveDecoding"
       :fetchpriority="effectiveFetchpriority"
-      :loading="effectiveLazy ? 'lazy' : 'eager'"
+      loading="lazy"
       :style="hydratingStyle"
     />
-    <noscript v-if="defersSsrImage" v-html="noscriptHtml" />
+    <noscript v-html="noscriptHtml" />
   </template>
+
+  <img
+    v-else-if="isHydrating"
+    v-bind="hydratingAttrs"
+    :alt="alt"
+    :width="mergedWidth"
+    :height="mergedHeight"
+    :decoding="effectiveDecoding"
+    :fetchpriority="effectiveFetchpriority"
+    :loading="effectiveLazy ? 'lazy' : 'eager'"
+    :style="hydratingStyle"
+  />
 
   <span
     v-else-if="isIdle"

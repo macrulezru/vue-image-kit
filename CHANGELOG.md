@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-10-05
+
+### Fixed
+
+- **`<VImage>` lost its root element on the server.** Since 1.6.0 the server-rendered image was wrapped in a `<template v-if>` next to a `<noscript>`, so the component rendered a fragment: `class`, `style` and other attributes given to `<VImage>` were not applied to the `<img>`, and Vue warned `Extraneous non-props attributes (class) were passed to component but could not be automatically inherited because component renders fragment or text or teleport root nodes`. A fragment is now only rendered for the one case that needs it — a lazy image with `ssrPlaceholder` and a ready preview — and there the attributes are passed to the `<img>` explicitly; every other server and client state is a single element again. The `class` is also put on the image inside the `<noscript>` fallback.
+
 ## [1.6.0] - 2026-10-03
 
 ### Added

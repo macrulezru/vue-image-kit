@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { createSSRApp } from 'vue'
+import { createSSRApp, nextTick } from 'vue'
+import { mount } from '@vue/test-utils'
 import { renderToString } from '@vue/server-renderer'
 import VImage from '../../src/components/VImage.vue'
 import { registerPlaceholder } from '../../src/utils/placeholder-registry'
@@ -126,5 +127,81 @@ describe('VImage ssrPlaceholder', () => {
     expect(await hydrationWarnings(await renderServerHtml(withProp), withProp)).toEqual([])
     const without = { ...base, placeholder: PREVIEW }
     expect(await hydrationWarnings(await renderServerHtml(without), without)).toEqual([])
+  })
+})
+
+describe('VImage fallthrough attributes', () => {
+  const base = { src: '/img.jpg', alt: 'Photo', width: 400, height: 300 }
+
+  async function warnings(fn: () => Promise<unknown>): Promise<string[]> {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      await fn()
+      return spy.mock.calls.flat().filter((arg): arg is string => typeof arg === 'string')
+    } finally {
+      spy.mockRestore()
+    }
+  }
+
+  async function renderWithAttrs(props: Record<string, unknown>, attrs: Record<string, unknown>) {
+    const app = createSSRApp(VImage, { ...props, ...attrs })
+    const originalWindow = globalThis.window
+    // @ts-expect-error simulating a real server environment (no window) for this render only
+    delete globalThis.window
+    try {
+      return await renderToString(app)
+    } finally {
+      globalThis.window = originalWindow
+    }
+  }
+
+  it('passes class and style to the server image and does not warn, with and without ssrPlaceholder', async () => {
+    for (const extra of [{}, { placeholder: PREVIEW, ssrPlaceholder: true }, { placeholder: PREVIEW, ssrPlaceholder: true, lazy: false }]) {
+      let html = ''
+      const messages = await warnings(async () => {
+        html = await renderWithAttrs({ ...base, ...extra }, { class: 'card-image', style: 'border-radius:8px', 'data-test': 'x' })
+      })
+      expect(messages.filter((m) => m.includes('Extraneous'))).toEqual([])
+      const img = html.match(/<img[^>]*>/)![0]
+      expect(img).toContain('class="card-image"')
+      expect(img).toContain('border-radius:8px')
+      expect(img).toContain('data-test="x"')
+    }
+  })
+
+  it('keeps a single root with class and listeners in every client state', async () => {
+    const messages = await warnings(async () => {
+      const wrapper = mount(VImage, { props: { ...base, lazy: false }, attrs: { class: 'card-image', 'data-test': 'x' } })
+      await nextTick()
+      expect(wrapper.classes()).toContain('card-image')
+      expect(wrapper.attributes('data-test')).toBe('x')
+      wrapper.unmount()
+    })
+    expect(messages.filter((m) => m.includes('Extraneous'))).toEqual([])
+  })
+
+  it('carries the class into the noscript fallback of a deferred image', async () => {
+    const html = await renderWithAttrs(
+      { ...base, placeholder: PREVIEW, ssrPlaceholder: true },
+      { class: ['a', { b: true, c: false }] },
+    )
+    expect(html).toMatch(/<noscript[^>]*><img [^>]*class="a b"/)
+  })
+
+  it('hydrates a deferred image with a class without a mismatch or a warning', async () => {
+    const props = { ...base, placeholder: PREVIEW, ssrPlaceholder: true, class: 'card-image' }
+    const html = await renderServerHtml(props)
+    const container = document.createElement('div')
+    container.innerHTML = html
+    document.body.appendChild(container)
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      createSSRApp(VImage, props).mount(container)
+      const messages = spy.mock.calls.flat().filter((arg): arg is string => typeof arg === 'string')
+      expect(messages.filter((m) => m.includes('Hydration') || m.includes('Extraneous'))).toEqual([])
+    } finally {
+      spy.mockRestore()
+      document.body.removeChild(container)
+    }
   })
 })
