@@ -76,6 +76,8 @@ const emit = defineEmits<{
   error: [e: Event]
 }>()
 
+defineOptions({ inheritAttrs: false })
+
 const attrs = useAttrs()
 const isSSR = typeof window === 'undefined'
 const isHydrating = ref(true)
@@ -355,8 +357,8 @@ const hydratingAttrs = computed(() =>
     : imgAttrs.value,
 )
 
-function deferredImgBindings() {
-  return mergeProps({ ...hydratingAttrs.value }, attrs)
+function withAttrs(base: object) {
+  return mergeProps({ ...base }, attrs)
 }
 
 function escapeAttr(value: string): string {
@@ -520,7 +522,7 @@ function handleError(e: Event): void {
 <template>
   <template v-if="isHydrating && defersSsrImage">
     <img
-      v-bind="deferredImgBindings()"
+      v-bind="withAttrs(hydratingAttrs)"
       :alt="alt"
       :width="mergedWidth"
       :height="mergedHeight"
@@ -534,7 +536,7 @@ function handleError(e: Event): void {
 
   <img
     v-else-if="isHydrating"
-    v-bind="hydratingAttrs"
+    v-bind="withAttrs(hydratingAttrs)"
     :alt="alt"
     :width="mergedWidth"
     :height="mergedHeight"
@@ -546,13 +548,14 @@ function handleError(e: Event): void {
 
   <span
     v-else-if="isIdle"
+    v-bind="$attrs"
     ref="observeTargetRef"
     :style="idleStyle"
     :class="{ 'vik-shimmer': showShimmerClass }"
     aria-hidden="true"
   />
 
-  <span v-else-if="isError" :class="errorClasses">
+  <span v-else-if="isError" v-bind="$attrs" :class="errorClasses">
     <slot name="error">
       <svg
         width="48"
@@ -570,7 +573,7 @@ function handleError(e: Event): void {
     </slot>
   </span>
 
-  <picture v-else-if="needsPicture" :class="loadedBoxClasses">
+  <picture v-else-if="needsPicture" class="vik-picture">
     <source
       v-for="s in mediaSources"
       :key="`${s.media}|${s.type ?? ''}`"
@@ -585,7 +588,7 @@ function handleError(e: Event): void {
     <source v-if="srcObject?.webp" :srcset="srcObject.webp" type="image/webp" />
 
     <img
-      v-bind="imgAttrs"
+      v-bind="withAttrs(imgAttrs)"
       :alt="alt"
       :width="mergedWidth"
       :height="mergedHeight"
@@ -600,7 +603,7 @@ function handleError(e: Event): void {
 
   <img
     v-else
-    v-bind="imgAttrs"
+    v-bind="withAttrs(imgAttrs)"
     :alt="alt"
     :width="mergedWidth"
     :height="mergedHeight"
@@ -621,6 +624,10 @@ function handleError(e: Event): void {
 .vik-box--responsive {
   width: 100%;
   height: auto;
+}
+
+.vik-picture {
+  display: contents;
 }
 
 .vik-box--fill {
