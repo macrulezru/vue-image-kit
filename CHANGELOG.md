@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2] - 2026-10-05
+
+### Fixed
+
+- **`class`, `style` and other attributes landed on the `<picture>`, not on the `<img>`.** With `sources` or a `src` object `<VImage>` renders a `<picture>`; the attributes given to the component went onto it, so `border-radius`, `object-fit` and similar rules from the user's own class had no visible effect, while the same class on a plain `<img>` worked. `inheritAttrs` is now `false` and the attributes are bound explicitly to the element that shows the image in every state: the server-rendered `<img>`, the idle placeholder, the error box and the real `<img>` (also inside `<picture>`). The `<picture>` is rendered with `display: contents` (`vik-picture`), so it takes no part in the layout. Listeners given to `<VImage>` (`@click`, …) are merged with the component's own `load`/`error` handlers on the `<img>`.
+- **Migration note:** a stylesheet or a test that reached the `<picture>` through a class or `data-*` attribute set on `<VImage>` has to target the `<img>` or a parent element now.
+
 ## [1.6.1] - 2026-10-05
 
 ### Fixed

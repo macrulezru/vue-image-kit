@@ -15,11 +15,11 @@ test.describe('art-direction sources — per-breakpoint width/height', () => {
 
     await page.getByTestId('sizes-demo-box').scrollIntoViewIfNeeded()
 
-    const source = page.locator(`[data-testid="sizes-demo-image"] source[media="${TABLET_MEDIA}"]`)
+    const source = page.locator(`[data-testid="sizes-demo-box"] source[media="${TABLET_MEDIA}"]`)
     await expect(source).toHaveAttribute('width', '1400')
     await expect(source).toHaveAttribute('height', '700')
 
-    const img = page.locator('[data-testid="sizes-demo-image"] img')
+    const img = page.locator('[data-testid="sizes-demo-box"] img')
     await expect(img).toHaveJSProperty('complete', true, { timeout: 10_000 })
 
     const box = await img.boundingBox()
