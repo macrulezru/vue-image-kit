@@ -85,7 +85,7 @@ describe('placeholders command', () => {
       await runPlaceholdersCommand(['--root', root, '--no-vite-config', '--force-write']),
     ).toBe(0)
     expect(readFileSync(join(root, 'src', 'App.vue'), 'utf8')).toMatch(
-      /<VImage src="\/a\.jpg" :width="40" :height="20" blurhash="[^"]+" \/>/,
+      /<VImage src="\/a\.jpg" :width="40" :height="20" hazehash="[^"]+" \/>/,
     )
     expect(logs.join('\n')).toContain('No placeholders manifest registration was found')
     expect(

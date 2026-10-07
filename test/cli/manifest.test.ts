@@ -35,6 +35,7 @@ const makeImage = (name: string): ProcessedImage => ({
   ],
   placeholder: 'data:image/jpeg;base64,/9j/abc',
   blurhash: 'LEHV6nWB2yk8pyo0',
+  hazehash: '',
   thumbhash: '',
 })
 
@@ -104,6 +105,7 @@ describe('generateManifestContent — mixed raster/SVG/GIF batch', () => {
     variants: [{ absPath: '/out/icon.svg', url: '/images/icon.svg', width: 64, height: 64, format: 'svg', sizeBytes: 1_200, skipped: false }],
     placeholder: '',
     blurhash: '',
+    hazehash: '',
     thumbhash: '',
   }
 
@@ -117,6 +119,7 @@ describe('generateManifestContent — mixed raster/SVG/GIF batch', () => {
     variants: [{ absPath: '/out/spinner.gif', url: '/images/spinner.gif', width: 100, height: 100, format: 'gif', sizeBytes: 40_000, skipped: false }],
     placeholder: '',
     blurhash: 'LEHV6nWB2yk8pyo0',
+    hazehash: '',
     thumbhash: '',
   }
 
@@ -132,6 +135,7 @@ describe('generateManifestContent — mixed raster/SVG/GIF batch', () => {
     ],
     placeholder: 'data:image/jpeg;base64,/9j/abc',
     blurhash: '',
+    hazehash: '',
     thumbhash: '',
   }
 

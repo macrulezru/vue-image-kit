@@ -23,7 +23,7 @@ export default defineConfig({
     outDir: 'dist/nuxt',
     emptyOutDir: true,
     rollupOptions: {
-      external: ['@nuxt/kit', '#app', '#imports', 'vue', '@macrulez/vue-image-kit', 'sharp', /^node:/],
+      external: ['@nuxt/kit', '#app', '#imports', 'vue', '@macrulez/vue-image-kit', 'sharp', 'hazehash', /^node:/],
       output: { exports: 'named' },
     },
     minify: false,

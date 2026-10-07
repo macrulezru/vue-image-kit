@@ -2,7 +2,7 @@ import type { Directive, DirectiveBinding } from 'vue'
 import type { LazyImgOptions } from '../types'
 import { observeShared } from '../utils/observer-pool'
 import { PLACEHOLDERS_KEY } from '../utils/placeholders'
-import { entryToImageUrl, lookupManifestEntry } from '../utils/manifest-placeholder'
+import { entryToImageUrlAsync, lookupManifestEntry } from '../utils/manifest-placeholder'
 import type { PlaceholderManifest } from '../types'
 
 interface LazyImgState {
@@ -37,13 +37,13 @@ function paintManifestPlaceholder(
   if (options.placeholder) return
   const entry = lookupManifestEntry(manifest, options.src)
   if (!entry) return
-  const url = entryToImageUrl(entry)
-  if (url) {
+  if (entry.color) el.style.backgroundColor = entry.color
+  void entryToImageUrlAsync(entry).then((url) => {
+    if (!url) return
     el.style.backgroundImage = `url(${url})`
     el.style.backgroundSize = 'cover'
     el.style.backgroundPosition = 'center'
-  }
-  if (entry.color) el.style.backgroundColor = entry.color
+  })
 }
 
 function applyImage(el: HTMLElement, options: LazyImgOptions): void {

@@ -42,7 +42,14 @@ const TRIGGER_RE =
   /VImage|v-image|useImage|useBackgroundImage|lazy-img|vLazyImg|PLACEHOLDERS_KEY|vueImageKit/
 const NUXT_CONFIG_RE = /^nuxt\.config\.(ts|js|mjs|mts)$/
 
-const PLACEHOLDER_PROPS = ['blurhash', 'thumbhash', 'placeholder', 'placeholderColor', 'image']
+const PLACEHOLDER_PROPS = [
+  'hazehash',
+  'blurhash',
+  'thumbhash',
+  'placeholder',
+  'placeholderColor',
+  'image',
+]
 
 const NODE_ELEMENT = 1
 const NODE_ATTRIBUTE = 6
@@ -212,7 +219,13 @@ function pushUsage(ctx: FileContext, usage: Omit<ImageUsage, 'file' | 'absFile'>
   ctx.usages.push({ file: ctx.relFile, absFile: ctx.absFile, ...usage })
 }
 
-const SOURCE_PLACEHOLDER_KEYS = ['blurhash', 'thumbhash', 'placeholder', 'placeholderColor']
+const SOURCE_PLACEHOLDER_KEYS = [
+  'hazehash',
+  'blurhash',
+  'thumbhash',
+  'placeholder',
+  'placeholderColor',
+]
 
 function jsQuote(attributeQuote: string): string {
   return attributeQuote === "'" ? '"' : "'"

@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import type { PlaceholderData } from './compute.js'
+import type { PlaceholderData, PlaceholderMode } from './compute.js'
 
 export interface CacheEntry {
   mtimeMs?: number
@@ -44,9 +44,10 @@ export function fileStamp(absPath: string): { mtimeMs: number; size: number } {
 
 export function hasModeData(
   data: PlaceholderData,
-  mode: 'blurhash' | 'thumbhash' | 'color',
+  mode: PlaceholderMode,
   colorOnly: boolean,
 ): boolean {
   if (colorOnly || mode === 'color') return data.color !== undefined
+  if (mode === 'hazehash') return data.hazehash !== undefined
   return mode === 'blurhash' ? data.blurhash !== undefined : data.thumbhash !== undefined
 }

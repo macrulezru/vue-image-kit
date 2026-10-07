@@ -16,6 +16,7 @@ export interface CliConfig {
   manifest: string | false
   publicPath: string
   lqip: boolean
+  hazehash: boolean
   blurhash: boolean
   thumbhash: boolean
   clean: boolean
@@ -35,6 +36,7 @@ export interface ManifestEntry {
   width: number
   height: number
   placeholder: string
+  hazehash: string
   blurhash: string
   thumbhash: string
   [key: string]: string | number
@@ -59,6 +61,7 @@ export interface ProcessedImage {
   originalSizeBytes: number
   variants: ProcessedVariant[]
   placeholder: string
+  hazehash: string
   blurhash: string
   thumbhash: string
 }
@@ -75,7 +78,7 @@ export interface ScanFileConfig {
 
 export interface PlaceholdersFileConfig extends ScanFileConfig {
   manifest?: string
-  mode?: 'blurhash' | 'thumbhash' | 'color'
+  mode?: 'hazehash' | 'blurhash' | 'thumbhash' | 'color'
   remote?: boolean
   replace?: boolean
   hosts?: string[]
@@ -89,5 +92,6 @@ export interface PlaceholdersFileConfig extends ScanFileConfig {
     components?: [number, number]
     sample?: number
     color?: 'dominant' | 'average'
+    budget?: number
   }
 }

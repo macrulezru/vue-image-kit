@@ -9,10 +9,11 @@ export type ProgramParser = (code: string) => AstNode | null
 
 const WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'ParenthesizedExpression'])
 
-const ENTRY_FIELDS = ['blurhash', 'thumbhash', 'color', 'width', 'height'] as const
+const ENTRY_FIELDS = ['hazehash', 'blurhash', 'thumbhash', 'color', 'width', 'height'] as const
 
 export function entryForMode(data: PlaceholderData, mode: PlaceholderMode): PlaceholderData {
   const entry: PlaceholderData = {}
+  if (mode === 'hazehash' && data.hazehash) entry.hazehash = data.hazehash
   if (mode === 'blurhash' && data.blurhash) entry.blurhash = data.blurhash
   if (mode === 'thumbhash' && data.thumbhash) entry.thumbhash = data.thumbhash
   if (data.color) entry.color = data.color

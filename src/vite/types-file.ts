@@ -9,6 +9,7 @@ export interface TypesFile {
 
 const BUILT_IN_QUERIES = new Set([
   'vik',
+  'hazehash',
   'thumbhash',
   'blurhash',
   'color',
@@ -16,6 +17,7 @@ const BUILT_IN_QUERIES = new Set([
   'preview',
   'aspect',
   'placeholder',
+  'placeholder=hazehash',
   'placeholder=blurhash',
   'placeholder=thumbhash',
   'placeholder=color',
@@ -38,6 +40,7 @@ const VIK_META = `{
   }`
 
 const PLACEHOLDER_LOOKUP = `{
+    hazehash?: string
     blurhash?: string
     thumbhash?: string
     placeholderColor?: string

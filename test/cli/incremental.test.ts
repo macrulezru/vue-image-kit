@@ -22,6 +22,7 @@ const fakeImage: ProcessedImage = {
   variants: [],
   placeholder: '',
   blurhash: '',
+  hazehash: '',
   thumbhash: '',
 }
 

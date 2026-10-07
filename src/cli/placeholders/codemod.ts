@@ -15,6 +15,7 @@ export interface InsertEdit {
 }
 
 export const REPLACEABLE_PROPS = [
+  'hazehash',
   'blurhash',
   'thumbhash',
   'placeholder',
@@ -35,11 +36,16 @@ export function placeholderAttributes(
   if (addSize && data.width && data.height) {
     attributes.push(`:width="${data.width}"`, `:height="${data.height}"`)
   }
-  if (mode === 'blurhash' && data.blurhash)
+  if (mode === 'hazehash' && data.hazehash)
+    attributes.push(`hazehash="${escapeAttribute(data.hazehash)}"`)
+  else if (mode === 'blurhash' && data.blurhash)
     attributes.push(`blurhash="${escapeAttribute(data.blurhash)}"`)
   else if (mode === 'thumbhash' && data.thumbhash)
     attributes.push(`thumbhash="${escapeAttribute(data.thumbhash)}"`)
-  else if (data.color && (mode === 'color' || (!data.blurhash && !data.thumbhash))) {
+  else if (
+    data.color &&
+    (mode === 'color' || (!data.hazehash && !data.blurhash && !data.thumbhash))
+  ) {
     attributes.push(`placeholder-color="${escapeAttribute(data.color)}"`)
   }
   return attributes
@@ -71,11 +77,16 @@ export function sourceProperties(
   if (addSize && data.width && data.height) {
     properties.push(`width: ${data.width}`, `height: ${data.height}`)
   }
-  if (mode === 'blurhash' && data.blurhash) {
+  if (mode === 'hazehash' && data.hazehash) {
+    properties.push(`hazehash: ${quoteJs(data.hazehash, quote)}`)
+  } else if (mode === 'blurhash' && data.blurhash) {
     properties.push(`blurhash: ${quoteJs(data.blurhash, quote)}`)
   } else if (mode === 'thumbhash' && data.thumbhash) {
     properties.push(`thumbhash: ${quoteJs(data.thumbhash, quote)}`)
-  } else if (data.color && (mode === 'color' || (!data.blurhash && !data.thumbhash))) {
+  } else if (
+    data.color &&
+    (mode === 'color' || (!data.hazehash && !data.blurhash && !data.thumbhash))
+  ) {
     properties.push(`placeholderColor: ${quoteJs(data.color, quote)}`)
   }
   return properties

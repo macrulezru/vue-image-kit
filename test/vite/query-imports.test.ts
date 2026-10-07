@@ -66,6 +66,7 @@ describe('parseImageRequest — field lists', () => {
 
   it('expands all and accepts spaces as separators', () => {
     expect(parseImageRequest('./a.png?placeholder=all')?.fields).toEqual([
+      'hazehash',
       'blurhash',
       'thumbhash',
       'color',
@@ -153,7 +154,15 @@ describe('placeholder lists through the plugin', () => {
     const { root, image } = await project()
     const { run } = loader(root)
     const raw = await run(`${image}?placeholder=all&shape=raw`)
-    expect(Object.keys(raw)).toEqual(['blurhash', 'thumbhash', 'color', 'preview', 'size', 'aspect'])
+    expect(Object.keys(raw)).toEqual([
+      'hazehash',
+      'blurhash',
+      'thumbhash',
+      'color',
+      'preview',
+      'size',
+      'aspect',
+    ])
     expect(raw.size).toEqual({ width: 200, height: 100 })
     expect(raw.aspect).toBe(2)
   })
@@ -171,6 +180,18 @@ describe('placeholder lists through the plugin', () => {
     const { root, image } = await project()
     const { run } = loader(root)
     expect(Object.keys(await run(`${image}?placeholder`))).toEqual([
+      'hazehash',
+      'placeholderColor',
+      'width',
+      'height',
+    ])
+    expect(Object.keys(await run(`${image}?placeholder=hazehash`))).toEqual([
+      'hazehash',
+      'placeholderColor',
+      'width',
+      'height',
+    ])
+    expect(Object.keys(await run(`${image}?placeholder=blurhash`))).toEqual([
       'blurhash',
       'placeholderColor',
       'width',

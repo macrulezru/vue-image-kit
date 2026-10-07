@@ -3,8 +3,8 @@ const path = require('node:path')
 const zlib = require('node:zlib')
 
 const LIMITS_KB = {
-  'dist/vue-image-kit.js': 16,
-  'dist/vue-image-kit.cjs': 14,
+  'dist/vue-image-kit.js': 17,
+  'dist/vue-image-kit.cjs': 15,
   'dist/cdn/index.js': 4,
 }
 

@@ -28,12 +28,25 @@ async function makeProject(): Promise<{
 }
 
 describe('placeholder service — single files', () => {
-  it('returns blurhash, color and size by default, writing nothing next to the image', async () => {
+  it('returns hazehash, color and size by default, writing nothing next to the image', async () => {
     const { root, image } = await makeProject()
     const file = await image('a.png', 300, 200)
     const service = createPlaceholderService(root, undefined)
     const props = await service.file(file)
+    expect(props.hazehash).toMatch(/^[A-Za-z0-9_-]+$/)
+    expect(props.blurhash).toBeUndefined()
+    expect(props.thumbhash).toBeUndefined()
+    expect(props.placeholderColor).toBe('#c82828')
+    expect(props).toMatchObject({ width: 300, height: 200 })
+  })
+
+  it('returns blurhash, color and size with mode blurhash', async () => {
+    const { root, image } = await makeProject()
+    const file = await image('a.png', 300, 200)
+    const service = createPlaceholderService(root, undefined, { mode: 'blurhash' })
+    const props = await service.file(file)
     expect(props.blurhash).toMatch(/^[0-9A-Za-z#$%*+,\-.:;=?@[\]^_{|}~]+$/)
+    expect(props.hazehash).toBeUndefined()
     expect(props.thumbhash).toBeUndefined()
     expect(props.placeholderColor).toBe('#c82828')
     expect(props).toMatchObject({ width: 300, height: 200 })
@@ -65,8 +78,9 @@ describe('placeholder service — single files', () => {
   it('honours tuning: components change the hash, the color strategy is accepted', async () => {
     const { root, image } = await makeProject()
     const file = await image('a.png', 120, 80)
-    const base = await createPlaceholderService(root, undefined).file(file)
+    const base = await createPlaceholderService(root, undefined, { mode: 'blurhash' }).file(file)
     const wide = await createPlaceholderService(root, undefined, {
+      mode: 'blurhash',
       tuning: { components: [6, 4] },
     }).file(file)
     expect(wide.blurhash!.length).toBeGreaterThan(base.blurhash!.length)
@@ -99,7 +113,7 @@ describe('placeholder service — folder manifest', () => {
     const { entries, warnings } = await service.manifest()
     expect(Object.keys(entries).sort()).toEqual(['/images/a.png', '/images/deep/b.png'])
     expect(entries['/images/a.png']).toMatchObject({ width: 40, height: 30 })
-    expect(entries['/images/a.png']!.blurhash).toBeTruthy()
+    expect(entries['/images/a.png']!.hazehash).toBeTruthy()
     expect(warnings).toEqual([])
   })
 

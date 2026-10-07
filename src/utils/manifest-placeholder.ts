@@ -2,6 +2,7 @@ import type { PlaceholderEntry, PlaceholderManifest } from '../types'
 import { decodeBlurhash } from './blurhash-decode'
 import { decodeThumbHash } from './thumbhash-decode'
 import { lookupRegisteredPlaceholder } from './placeholder-registry'
+import { hazehashToDataUrl } from './hazehash-decode'
 
 export function lookupManifestEntry(
   manifest: PlaceholderManifest | null | undefined,
@@ -27,6 +28,16 @@ function blurhashToDataUrl(hash: string, width?: number, height?: number): strin
   } catch {
     return undefined
   }
+}
+
+export async function entryToImageUrlAsync(
+  entry: PlaceholderEntry | undefined,
+): Promise<string | undefined> {
+  if (entry?.hazehash) {
+    const url = await hazehashToDataUrl(entry.hazehash)
+    if (url) return url
+  }
+  return entryToImageUrl(entry)
 }
 
 export function entryToImageUrl(entry: PlaceholderEntry | undefined): string | undefined {

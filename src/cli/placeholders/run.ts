@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import type { ImageSource, ImageUsage, ScanResult, SourceEntry } from '../scan/types.js'
 import { toPosix } from '../scan/files.js'
-import type { RgbaToThumbHash, SharpFactory } from '../deps.js'
+import type { HazehashEncode, RgbaToThumbHash, SharpFactory } from '../deps.js'
 import type { CdnModule } from '../cdn-bridge.js'
 import type { PlaceholderData, PlaceholderMode, PlaceholderTuning } from './compute.js'
 import { computeJob, isSvg, type SourceJob } from './job.js'
@@ -50,6 +50,7 @@ export interface PlaceholdersOptions {
 export interface PlaceholdersDeps {
   sharp: SharpFactory
   rgbaToThumbHash?: RgbaToThumbHash
+  encodeHazehash?: HazehashEncode
   cdn: CdnModule | null
   cache: PlaceholderCache
   parseProgram?: ProgramParser
@@ -360,7 +361,13 @@ export async function runPlaceholders(
           timeout: options.timeout,
           maxBytes: options.maxBytes,
         },
-        { sharp: deps.sharp, rgbaToThumbHash: deps.rgbaToThumbHash, cdn: deps.cdn, cache: deps.cache },
+        {
+          sharp: deps.sharp,
+          rgbaToThumbHash: deps.rgbaToThumbHash,
+          encodeHazehash: deps.encodeHazehash,
+          cdn: deps.cdn,
+          cache: deps.cache,
+        },
       )
       if (job.remote) report.computed.remote++
       else report.computed.local++
@@ -464,7 +471,13 @@ export async function runPlaceholders(
         maxBytes: options.maxBytes,
         refreshRemote: options.refreshRemote,
       },
-      { sharp: deps.sharp, rgbaToThumbHash: deps.rgbaToThumbHash, cdn: deps.cdn, cache: deps.cache },
+      {
+          sharp: deps.sharp,
+          rgbaToThumbHash: deps.rgbaToThumbHash,
+          encodeHazehash: deps.encodeHazehash,
+          cdn: deps.cdn,
+          cache: deps.cache,
+        },
     )
     Object.assign(manifestEntries, folders.entries)
     report.folderEntries = Object.keys(folders.entries).length

@@ -20,6 +20,8 @@ Options:
   --public-path <str>  URL prefix for manifest paths (default: /images)
   --lqip               Generate base64 LQIP placeholder (default: true)
   --no-lqip            Disable LQIP generation
+  --hazehash           Generate HazeHash string (default: true when the hazehash package is installed)
+  --no-hazehash        Disable HazeHash generation
   --blurhash           Generate BlurHash string (default: true)
   --no-blurhash        Disable BlurHash generation
   --thumbhash          Generate ThumbHash string (default: false)
@@ -54,6 +56,8 @@ function parseCliArgs(argv: string[]): Partial<CliConfig> | null {
       'public-path': { type: 'string' },
       lqip: { type: 'boolean', default: true },
       'no-lqip': { type: 'boolean', default: false },
+      hazehash: { type: 'boolean' },
+      'no-hazehash': { type: 'boolean', default: false },
       blurhash: { type: 'boolean', default: true },
       'no-blurhash': { type: 'boolean', default: false },
       thumbhash: { type: 'boolean', default: false },
@@ -88,6 +92,9 @@ function parseCliArgs(argv: string[]): Partial<CliConfig> | null {
 
   if (values['no-lqip']) result.lqip = false
   else if (values.lqip != null) result.lqip = values.lqip
+
+  if (values['no-hazehash']) result.hazehash = false
+  else if (values.hazehash != null) result.hazehash = values.hazehash
 
   if (values['no-blurhash']) result.blurhash = false
   else if (values.blurhash != null) result.blurhash = values.blurhash

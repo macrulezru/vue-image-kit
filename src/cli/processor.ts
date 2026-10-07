@@ -21,7 +21,7 @@ import {
   buildIncrementalEntry,
 } from './incremental.js'
 import type { IncrementalState } from './incremental.js'
-import { loadSharp, loadThumbhash } from './deps.js'
+import { loadHazehash, loadSharp, loadThumbhash } from './deps.js'
 import { readSvgSize } from './placeholders/svg.js'
 import type { RgbaToThumbHash } from './deps.js'
 
@@ -44,6 +44,17 @@ async function getSharp() {
 
 async function getRgbaToThumbHash(): Promise<RgbaToThumbHash> {
   return loadThumbhash('generate')
+}
+
+async function hazehashFromImage(image: SharpImage): Promise<string> {
+  const encodeHazehash = await loadHazehash('generate')
+  const { data, info } = await image
+    .clone()
+    .resize(100, 100, { fit: 'inside', withoutEnlargement: true })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
+  return encodeHazehash({ data, width: info.width, height: info.height })
 }
 
 async function thumbhashFromImage(image: SharpImage): Promise<string> {
@@ -140,6 +151,7 @@ async function processSvg(
     originalSizeBytes: sizeBytes,
     variants: [{ absPath: outPath, url, width, height, format: 'svg', sizeBytes, skipped }],
     placeholder: '',
+    hazehash: '',
     blurhash: '',
     thumbhash: '',
   }
@@ -296,6 +308,11 @@ async function processOne(
     placeholder = `data:image/jpeg;base64,${lqipBuf.toString('base64')}`
   }
 
+  let hazehashStr = ''
+  if (config.hazehash && !config.dryRun) {
+    hazehashStr = await hazehashFromImage(image)
+  }
+
   let blurhashStr = ''
   if (config.blurhash && !config.dryRun) {
     const thumbSize = 64
@@ -329,7 +346,7 @@ async function processOne(
 
   return {
     name, srcAbsPath: srcPath, originalWidth, originalHeight, originalFormat, originalSizeBytes,
-    variants, placeholder, blurhash: blurhashStr, thumbhash: thumbhashStr,
+    variants, placeholder, hazehash: hazehashStr, blurhash: blurhashStr, thumbhash: thumbhashStr,
   }
 }
 

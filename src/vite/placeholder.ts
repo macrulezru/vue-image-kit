@@ -1,10 +1,10 @@
 import { isAbsolute, join, resolve } from 'node:path'
-import { loadSharp, loadThumbhash } from '../cli/deps.js'
-import type { RgbaToThumbHash, SharpFactory } from '../cli/deps.js'
+import { loadHazehash, loadSharp, loadThumbhash } from '../cli/deps.js'
+import type { HazehashEncode, RgbaToThumbHash, SharpFactory } from '../cli/deps.js'
 import { loadCdnModule } from '../cli/cdn-bridge.js'
 import { fileStamp, hasModeData, loadCache, saveCache } from '../cli/placeholders/cache.js'
 import type { PlaceholderCache } from '../cli/placeholders/cache.js'
-import { resolveTuning, tuningKey } from '../cli/placeholders/compute.js'
+import { defaultPlaceholderMode, resolveTuning, tuningKey } from '../cli/placeholders/compute.js'
 import type { PlaceholderData, PlaceholderMode, PlaceholderTuning } from '../cli/placeholders/compute.js'
 import { buildFolderManifest, listFolderImages } from '../cli/placeholders/folders.js'
 import type { FolderInput } from '../cli/placeholders/folders.js'
@@ -13,9 +13,17 @@ import { entryForMode } from '../cli/placeholders/manifest.js'
 import { thumbHashToRGBA } from '../utils/thumbhash-decode.js'
 import type { ManifestEntries } from '../cli/placeholders/manifest.js'
 
-export type PlaceholderField = 'blurhash' | 'thumbhash' | 'color' | 'size' | 'preview' | 'aspect'
+export type PlaceholderField =
+  | 'hazehash'
+  | 'blurhash'
+  | 'thumbhash'
+  | 'color'
+  | 'size'
+  | 'preview'
+  | 'aspect'
 
 export const PLACEHOLDER_FIELDS: readonly PlaceholderField[] = [
+  'hazehash',
   'blurhash',
   'thumbhash',
   'color',
@@ -32,6 +40,7 @@ export interface FieldSpec {
 }
 
 export interface FieldResult {
+  hazehash?: string
   blurhash?: string
   thumbhash?: string
   color?: string
@@ -42,6 +51,7 @@ export interface FieldResult {
 }
 
 export interface PlaceholderProps {
+  hazehash?: string
   blurhash?: string
   thumbhash?: string
   placeholderColor?: string
@@ -80,6 +90,7 @@ export interface PlaceholderService {
 
 export function toProps(data: PlaceholderData): PlaceholderProps {
   const props: PlaceholderProps = {}
+  if (data.hazehash) props.hazehash = data.hazehash
   if (data.blurhash) props.blurhash = data.blurhash
   if (data.thumbhash) props.thumbhash = data.thumbhash
   if (data.color) props.placeholderColor = data.color
@@ -123,7 +134,7 @@ export function createPlaceholderService(
   options: PlaceholdersPluginOptions = {},
 ): PlaceholderService {
   const root = options.root ? resolve(options.root) : viteRoot
-  const mode: PlaceholderMode = options.mode ?? 'blurhash'
+  const mode: PlaceholderMode = options.mode ?? defaultPlaceholderMode()
   const publicDir = options.publicDir
     ? isAbsolute(options.publicDir)
       ? options.publicDir
@@ -137,6 +148,7 @@ export function createPlaceholderService(
   let cache: PlaceholderCache | null = null
   let sharp: SharpFactory | null = null
   let rgbaToThumbHash: RgbaToThumbHash | undefined
+  let encodeHazehash: HazehashEncode | undefined
   let dirty = false
   let timer: ReturnType<typeof setTimeout> | null = null
 
@@ -167,7 +179,8 @@ export function createPlaceholderService(
   async function deps(wanted: PlaceholderMode) {
     sharp ??= await loadSharp('vite plugin')
     if (wanted === 'thumbhash') rgbaToThumbHash ??= await loadThumbhash('vite plugin')
-    return { sharp, rgbaToThumbHash, cdn: await loadCdnModule(), cache: getCache() }
+    if (wanted === 'hazehash') encodeHazehash ??= await loadHazehash('vite plugin')
+    return { sharp, rgbaToThumbHash, encodeHazehash, cdn: await loadCdnModule(), cache: getCache() }
   }
 
   async function renderPreview(thumbhash: string): Promise<string> {
@@ -190,6 +203,7 @@ export function createPlaceholderService(
     jobCache: PlaceholderCache,
   ): Promise<PlaceholderData> {
     const modes: PlaceholderMode[] = []
+    if (!vector && needed.has('hazehash')) modes.push('hazehash')
     if (!vector && needed.has('blurhash')) modes.push('blurhash')
     if (!vector && (needed.has('thumbhash') || needed.has('preview'))) modes.push('thumbhash')
     if (modes.length === 0) modes.push('color')

@@ -54,7 +54,7 @@ describe('vite build integration', () => {
     expect(code).toContain('"/images/a.png"')
     expect(code).toContain('"/assets/one.png"')
     expect(code).toContain('"/assets/two.png"')
-    expect(code).toMatch(/"blurhash":\s*"[^"]+"/)
+    expect(code).toMatch(/"hazehash":\s*"[^"]+"/)
     expect(code).toMatch(/"width":\s*80/)
   })
 
@@ -67,7 +67,7 @@ describe('vite build integration', () => {
     )
     expect(code).toContain('one.png')
     expect(code).toContain('two.png')
-    expect(code).toMatch(/blurhash/)
+    expect(code).toMatch(/hazehash/)
     expect(code).toContain('"placeholderColor"')
   })
 
