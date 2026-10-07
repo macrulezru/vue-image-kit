@@ -1,6 +1,7 @@
 import type { PlaceholderEntry } from '../types'
 
 export interface RegisteredPlaceholder {
+  hazehash?: string
   blurhash?: string
   thumbhash?: string
   color?: string
@@ -20,6 +21,7 @@ function store(): Map<string, RegisteredPlaceholder> {
 
 function toEntry(data: RegisteredPlaceholder): PlaceholderEntry | undefined {
   const entry: PlaceholderEntry = {}
+  if (data.hazehash) entry.hazehash = data.hazehash
   if (data.blurhash) entry.blurhash = data.blurhash
   if (data.thumbhash) entry.thumbhash = data.thumbhash
   const color = data.color ?? data.placeholderColor

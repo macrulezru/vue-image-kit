@@ -1,10 +1,15 @@
 import { encodeBlurhash } from '../blurhash-encode.js'
-import type { RgbaToThumbHash, SharpFactory } from '../deps.js'
+import { hazehashAvailable, type HazehashEncode, type RgbaToThumbHash, type SharpFactory } from '../deps.js'
 import { readSvgSize, svgDensity } from './svg.js'
 
-export type PlaceholderMode = 'blurhash' | 'thumbhash' | 'color'
+export type PlaceholderMode = 'hazehash' | 'blurhash' | 'thumbhash' | 'color'
+
+export function defaultPlaceholderMode(): PlaceholderMode {
+  return hazehashAvailable() ? 'hazehash' : 'blurhash'
+}
 
 export interface PlaceholderData {
+  hazehash?: string
   blurhash?: string
   thumbhash?: string
   color?: string
@@ -19,15 +24,22 @@ export interface PlaceholderTuning {
   components?: [number, number]
   sample?: number
   color?: ColorStrategy
+  budget?: number
 }
 
 export interface ResolvedTuning {
   components: [number, number]
   sample: number
   color: ColorStrategy
+  budget: number
 }
 
-export const DEFAULT_TUNING: ResolvedTuning = { components: [4, 3], sample: 100, color: 'dominant' }
+export const DEFAULT_TUNING: ResolvedTuning = {
+  components: [4, 3],
+  sample: 100,
+  color: 'dominant',
+  budget: 28,
+}
 
 function clampInt(value: number | undefined, min: number, max: number, fallback: number): number {
   if (value === undefined || !Number.isFinite(value)) return fallback
@@ -42,12 +54,13 @@ export function resolveTuning(tuning: PlaceholderTuning = {}): ResolvedTuning {
     ],
     sample: clampInt(tuning.sample, 8, 256, DEFAULT_TUNING.sample),
     color: tuning.color === 'average' ? 'average' : 'dominant',
+    budget: clampInt(tuning.budget, 7, 48, DEFAULT_TUNING.budget),
   }
 }
 
 export function tuningKey(tuning: PlaceholderTuning = {}): string {
   const resolved = resolveTuning(tuning)
-  return `${resolved.components.join('x')}|${resolved.sample}|${resolved.color}`
+  return `${resolved.components.join('x')}|${resolved.sample}|${resolved.color}|${resolved.budget}`
 }
 
 export interface ComputeOptions {
@@ -55,6 +68,7 @@ export interface ComputeOptions {
   tuning?: PlaceholderTuning
   sharp: SharpFactory
   rgbaToThumbHash?: RgbaToThumbHash
+  encodeHazehash?: HazehashEncode
   includeSize: boolean
   colorOnly: boolean
 }
@@ -151,7 +165,12 @@ export async function computePlaceholder(
   if (color) data.color = color
   if (options.colorOnly) return data
 
-  if (options.mode === 'blurhash') {
+  if (options.mode === 'hazehash' && options.encodeHazehash) {
+    data.hazehash = options.encodeHazehash(
+      { data: rgba, width: info.width, height: info.height },
+      { budget: tuning.budget },
+    )
+  } else if (options.mode === 'blurhash') {
     data.blurhash = encodeBlurhash(
       rgbaToRgbOverWhite(rgba),
       info.width,

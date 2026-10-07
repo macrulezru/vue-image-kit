@@ -18,6 +18,7 @@ export function buildEntry(image: ProcessedImage, widths: number[]): ManifestEnt
       width: image.originalWidth,
       height: image.originalHeight,
       placeholder: '',
+      hazehash: '',
       blurhash: '',
       thumbhash: '',
     }
@@ -35,6 +36,7 @@ export function buildEntry(image: ProcessedImage, widths: number[]): ManifestEnt
       width: image.originalWidth,
       height: image.originalHeight,
       placeholder: image.placeholder,
+      hazehash: image.hazehash,
       blurhash: image.blurhash,
       thumbhash: image.thumbhash,
     }
@@ -59,6 +61,7 @@ export function buildEntry(image: ProcessedImage, widths: number[]): ManifestEnt
     width: image.originalWidth,
     height: image.originalHeight,
     placeholder: image.placeholder,
+    hazehash: image.hazehash,
     blurhash: image.blurhash,
     thumbhash: image.thumbhash,
   }
@@ -92,6 +95,7 @@ function buildInterface(widths: number[]): string {
     '  width: number',
     '  height: number',
     '  placeholder: string',
+    '  hazehash: string',
     '  blurhash: string',
     '  thumbhash: string',
     '}',

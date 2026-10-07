@@ -158,7 +158,7 @@ describe('imports through the plugin', () => {
   })
 
   it('matches a preview list against the real path of an aliased import', async () => {
-    const run = transformer({ placeholders: { imports: { preview: ['src/assets/hero/'] } } })
+    const run = transformer({ placeholders: { mode: 'blurhash', imports: { preview: ['src/assets/hero/'] } } })
     const context = {
       resolve: async (source: string) => ({ id: source.replace('@/', '/p/src/') }),
     }
@@ -169,7 +169,10 @@ describe('imports through the plugin', () => {
   })
 
   it('matches a dev-server URL that is already analyzed, after cutting the base', async () => {
-    const plugin = vueImageKit({ generate: false, placeholders: { imports: { preview: ['src/assets/hero/'] } } })
+    const plugin = vueImageKit({
+      generate: false,
+      placeholders: { mode: 'blurhash', imports: { preview: ['src/assets/hero/'] } },
+    })
     const configure = plugin.configResolved as unknown as (config: unknown) => void
     configure({ command: 'serve', root: '/p', base: '/_nuxt/', publicDir: false })
     const hook = plugin.transform as unknown as Transform
@@ -263,7 +266,7 @@ describe('vite build with imports on', () => {
     const mod = await bundleAndRun(
       root,
       "import a from './a.png'\nimport { lookupRegisteredPlaceholder } from '@macrulez/vue-image-kit'\nexport const url = a\nexport const entry = () => lookupRegisteredPlaceholder(a)\n",
-      { placeholders: { imports: true } },
+      { placeholders: { imports: true, mode: 'blurhash' } },
     )
     expect(typeof mod.url).toBe('string')
     expect(mod.url).toMatch(/\.png$|data:/)
@@ -278,7 +281,7 @@ describe('vite build with imports on', () => {
     const mod = await bundleAndRun(
       root,
       "import a from './a.png'\nimport { lookupRegisteredPlaceholder } from '@macrulez/vue-image-kit'\nexport const atLoad = lookupRegisteredPlaceholder(a)\n",
-      { placeholders: { imports: true } },
+      { placeholders: { imports: true, mode: 'blurhash' } },
     )
     expect(mod.atLoad.blurhash).toMatch(/^L/)
   })
@@ -298,7 +301,7 @@ describe('vite build with imports on', () => {
     const mod = await bundleAndRun(
       root,
       "import a from './a.png'\nimport broken from './broken.png'\nimport { lookupRegisteredPlaceholder } from '@macrulez/vue-image-kit'\nexport const good = lookupRegisteredPlaceholder(a)\nexport const bad = lookupRegisteredPlaceholder(broken)\n",
-      { placeholders: { imports: true } },
+      { placeholders: { imports: true, mode: 'blurhash' } },
     )
     expect(mod.good.blurhash).toMatch(/^L/)
     expect(mod.bad).toBeUndefined()

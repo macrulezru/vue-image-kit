@@ -1,4 +1,4 @@
-import type { RgbaToThumbHash, SharpFactory } from '../deps.js'
+import type { HazehashEncode, RgbaToThumbHash, SharpFactory } from '../deps.js'
 import type { CdnModule } from '../cdn-bridge.js'
 import {
   computePlaceholder,
@@ -29,6 +29,7 @@ export interface JobSettings {
 export interface JobDeps {
   sharp: SharpFactory
   rgbaToThumbHash?: RgbaToThumbHash | undefined
+  encodeHazehash?: HazehashEncode | undefined
   cdn: CdnModule | null
   cache: PlaceholderCache
 }
@@ -46,6 +47,7 @@ export async function computeJob(
     mode: settings.mode,
     sharp: deps.sharp,
     ...(deps.rgbaToThumbHash ? { rgbaToThumbHash: deps.rgbaToThumbHash } : {}),
+    ...(deps.encodeHazehash ? { encodeHazehash: deps.encodeHazehash } : {}),
     ...(settings.tuning ? { tuning: settings.tuning } : {}),
     colorOnly: job.colorOnly,
   }

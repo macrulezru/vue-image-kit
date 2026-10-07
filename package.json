@@ -1,6 +1,6 @@
 {
   "name": "@macrulez/vue-image-kit",
-  "version": "1.6.2",
+  "version": "1.7.0",
   "description": "Vue 3 image optimization — lazy loading, WebP/AVIF, srcset, Blurhash/LQIP placeholders, CDN adapters and a CLI, with zero runtime dependencies.",
   "author": "macrulez <macrulezru@gmail.com> (https://macrulez.ru/en)",
   "license": "MIT",
@@ -105,11 +105,15 @@
     "typescript"
   ],
   "peerDependencies": {
+    "hazehash": ">=0.1.1",
     "sharp": ">=0.33.0",
     "thumbhash": ">=0.1.0",
     "vue": "^3.0.0"
   },
   "peerDependenciesMeta": {
+    "hazehash": {
+      "optional": true
+    },
     "sharp": {
       "optional": true
     },
@@ -130,6 +134,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-vue": "^10.9.1",
     "globals": "^17.6.0",
+    "hazehash": "^0.1.1",
     "jsdom": "^24.0.0",
     "postcss-html": "^1.8.1",
     "prettier": "^3.8.3",

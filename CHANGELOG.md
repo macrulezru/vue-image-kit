@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-10-07
+
+### Added
+
+- **HazeHash placeholders — the preferred ones.** New `hazehash` prop on `<VImage>`, and `hazehash` in `SourcePlaceholder`, `ImageMeta` and manifest entries: a 7–48 byte string (28 by default) from the optional peer `hazehash` that decodes to a blurred preview with the right aspect ratio and alpha channel. When several placeholders are given, `hazehash` wins over `blurhash`, `thumbhash` and `placeholder`; `v-lazy-img` and `useBackgroundImage()` use it too. The package is loaded on demand; without it one warning is logged and the next placeholder is used.
+- **Build tools.** `mode: 'hazehash'` for the Vite plugin, the Nuxt option, `placeholders --mode hazehash` and `generate --hazehash`; `?hazehash` and `?placeholder=hazehash` imports, `hazehash` among the fields of `?placeholder=…` and `all`; the hash is written by `placeholders --replace` and read by `scan`.
+- **`tuning.budget`** (`--budget`, `&budget=` in an import) — the size of a HazeHash string in bytes, 7–48, default 28.
+
+### Changed
+
+- **The default placeholder mode is `hazehash` when the `hazehash` package is installed**, otherwise `blurhash` as before. **Migration note:** set `mode: 'blurhash'` (or `--mode blurhash`) to keep BlurHash, and install `hazehash` in the app (`npm install hazehash`) because the browser decodes the hashes.
+- `hazehash` is an optional peer dependency (`>=0.1.1`).
+
 ## [1.6.2] - 2026-10-05
 
 ### Fixed

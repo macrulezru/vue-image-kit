@@ -7,6 +7,7 @@ export interface SrcSet {
 }
 
 export interface SourcePlaceholder {
+  hazehash?: string
   blurhash?: string
   thumbhash?: string
   placeholder?: string
@@ -28,6 +29,7 @@ export type ResponsiveSrc = Record<string, ResponsiveSrcEntry>
 export type BreakpointMap = Record<string, string>
 
 export interface PlaceholderEntry {
+  hazehash?: string
   blurhash?: string
   thumbhash?: string
   color?: string
@@ -73,6 +75,7 @@ export interface ImageMeta {
   width?: number
   height?: number
   placeholder?: string
+  hazehash?: string
   blurhash?: string
   thumbhash?: string
   sizes?: string

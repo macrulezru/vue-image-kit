@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, inject, mergeProps, normalizeClass, useAttrs } from 'vue'
+import { ref, computed, onMounted, inject, mergeProps, normalizeClass, useAttrs, watch } from 'vue'
 import { useImage } from '../composables/useImage'
 import { useBreakpoints } from '../composables/useBreakpoints'
 import { useActiveMediaSource } from '../composables/useActiveMediaSource'
@@ -14,6 +14,7 @@ import { useServerRoute } from '../composables/useServerLoader'
 import { buildImageUrl } from '../server/url'
 import { PLACEHOLDERS_KEY } from '../utils/placeholders'
 import { lookupManifestEntry } from '../utils/manifest-placeholder'
+import { hazehashToDataUrl } from '../utils/hazehash-decode'
 import type {
   SrcSet,
   ResponsiveSrc,
@@ -31,6 +32,7 @@ interface Props {
   alt: string
   width?: number
   height?: number
+  hazehash?: string
   blurhash?: string
   thumbhash?: string
   placeholder?: string
@@ -226,6 +228,7 @@ const sourcePlaceholder = computed(() => {
   const entry = sourceManifestEntry.value
   if (!own && !entry) return undefined
   return {
+    hazehash: own?.hazehash ?? entry?.hazehash,
     blurhash: own?.blurhash ?? entry?.blurhash,
     thumbhash: own?.thumbhash ?? entry?.thumbhash,
     placeholder: own?.placeholder,
@@ -234,6 +237,11 @@ const sourcePlaceholder = computed(() => {
   }
 })
 
+const mergedHazehash = computed(() =>
+  sourcePlaceholder.value
+    ? sourcePlaceholder.value.hazehash
+    : (props.hazehash ?? props.image?.hazehash ?? manifestEntry.value?.hazehash),
+)
 const mergedBlurhash = computed(() =>
   sourcePlaceholder.value
     ? sourcePlaceholder.value.blurhash
@@ -282,6 +290,7 @@ const colorPlaceholder = computed(() => {
   if (
     manifestColor &&
     !props.placeholderMode &&
+    !usesHazehash.value &&
     !mergedBlurhash.value &&
     !mergedThumbhash.value &&
     !mergedPlaceholder.value
@@ -294,7 +303,30 @@ const colorPlaceholder = computed(() => {
 const isShimmer = computed(() => props.placeholderMode === 'shimmer' && !colorPlaceholder.value)
 const showShimmerClass = computed(() => isShimmer.value && !isLoaded.value && !isError.value)
 
+const hazehashUrl = ref<string | undefined>(undefined)
+const hazehashFailed = ref(false)
+const usesHazehash = computed(() => !!mergedHazehash.value && !hazehashFailed.value)
+let hazehashRun = 0
+
+function refreshHazehash(): void {
+  const hash = mergedHazehash.value
+  const run = ++hazehashRun
+  hazehashUrl.value = undefined
+  hazehashFailed.value = false
+  if (!hash) return
+  void hazehashToDataUrl(hash).then((url) => {
+    if (run !== hazehashRun) return
+    if (url) hazehashUrl.value = url
+    else hazehashFailed.value = true
+  })
+}
+
+watch(mergedHazehash, () => {
+  if (!isHydrating.value) refreshHazehash()
+})
+
 const effectivePlaceholder = computed(() => {
+  if (usesHazehash.value) return undefined
   if (colorPlaceholder.value) return undefined
   if (props.placeholderMode === 'color' || props.placeholderMode === 'shimmer') return undefined
   if (mergedBlurhash.value && effectiveWidth.value && effectiveHeight.value) return undefined
@@ -321,7 +353,7 @@ function blurhashToDataUrl(hash: string, width: number, height: number): string 
 }
 
 const blurhashDataUrl = computed<string | undefined>(() => {
-  if (isSSR) return undefined
+  if (isSSR || usesHazehash.value) return undefined
   if (!mergedBlurhash.value || !effectiveWidth.value || !effectiveHeight.value) return undefined
   return blurhashToDataUrl(mergedBlurhash.value, effectiveWidth.value, effectiveHeight.value)
 })
@@ -392,6 +424,9 @@ const placeholderBackgroundStyle = computed(() => {
   if (props.ssrPlaceholder && mergedPlaceholder.value) {
     return previewBackground(mergedPlaceholder.value)
   }
+  if (hazehashUrl.value) {
+    return previewBackground(hazehashUrl.value)
+  }
   if (blurhashDataUrl.value) {
     return {
       backgroundImage: `url(${blurhashDataUrl.value})`,
@@ -412,6 +447,7 @@ const placeholderBackgroundStyle = computed(() => {
 const mountedOpacity = ref(false)
 onMounted(() => {
   isHydrating.value = false
+  refreshHazehash()
   if (props.fadeIn) {
     requestAnimationFrame(() => {
       mountedOpacity.value = true

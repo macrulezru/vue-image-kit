@@ -16,6 +16,11 @@ declare module '*?vik' {
   export default meta
 }
 
+declare module '*?hazehash' {
+  const hash: string
+  export default hash
+}
+
 declare module '*?thumbhash' {
   const hash: string
   export default hash
@@ -28,8 +33,19 @@ declare module '*?blurhash' {
 
 declare module '*?placeholder' {
   const props: {
+    hazehash?: string
     blurhash?: string
     thumbhash?: string
+    placeholderColor?: string
+    width?: number
+    height?: number
+  }
+  export default props
+}
+
+declare module '*?placeholder=hazehash' {
+  const props: {
+    hazehash?: string
     placeholderColor?: string
     width?: number
     height?: number
@@ -89,7 +105,14 @@ declare module '*?aspect' {
 declare module 'virtual:vue-image-kit/placeholders' {
   const placeholders: Record<
     string,
-    { blurhash?: string; thumbhash?: string; color?: string; width?: number; height?: number }
+    {
+      hazehash?: string
+      blurhash?: string
+      thumbhash?: string
+      color?: string
+      width?: number
+      height?: number
+    }
   >
   export default placeholders
 }

@@ -21,7 +21,7 @@ export default defineConfig({
     outDir: 'dist/vite',
     emptyOutDir: true,
     rollupOptions: {
-      external: ['vite', 'sharp', 'thumbhash', /^node:/],
+      external: ['vite', 'sharp', 'thumbhash', 'hazehash', /^hazehash\//, /^node:/],
       output: { exports: 'named' },
     },
     minify: false,

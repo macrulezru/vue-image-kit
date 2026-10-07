@@ -2,12 +2,12 @@ import { existsSync } from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { loadConfig } from '../config.js'
-import { loadSharp, loadThumbhash } from '../deps.js'
+import { loadHazehash, loadSharp, loadThumbhash } from '../deps.js'
 import { loadCdnModule } from '../cdn-bridge.js'
 import { createProgramParser, loadCompiler, scanProject } from '../scan/scanner.js'
 import { findNuxtConfig, nuxtSrcDir } from '../scan/aliases.js'
 import { loadCache, saveCache } from '../placeholders/cache.js'
-import { tuningKey, type ColorStrategy, type PlaceholderMode, type PlaceholderTuning } from '../placeholders/compute.js'
+import { defaultPlaceholderMode, tuningKey, type ColorStrategy, type PlaceholderMode, type PlaceholderTuning } from '../placeholders/compute.js'
 import type { FolderInput } from '../placeholders/folders.js'
 import { runPlaceholders, type PlaceholdersReport, type SkipReason } from '../placeholders/run.js'
 import {
@@ -18,7 +18,7 @@ import {
 } from './discovery.js'
 
 export const PLACEHOLDERS_HELP = `
-vue-image-kit placeholders — generate blurhash/thumbhash/dominant-color placeholders
+vue-image-kit placeholders — generate hazehash/blurhash/thumbhash/dominant-color placeholders
 for <VImage> usages that don't have one yet
 
 Every <VImage> whose source can be resolved statically (a public/ path, a local
@@ -36,11 +36,13 @@ Usage:
 Options:
 ${DISCOVERY_HELP}
   --manifest <path>    Placeholders manifest, .ts or .json (default: src/image-placeholders.ts)
-  --mode <mode>        blurhash (default), thumbhash or color (the image's dominant color)
+  --mode <mode>        hazehash, blurhash, thumbhash or color (the image's dominant color).
+                       Default: hazehash when the hazehash package is installed, otherwise blurhash
   --dir <path>         Also compute every image in this folder (recursive), repeatable. Entries are keyed by
                        the URL the file is served at: relative to the public dir, or <path>=<urlPrefix>
                        for folders served from elsewhere. Covers images whose src is built at runtime
   --url <url>          Also compute this remote/CDN image, repeatable (no --remote needed)
+  --budget <bytes>     HazeHash: most bytes one hash may take, 7-48 (default: 28)
   --components <XxY>   BlurHash components, 1-9 each (default: 4x3)
   --sample <px>        Size the image is downscaled to before hashing (default: 100, max 256)
   --color <strategy>   dominant (default) or average — how the placeholder color is chosen
@@ -55,8 +57,8 @@ ${DISCOVERY_HELP}
   --force-write        Edit source files even if they have uncommitted changes
   --no-cache           Recompute every placeholder, ignoring the cache
   --refresh-remote     Re-download remote images even if they are cached
-  --replace            Also redo usages that already have a placeholder: their static blurhash/
-                       thumbhash/placeholder/placeholder-color/placeholder-mode attributes are
+  --replace            Also redo usages that already have a placeholder: their static hazehash/
+                       blurhash/thumbhash/placeholder/placeholder-color/placeholder-mode attributes are
                        removed and replaced by the --mode placeholder (bound values and :image are kept)
   --help               Show this help
 
@@ -71,7 +73,7 @@ Examples:
   npx vue-image-kit placeholders --remote --hosts res.cloudinary.com --limit 200
 `
 
-const MODES = new Set<PlaceholderMode>(['blurhash', 'thumbhash', 'color'])
+const MODES = new Set<PlaceholderMode>(['hazehash', 'blurhash', 'thumbhash', 'color'])
 
 const SKIP_TEXT: Record<SkipReason, string> = {
   'has-placeholder': 'already have a placeholder (use --replace to redo static ones)',
@@ -110,7 +112,12 @@ export function parseDirs(
 }
 
 export function resolveTuningFlags(
-  values: { components?: string | undefined; sample?: string | undefined; color?: string | undefined },
+  values: {
+    components?: string | undefined
+    sample?: string | undefined
+    color?: string | undefined
+    budget?: string | undefined
+  },
   config: PlaceholderTuning | undefined,
 ): PlaceholderTuning {
   const tuning: PlaceholderTuning = { ...(config ?? {}) }
@@ -121,6 +128,12 @@ export function resolveTuningFlags(
   }
   const sample = positiveInt(values.sample, '--sample')
   if (sample !== undefined) tuning.sample = sample
+  if (values.budget !== undefined) {
+    const budget = Number(values.budget)
+    if (!Number.isInteger(budget) || budget < 7 || budget > 48)
+      throw new Error(`--budget must be a whole number of bytes from 7 to 48 (got "${values.budget}")`)
+    tuning.budget = budget
+  }
   if (values.color !== undefined) {
     if (values.color !== 'dominant' && values.color !== 'average')
       throw new Error(`--color must be dominant or average (got "${values.color}")`)
@@ -202,6 +215,7 @@ export async function runPlaceholdersCommand(argv: string[]): Promise<number> {
       mode: { type: 'string' },
       dir: { type: 'string', multiple: true },
       url: { type: 'string', multiple: true },
+      budget: { type: 'string' },
       components: { type: 'string' },
       sample: { type: 'string' },
       color: { type: 'string' },
@@ -228,9 +242,9 @@ export async function runPlaceholdersCommand(argv: string[]): Promise<number> {
 
   const fileConfig = await loadConfig(values.root ? resolve(values.root) : process.cwd())
   const config = fileConfig.placeholders ?? {}
-  const mode = (values.mode ?? config.mode ?? 'blurhash') as PlaceholderMode
+  const mode = (values.mode ?? config.mode ?? defaultPlaceholderMode()) as PlaceholderMode
   if (!MODES.has(mode))
-    throw new Error(`--mode must be blurhash, thumbhash or color (got "${values.mode}")`)
+    throw new Error(`--mode must be hazehash, blurhash, thumbhash or color (got "${values.mode}")`)
 
   const tuning = resolveTuningFlags(values, config.tuning)
   const dirs = parseDirs(values.dir, config.dirs)
@@ -248,6 +262,7 @@ export async function runPlaceholdersCommand(argv: string[]): Promise<number> {
 
   const sharp = await loadSharp('placeholders')
   const rgbaToThumbHash = mode === 'thumbhash' ? await loadThumbhash('placeholders') : undefined
+  const encodeHazehash = mode === 'hazehash' ? await loadHazehash('placeholders') : undefined
   const cdn = await loadCdnModule()
   const compiler = await loadCompiler()
   const scan = await scanProject(scanOptions, { cdn, compiler })
@@ -284,6 +299,7 @@ export async function runPlaceholdersCommand(argv: string[]): Promise<number> {
     {
       sharp,
       ...(rgbaToThumbHash ? { rgbaToThumbHash } : {}),
+      ...(encodeHazehash ? { encodeHazehash } : {}),
       cdn,
       cache,
       parseProgram: createProgramParser(compiler),

@@ -28,6 +28,7 @@ export function computeConfigHash(config: CliConfig): string {
     template: config.template,
     publicPath: config.publicPath,
     lqip: config.lqip,
+    hazehash: config.hazehash,
     blurhash: config.blurhash,
     thumbhash: config.thumbhash,
   }

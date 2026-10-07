@@ -191,3 +191,26 @@ describe('computeThumbhash (build-time ?thumbhash pipeline)', () => {
     rmSync(cleanDir, { recursive: true, force: true })
   })
 })
+
+describe('processImage with hazehash (build-time generate pipeline)', () => {
+  it('emits a hazehash that decodes with the right proportions and puts it in the manifest entry', async () => {
+    const image = await processImage(srcPath, { ...config, hazehash: true })
+    expect(image.hazehash).toMatch(/^[A-Za-z0-9_-]+$/)
+    const { getAspectRatio } = await import('hazehash')
+    expect(getAspectRatio(image.hazehash)).toBeCloseTo(64 / 48, 0)
+    expect(buildEntry(image, config.widths).hazehash).toBe(image.hazehash)
+  })
+
+  it('leaves the hazehash empty when it is switched off', async () => {
+    const image = await processImage(srcPath, { ...config, hazehash: false })
+    expect(image.hazehash).toBe('')
+  })
+
+  it('writes the hazehash field into the generated manifest interface', async () => {
+    const { generateManifestContent } = await import('../../src/cli/manifest')
+    const image = await processImage(srcPath, { ...config, hazehash: true })
+    const content = generateManifestContent([image], config.widths)
+    expect(content).toContain('hazehash: string')
+    expect(content).toContain(`"hazehash": "${image.hazehash}"`)
+  })
+})

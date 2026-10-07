@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import { resolve, join } from 'node:path'
+import { hazehashAvailable } from './deps.js'
 import type { CliConfig, PlaceholdersFileConfig, ScanFileConfig } from './types.js'
 
 type PartialCliConfig = Partial<Omit<CliConfig, 'quality'> & { quality: Partial<CliConfig['quality']> }> & {
@@ -45,6 +46,7 @@ export const DEFAULTS: CliConfig = {
   manifest: false,
   publicPath: '/images',
   lqip: true,
+  hazehash: hazehashAvailable(),
   blurhash: true,
   thumbhash: false,
   clean: false,

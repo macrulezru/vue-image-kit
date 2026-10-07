@@ -9,7 +9,13 @@ export interface NormalizedResponsiveEntry {
   placeholder?: SourcePlaceholder
 }
 
-const PLACEHOLDER_FIELDS = ['blurhash', 'thumbhash', 'placeholder', 'placeholderColor'] as const
+const PLACEHOLDER_FIELDS = [
+  'hazehash',
+  'blurhash',
+  'thumbhash',
+  'placeholder',
+  'placeholderColor',
+] as const
 
 function pickPlaceholder(entry: object): SourcePlaceholder | undefined {
   const picked: SourcePlaceholder = {}

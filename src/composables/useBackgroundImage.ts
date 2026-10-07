@@ -3,7 +3,7 @@ import type { Ref, ComputedRef, StyleValue } from 'vue'
 import { useLazyLoad } from './useLazyLoad'
 import type { ImageStatus } from '../types'
 import { PLACEHOLDERS_KEY } from '../utils/placeholders'
-import { entryToImageUrl, lookupManifestEntry } from '../utils/manifest-placeholder'
+import { entryToImageUrlAsync, lookupManifestEntry } from '../utils/manifest-placeholder'
 
 export interface UseBackgroundImageOptions {
   placeholder?: string
@@ -78,7 +78,9 @@ export function useBackgroundImage(
   const { isIntersecting, observe } = useLazyLoad({ rootMargin, threshold })
 
   onMounted(() => {
-    manifestImage.value = entryToImageUrl(manifestEntry)
+    void entryToImageUrlAsync(manifestEntry).then((url) => {
+      manifestImage.value = url
+    })
     if (lazy) {
       observe(target)
     } else {

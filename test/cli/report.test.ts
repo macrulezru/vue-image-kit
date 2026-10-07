@@ -33,6 +33,7 @@ function makeImage(overrides: Partial<ProcessedImage> = {}): ProcessedImage {
     ],
     placeholder: '',
     blurhash: '',
+    hazehash: '',
     thumbhash: '',
     ...overrides,
   }
