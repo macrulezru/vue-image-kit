@@ -158,8 +158,7 @@ const serverSrcset = computed<string | undefined>(() => {
 
 const placeholderManifest = inject(PLACEHOLDERS_KEY, null)
 const manifestEntry = computed(() => {
-  const key =
-    typeof props.src === 'string' ? props.src : (props.src?.fallback ?? props.image?.src)
+  const key = typeof props.src === 'string' ? props.src : (props.src?.fallback ?? props.image?.src)
   return lookupManifestEntry(placeholderManifest, key)
 })
 
@@ -383,9 +382,15 @@ const defersSsrImage = computed(() => usesSsrPreview.value && effectiveLazy.valu
 const TRANSPARENT_PIXEL =
   'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
 
+const blankSrc = computed(() =>
+  effectiveWidth.value && effectiveHeight.value
+    ? `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${effectiveWidth.value}' height='${effectiveHeight.value}'/%3E`
+    : TRANSPARENT_PIXEL,
+)
+
 const hydratingAttrs = computed(() =>
   defersSsrImage.value
-    ? { ...imgAttrs.value, src: TRANSPARENT_PIXEL, srcset: undefined, sizes: undefined }
+    ? { ...imgAttrs.value, src: blankSrc.value, srcset: undefined, sizes: undefined }
     : imgAttrs.value,
 )
 
@@ -471,40 +476,6 @@ const aspectRatio = computed(() => {
   return undefined
 })
 
-const boxStyle = computed(() => {
-  if (props.layout === 'fill') {
-    return {
-      position: 'absolute' as const,
-      inset: '0',
-      display: 'block' as const,
-      width: '100%',
-      height: '100%',
-    }
-  }
-  if (props.layout === 'fixed' && effectiveWidth.value && effectiveHeight.value) {
-    return {
-      display: 'inline-block' as const,
-      width: `${effectiveWidth.value}px`,
-      height: `${effectiveHeight.value}px`,
-    }
-  }
-  if (effectiveWidth.value && effectiveHeight.value) {
-    return {
-      display: 'block' as const,
-      width: '100%',
-      height: 'auto',
-      aspectRatio: aspectRatio.value,
-    }
-  }
-  return { display: 'block' as const }
-})
-
-const idleStyle = computed(() => ({
-  ...boxStyle.value,
-  ...placeholderBackgroundStyle.value,
-  ...fadeStyle.value,
-}))
-
 const isFillLayout = computed(() => props.layout === 'fill')
 const isFixedLayout = computed(() => props.layout === 'fixed')
 const isResponsiveSized = computed(
@@ -513,6 +484,13 @@ const isResponsiveSized = computed(
     !isFixedLayout.value &&
     !!(effectiveWidth.value && effectiveHeight.value),
 )
+
+const idleStyle = computed(() => ({
+  ...(isResponsiveSized.value ? { aspectRatio: aspectRatio.value } : {}),
+  ...fixedSizeStyle.value,
+  ...placeholderBackgroundStyle.value,
+  ...fadeStyle.value,
+}))
 
 const loadedBoxClasses = computed(() => ({
   'vik-box': true,
@@ -536,7 +514,17 @@ const usesDefaultFit = computed(() => !props.fit && isBoxConstrained.value)
 
 const fitStyle = computed(() => (props.fit ? { objectFit: props.fit } : {}))
 
+const loadingSizeStyle = computed(() =>
+  !isLoaded.value && isResponsiveSized.value
+    ? {
+        contain: 'size',
+        containIntrinsicSize: `${effectiveWidth.value}px ${effectiveHeight.value}px`,
+      }
+    : {},
+)
+
 const realImgStyle = computed(() => ({
+  ...loadingSizeStyle.value,
   ...fixedSizeStyle.value,
   ...fitStyle.value,
   ...(objectPosition.value ? { objectPosition: objectPosition.value } : {}),
@@ -582,13 +570,17 @@ function handleError(e: Event): void {
     :style="hydratingStyle"
   />
 
-  <span
+  <img
     v-else-if="isIdle"
     v-bind="$attrs"
     ref="observeTargetRef"
-    :style="idleStyle"
-    :class="{ 'vik-shimmer': showShimmerClass }"
+    :src="blankSrc"
+    alt=""
     aria-hidden="true"
+    :width="mergedWidth"
+    :height="mergedHeight"
+    :style="idleStyle"
+    :class="[loadedBoxClasses, { 'vik-fit': usesDefaultFit, 'vik-shimmer': showShimmerClass }]"
   />
 
   <span v-else-if="isError" v-bind="$attrs" :class="errorClasses">

@@ -57,7 +57,7 @@ function mountWithManifest(
 }
 
 function placeholderStyle(wrapper: ReturnType<typeof mount>): string {
-  return wrapper.find('span[aria-hidden="true"]').attributes('style') ?? ''
+  return wrapper.find('img[aria-hidden="true"]').attributes('style') ?? ''
 }
 
 describe('VImage — placeholders manifest', () => {

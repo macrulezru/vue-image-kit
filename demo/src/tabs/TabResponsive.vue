@@ -1,4 +1,12 @@
 <script setup lang="ts">
+const sameSizeCases = [
+  { id: 'max', title: 'width: 100%; max-width: 200px' },
+  { id: 'wide', title: 'A' },
+  { id: 'half', title: 'width: 50%' },
+  { id: 'auto', title: 'no size rules' },
+  { id: 'height', title: 'height: 160px; width: auto' },
+]
+
 import { ref, computed } from 'vue'
 import { images } from '../assets/images'
 
@@ -183,6 +191,33 @@ app.use(VImageKitPlugin, {
       >
     </div>
 
+    <!-- Placeholder sizing follows the image's own CSS -->
+    <div class="panel" style="margin-bottom: 24px" data-testid="same-size-demo">
+      <p class="panel-title">The placeholder is sized exactly like the loaded image</p>
+      <p style="font-size: 0.78rem; color: #8b949e; margin: 0 0 12px">
+        Each image sits in a parent that shrinks to its content. Whatever width the page's CSS gives
+        the image, the placeholder takes the same box, so nothing jumps when the photo arrives.
+      </p>
+      <div
+        v-for="c in sameSizeCases"
+        :key="c.id"
+        class="same-size-parent"
+        :data-testid="'same-size-' + c.id"
+      >
+        <div class="same-size-link">
+          <VImage
+            :class="'same-size-' + c.id"
+            :data-testid="'same-size-image-' + c.id"
+            src="/images/art-direction-portrait.jpg"
+            alt="Portrait"
+            :width="720"
+            :height="1237"
+          />
+          <div>{{ c.title }}</div>
+        </div>
+      </div>
+    </div>
+
     <!-- Resolved sources table -->
     <div class="panel">
       <p class="panel-title">Resolved &lt;source&gt; elements (after merge &amp; sort)</p>
@@ -212,6 +247,40 @@ app.use(VImageKitPlugin, {
 </template>
 
 <style scoped>
+.same-size-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.same-size-parent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 16px;
+  font-size: 0.75rem;
+  color: #8b949e;
+}
+
+.same-size-max {
+  width: 100%;
+  max-width: 200px;
+}
+
+.same-size-wide {
+  width: 100%;
+  max-width: 300px;
+}
+
+.same-size-half {
+  width: 50%;
+}
+
+.same-size-height {
+  height: 160px;
+  width: auto;
+}
+
 .code-block {
   margin: 0;
   overflow-x: auto;

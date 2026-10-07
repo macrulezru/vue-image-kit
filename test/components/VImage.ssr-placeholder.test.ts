@@ -66,7 +66,7 @@ describe('VImage ssrPlaceholder', () => {
       ssrPlaceholder: true,
     })
     const img = html.match(/<img[^>]*>/)![0]
-    expect(img).toContain('src="data:image/gif;base64,')
+    expect(img).toMatch(/src="data:image\/(gif;base64,|svg\+xml,)/)
     expect(img).not.toContain('/img.jpg')
     expect(html).toContain('<img src="/img.jpg?a=1&amp;b=2" alt="A &quot;quoted&quot; &lt;alt&gt;"')
     expect(html).toMatch(/<noscript[^>]*><img src=/)
@@ -74,7 +74,12 @@ describe('VImage ssrPlaceholder', () => {
 
   it('keeps the real src for an eager image (lazy=false or priority), with the preview behind it', async () => {
     for (const extra of [{ lazy: false }, { priority: true }]) {
-      const html = await renderServerHtml({ ...base, placeholder: PREVIEW, ssrPlaceholder: true, ...extra })
+      const html = await renderServerHtml({
+        ...base,
+        placeholder: PREVIEW,
+        ssrPlaceholder: true,
+        ...extra,
+      })
       const img = html.match(/<img[^>]*>/)![0]
       expect(img).toContain('src="/img.jpg"')
       expect(img).toContain('background-image')
@@ -100,7 +105,10 @@ describe('VImage ssrPlaceholder', () => {
   })
 
   it('takes the preview of an image from the registry', async () => {
-    registerPlaceholder('/img.jpg', { blurhash: 'LEHV6nWB2yk8pyo0adR*.7kCMdnj', placeholder: PREVIEW })
+    registerPlaceholder('/img.jpg', {
+      blurhash: 'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
+      placeholder: PREVIEW,
+    })
     const html = await renderServerHtml({ ...base, ssrPlaceholder: true })
     expect(html).toContain(`background-image:url(${PREVIEW})`)
   })
@@ -156,10 +164,17 @@ describe('VImage fallthrough attributes', () => {
   }
 
   it('passes class and style to the server image and does not warn, with and without ssrPlaceholder', async () => {
-    for (const extra of [{}, { placeholder: PREVIEW, ssrPlaceholder: true }, { placeholder: PREVIEW, ssrPlaceholder: true, lazy: false }]) {
+    for (const extra of [
+      {},
+      { placeholder: PREVIEW, ssrPlaceholder: true },
+      { placeholder: PREVIEW, ssrPlaceholder: true, lazy: false },
+    ]) {
       let html = ''
       const messages = await warnings(async () => {
-        html = await renderWithAttrs({ ...base, ...extra }, { class: 'card-image', style: 'border-radius:8px', 'data-test': 'x' })
+        html = await renderWithAttrs(
+          { ...base, ...extra },
+          { class: 'card-image', style: 'border-radius:8px', 'data-test': 'x' },
+        )
       })
       expect(messages.filter((m) => m.includes('Extraneous'))).toEqual([])
       const img = html.match(/<img[^>]*>/)![0]
@@ -171,7 +186,10 @@ describe('VImage fallthrough attributes', () => {
 
   it('keeps a single root with class and listeners in every client state', async () => {
     const messages = await warnings(async () => {
-      const wrapper = mount(VImage, { props: { ...base, lazy: false }, attrs: { class: 'card-image', 'data-test': 'x' } })
+      const wrapper = mount(VImage, {
+        props: { ...base, lazy: false },
+        attrs: { class: 'card-image', 'data-test': 'x' },
+      })
       await nextTick()
       expect(wrapper.classes()).toContain('card-image')
       expect(wrapper.attributes('data-test')).toBe('x')
@@ -198,7 +216,9 @@ describe('VImage fallthrough attributes', () => {
     try {
       createSSRApp(VImage, props).mount(container)
       const messages = spy.mock.calls.flat().filter((arg): arg is string => typeof arg === 'string')
-      expect(messages.filter((m) => m.includes('Hydration') || m.includes('Extraneous'))).toEqual([])
+      expect(messages.filter((m) => m.includes('Hydration') || m.includes('Extraneous'))).toEqual(
+        [],
+      )
     } finally {
       spy.mockRestore()
       document.body.removeChild(container)

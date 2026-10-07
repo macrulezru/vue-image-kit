@@ -2,7 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import VImage from '../../src/components/VImage.vue'
-import { registerPlaceholder, lookupRegisteredPlaceholder } from '../../src/utils/placeholder-registry'
+import {
+  registerPlaceholder,
+  lookupRegisteredPlaceholder,
+} from '../../src/utils/placeholder-registry'
 import { lookupManifestEntry } from '../../src/utils/manifest-placeholder'
 import { PLACEHOLDERS_KEY } from '../../src/utils/placeholders'
 import { clearObserverPool } from '../../src/utils/observer-pool'
@@ -94,14 +97,16 @@ describe('VImage with a registered placeholder and no manifest', () => {
     })
     const wrapper = mount(VImage, { props: { src: '/_nuxt/hero.hash1.webp', alt: 'Hero' } })
     await nextTick()
-    const style = wrapper.find('span[aria-hidden="true"]').attributes('style') ?? ''
+    const style = wrapper.find('img[aria-hidden="true"]').attributes('style') ?? ''
     expect(style).toContain('background-image: url("data:image/png;base64,MOCK')
     expect(style).toContain('aspect-ratio: 800 / 600')
   })
 
   it('puts the registered size on the real image once it loads', async () => {
     registerPlaceholder('/_nuxt/size.hash2.webp', { color: '#123456', width: 800, height: 600 })
-    const wrapper = mount(VImage, { props: { src: '/_nuxt/size.hash2.webp', alt: 'Size', lazy: false } })
+    const wrapper = mount(VImage, {
+      props: { src: '/_nuxt/size.hash2.webp', alt: 'Size', lazy: false },
+    })
     await nextTick()
     ioCallback?.([{ isIntersecting: true } as IntersectionObserverEntry])
     await nextTick()
@@ -130,7 +135,7 @@ describe('VImage with a registered placeholder and no manifest', () => {
       global: { provide: { [PLACEHOLDERS_KEY as symbol]: { '/other.png': { color: '#000000' } } } },
     })
     await nextTick()
-    expect(wrapper.find('span[aria-hidden="true"]').attributes('style') ?? '').toContain(
+    expect(wrapper.find('img[aria-hidden="true"]').attributes('style') ?? '').toContain(
       'aspect-ratio: 200 / 100',
     )
   })

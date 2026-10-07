@@ -61,7 +61,7 @@ describe('VImage fallthrough attributes', () => {
     const wrapper = mount(VImage, { props: { ...base, src: '/img.jpg' }, attrs })
     await settle()
     const idle = wrapper.element as HTMLElement
-    expect(idle.tagName).toBe('SPAN')
+    expect(idle.tagName).toBe('IMG')
     expect(idle.classList.contains('card-image')).toBe(true)
     expect(idle.getAttribute('data-test')).toBe('x')
 
@@ -112,7 +112,9 @@ describe('VImage fallthrough attributes', () => {
     const picture = wrapper.element as HTMLElement
     expect(picture.tagName).toBe('PICTURE')
     expect(picture.classList.contains('card-image')).toBe(false)
-    expect((picture.querySelector('img') as HTMLElement).classList.contains('card-image')).toBe(true)
+    expect((picture.querySelector('img') as HTMLElement).classList.contains('card-image')).toBe(
+      true,
+    )
   })
 
   it('keeps a listener given by the user next to the component own load handler', async () => {
@@ -198,7 +200,9 @@ describe('VImage fallthrough attributes on the server', () => {
     const spy = spyWarn()
     try {
       createSSRApp(VImage, props).mount(container)
-      expect(warnings(spy).filter((m) => m.includes('Hydration') || m.includes('Extraneous'))).toEqual([])
+      expect(
+        warnings(spy).filter((m) => m.includes('Hydration') || m.includes('Extraneous')),
+      ).toEqual([])
     } finally {
       spy.mockRestore()
       document.body.removeChild(container)
