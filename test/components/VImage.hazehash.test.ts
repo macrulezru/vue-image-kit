@@ -46,7 +46,7 @@ afterEach(() => {
 })
 
 function style(wrapper: ReturnType<typeof mount>): string {
-  return wrapper.find('span[aria-hidden="true"]').attributes('style') ?? ''
+  return wrapper.find('img[aria-hidden="true"]').attributes('style') ?? ''
 }
 
 async function settle(): Promise<void> {
@@ -90,7 +90,14 @@ describe('VImage hazehash placeholder', () => {
       release = resolve
     })
     const wrapper = mount(VImage, {
-      props: { src: '/photo.jpg', alt: 'Photo', width: 800, height: 600, hazehash: HAZEHASH, blurhash: BLURHASH },
+      props: {
+        src: '/photo.jpg',
+        alt: 'Photo',
+        width: 800,
+        height: 600,
+        hazehash: HAZEHASH,
+        blurhash: BLURHASH,
+      },
     })
     await settle()
     expect(style(wrapper)).not.toContain('MOCK')
@@ -103,7 +110,14 @@ describe('VImage hazehash placeholder', () => {
   it('falls back to the next placeholder when the hazehash cannot be decoded', async () => {
     decodeResult.url = undefined
     const wrapper = mount(VImage, {
-      props: { src: '/photo.jpg', alt: 'Photo', width: 800, height: 600, hazehash: HAZEHASH, blurhash: BLURHASH },
+      props: {
+        src: '/photo.jpg',
+        alt: 'Photo',
+        width: 800,
+        height: 600,
+        hazehash: HAZEHASH,
+        blurhash: BLURHASH,
+      },
     })
     await settle()
     expect(style(wrapper)).toContain('data:image/png;base64,MOCK')
@@ -112,7 +126,13 @@ describe('VImage hazehash placeholder', () => {
 
   it('takes the hazehash of an image from the manifest', async () => {
     const manifest: PlaceholderManifest = {
-      '/photo.jpg': { hazehash: HAZEHASH, blurhash: BLURHASH, color: '#123456', width: 800, height: 600 },
+      '/photo.jpg': {
+        hazehash: HAZEHASH,
+        blurhash: BLURHASH,
+        color: '#123456',
+        width: 800,
+        height: 600,
+      },
     }
     const wrapper = mount(VImage, {
       props: { src: '/photo.jpg', alt: 'Photo' },
@@ -124,7 +144,12 @@ describe('VImage hazehash placeholder', () => {
   })
 
   it('takes the hazehash of an image from the registry of imported images', async () => {
-    registerPlaceholder('/_nuxt/hero.hash.webp', { hazehash: HAZEHASH, color: '#123456', width: 800, height: 600 })
+    registerPlaceholder('/_nuxt/hero.hash.webp', {
+      hazehash: HAZEHASH,
+      color: '#123456',
+      width: 800,
+      height: 600,
+    })
     const wrapper = mount(VImage, { props: { src: '/_nuxt/hero.hash.webp', alt: 'Hero' } })
     await settle()
     expect(style(wrapper)).toContain('HAZE')
@@ -132,7 +157,10 @@ describe('VImage hazehash placeholder', () => {
 
   it('takes the hazehash from an ImageMeta object', async () => {
     const wrapper = mount(VImage, {
-      props: { image: { src: '/photo.jpg', width: 800, height: 600, hazehash: HAZEHASH }, alt: 'Photo' },
+      props: {
+        image: { src: '/photo.jpg', width: 800, height: 600, hazehash: HAZEHASH },
+        alt: 'Photo',
+      },
     })
     await settle()
     expect(style(wrapper)).toContain('HAZE')

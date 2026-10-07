@@ -59,6 +59,6 @@ test.describe('art-direction sources — per-breakpoint width/height', () => {
       expect(tabletBox!.width / tabletBox!.height).toBeCloseTo(TABLET_RATIO, 1)
     }).toPass({ timeout: 5_000 })
 
-    await expect(placeholder).toHaveJSProperty('tagName', 'SPAN')
+    await expect(placeholder).toHaveJSProperty('tagName', 'IMG')
   })
 })

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-10-07
+
+### Fixed
+
+- **The preview behaves exactly like the image it stands for.** The placeholder of a `<VImage>` used to be an empty `<span>` with inline `width: 100%`, `height: auto` and an `aspect-ratio`. Inline styles beat the page's own CSS, and an empty box has no intrinsic size, so with `width: 50%`, a fixed height, or a parent that shrinks to its content (a flex column with `align-items: center`) the preview was a different size than the loaded image, and the layout jumped when the image started loading. The idle placeholder is now an `<img>` with the same `width`/`height` attributes and the same classes as the loaded one (a transparent image of the same `width`×`height` as `src`, so its natural size matches the photo, and the hash preview as its background), with no inline `width`/`height` — the browser sizes it by the same rules and the same CSS as the real image. Only an explicit `aspect-ratio` stays inline.
+- **The box also stays the same while the file downloads.** Between the moment the real `<img>` gets its `src` and the moment its first bytes arrive the browser knows no natural size, so a parent that shrinks to its content collapsed again. While the image loads, the `<img>` now carries `contain: size` with a `contain-intrinsic-size` of its `width`×`height`; both are removed once it has loaded.
+- **Migration note:** a test or a stylesheet that looked for the idle placeholder as a `span` has to look for `img[aria-hidden="true"]`; the placeholder has an empty `alt`.
+
 ## [1.7.0] - 2026-10-07
 
 ### Added
