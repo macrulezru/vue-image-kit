@@ -26,9 +26,7 @@ export function twicpics(baseUrl: string): CdnAdapter {
       return `${base}${cleanPath}?twic=${twic}`
     },
     srcset(path, widths, opts = {}) {
-      return widths
-        .map((w) => `${this.url(path, { ...opts, width: w })} ${w}w`)
-        .join(', ')
+      return widths.map((w) => `${this.url(path, { ...opts, width: w })} ${w}w`).join(', ')
     },
   }
 }

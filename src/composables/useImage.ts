@@ -100,7 +100,9 @@ export function useImage(options: UseImageOptions): UseImageReturn {
       const delay = retryDelay * Math.pow(2, retryCount - 1)
       setTimeout(() => {
         status.value = 'idle'
-        setTimeout(() => { status.value = 'loading' }, 0)
+        setTimeout(() => {
+          status.value = 'loading'
+        }, 0)
       }, delay)
     } else {
       status.value = 'error'

@@ -284,7 +284,11 @@ const colorPlaceholder = computed(() => {
   const manifestColor = effectiveManifestColor.value
   if (props.placeholderMode === 'color') {
     if (manifestColor) return manifestColor
-    if (mergedThumbhash.value) return thumbHashToAverageColor(mergedThumbhash.value)
+    if (mergedThumbhash.value) {
+      const color = thumbHashToAverageColor(mergedThumbhash.value)
+      if (color) return color
+      return 'rgba(0, 0, 0, 0)'
+    }
   }
   if (
     manifestColor &&

@@ -25,17 +25,29 @@ function detectCloudinary(url: URL): Detection | null {
   const match = url.pathname.match(/^\/([^/]+)\/((?:image|video|raw)\/upload)\/(.+)$/)
   if (!match) return null
   const [, cloudName, resourceType, assetPath] = match
-  return { provider: 'cloudinary', adapter: cloudinary({ cloudName: cloudName!, resourceType: resourceType! }), assetPath: assetPath! }
+  return {
+    provider: 'cloudinary',
+    adapter: cloudinary({ cloudName: cloudName!, resourceType: resourceType! }),
+    assetPath: assetPath!,
+  }
 }
 
 function detectImgix(url: URL): Detection | null {
   if (!url.hostname.endsWith('.imgix.net') || hasQuery(url)) return null
-  return { provider: 'imgix', adapter: imgix(`${url.protocol}//${url.hostname}`), assetPath: url.pathname }
+  return {
+    provider: 'imgix',
+    adapter: imgix(`${url.protocol}//${url.hostname}`),
+    assetPath: url.pathname,
+  }
 }
 
 function detectBunny(url: URL): Detection | null {
   if (!url.hostname.endsWith('.b-cdn.net') || hasQuery(url)) return null
-  return { provider: 'bunny', adapter: bunny(`${url.protocol}//${url.hostname}`), assetPath: url.pathname }
+  return {
+    provider: 'bunny',
+    adapter: bunny(`${url.protocol}//${url.hostname}`),
+    assetPath: url.pathname,
+  }
 }
 
 function detectImageKit(url: URL): Detection | null {
@@ -55,7 +67,11 @@ function detectSanity(url: URL): Detection | null {
   const segments = url.pathname.split('/').filter(Boolean)
   if (segments.length < 4 || segments[0] !== 'images') return null
   const [, projectId, dataset, ...rest] = segments
-  return { provider: 'sanity', adapter: sanity({ projectId: projectId!, dataset: dataset! }), assetPath: rest.join('/') }
+  return {
+    provider: 'sanity',
+    adapter: sanity({ projectId: projectId!, dataset: dataset! }),
+    assetPath: rest.join('/'),
+  }
 }
 
 function detectStoryblok(url: URL): Detection | null {
@@ -70,7 +86,11 @@ function detectContentful(url: URL): Detection | null {
 
 function detectGumlet(url: URL): Detection | null {
   if (!url.hostname.endsWith('.gumlet.io') || hasQuery(url)) return null
-  return { provider: 'gumlet', adapter: gumlet(`${url.protocol}//${url.hostname}`), assetPath: url.pathname }
+  return {
+    provider: 'gumlet',
+    adapter: gumlet(`${url.protocol}//${url.hostname}`),
+    assetPath: url.pathname,
+  }
 }
 
 const DETECTORS: Detector[] = [
@@ -97,7 +117,8 @@ function resolveDetection(url: string, config: AutoLoaderConfig): Detection | nu
   }
 
   const customAdapter = config.hosts?.[parsed.hostname]
-  if (customAdapter) return { provider: 'custom', adapter: customAdapter, assetPath: parsed.pathname }
+  if (customAdapter)
+    return { provider: 'custom', adapter: customAdapter, assetPath: parsed.pathname }
 
   for (const detect of DETECTORS) {
     const detection = detect(parsed)
@@ -111,7 +132,11 @@ export function detectCdnProvider(url: string, config: AutoLoaderConfig = {}): s
   return resolveDetection(url, config)?.provider ?? null
 }
 
-export function autoLoader(url: string, opts: CdnUrlOptions = {}, config: AutoLoaderConfig = {}): string {
+export function autoLoader(
+  url: string,
+  opts: CdnUrlOptions = {},
+  config: AutoLoaderConfig = {},
+): string {
   const detection = resolveDetection(url, config)
   return detection ? detection.adapter.url(detection.assetPath, opts) : url
 }

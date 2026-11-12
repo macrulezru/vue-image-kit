@@ -1,5 +1,10 @@
 import { encodeBlurhash } from '../blurhash-encode.js'
-import { hazehashAvailable, type HazehashEncode, type RgbaToThumbHash, type SharpFactory } from '../deps.js'
+import {
+  hazehashAvailable,
+  type HazehashEncode,
+  type RgbaToThumbHash,
+  type SharpFactory,
+} from '../deps.js'
 import { readSvgSize, svgDensity } from './svg.js'
 
 export type PlaceholderMode = 'hazehash' | 'blurhash' | 'thumbhash' | 'color'

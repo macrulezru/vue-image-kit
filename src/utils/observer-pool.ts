@@ -1,4 +1,3 @@
-
 interface PoolEntry {
   observer: IntersectionObserver
   callbacks: Map<Element, () => void>

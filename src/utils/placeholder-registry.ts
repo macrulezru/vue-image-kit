@@ -15,7 +15,10 @@ export interface RegisteredPlaceholder {
 const STORE_KEY = '__VIK_PLACEHOLDERS__'
 
 function store(): Map<string, RegisteredPlaceholder> {
-  const host = globalThis as unknown as Record<string, Map<string, RegisteredPlaceholder> | undefined>
+  const host = globalThis as unknown as Record<
+    string,
+    Map<string, RegisteredPlaceholder> | undefined
+  >
   return (host[STORE_KEY] ??= new Map())
 }
 

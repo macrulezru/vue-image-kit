@@ -1,4 +1,3 @@
-
 function thumbHashToApproximateAspectRatio(hash: Uint8Array): number {
   const header = hash[3] ?? 0
   const hasAlpha = (hash[2] ?? 0) & 0x80
@@ -9,6 +8,10 @@ function thumbHashToApproximateAspectRatio(hash: Uint8Array): number {
 }
 
 export function thumbHashToRGBA(hash: Uint8Array): { w: number; h: number; rgba: Uint8Array } {
+  if (!(hash instanceof Uint8Array) || hash.length < 5 || hash.length > 32) {
+    throw new Error(`[thumbhash] invalid byte length: ${hash?.length}`)
+  }
+
   const { PI, min, max, cos, round } = Math
   const at = (i: number): number => hash[i] ?? 0
 
@@ -50,7 +53,10 @@ export function thumbHashToRGBA(hash: Uint8Array): { w: number; h: number; rgba:
 
   for (let y = 0, i = 0; y < h; y++) {
     for (let x = 0; x < w; x++, i += 4) {
-      let l = lDC, p = pDC, q = qDC, a = aDC
+      let l = lDC,
+        p = pDC,
+        q = qDC,
+        a = aDC
 
       for (let cx = 0, n = max(lx, hasAlpha ? 5 : 3); cx < n; cx++)
         fx[cx] = cos((PI / w) * (x + 0.5) * cx)
@@ -76,7 +82,7 @@ export function thumbHashToRGBA(hash: Uint8Array): { w: number; h: number; rgba:
       const b = l - (2 / 3) * p
       const r = (3 * l - b + q) / 2
       const g = r - q
-      rgba[i]     = max(0, 255 * min(1, r))
+      rgba[i] = max(0, 255 * min(1, r))
       rgba[i + 1] = max(0, 255 * min(1, g))
       rgba[i + 2] = max(0, 255 * min(1, b))
       rgba[i + 3] = max(0, 255 * min(1, a))
@@ -112,8 +118,10 @@ function rgbaToPng(w: number, h: number, rgba: Uint8Array): string {
 
   const ihdr = new Uint8Array(13)
   const dv = new DataView(ihdr.buffer)
-  dv.setUint32(0, w); dv.setUint32(4, h)
-  ihdr[8] = 8; ihdr[9] = 6
+  dv.setUint32(0, w)
+  dv.setUint32(4, h)
+  ihdr[8] = 8
+  ihdr[9] = 6
 
   const rowSize = 1 + w * 4
   const raw = new Uint8Array(h * rowSize)
@@ -126,71 +134,122 @@ function rgbaToPng(w: number, h: number, rgba: Uint8Array): string {
     const bs = 32768
     const nb = Math.ceil(data.length / bs)
     const out = new Uint8Array(2 + data.length + nb * 5 + 4)
-    out[0] = 0x78; out[1] = 0x01
-    let oi = 2, a1 = 1, a2 = 0
+    out[0] = 0x78
+    out[1] = 0x01
+    let oi = 2,
+      a1 = 1,
+      a2 = 0
     for (let i = 0; i < nb; i++) {
-      const s = i * bs, e = Math.min(s + bs, data.length)
+      const s = i * bs,
+        e = Math.min(s + bs, data.length)
       const blk = data.subarray(s, e)
       out[oi++] = i === nb - 1 ? 1 : 0
-      out[oi++] = blk.length & 0xff; out[oi++] = (blk.length >> 8) & 0xff
-      out[oi++] = ~blk.length & 0xff; out[oi++] = (~blk.length >> 8) & 0xff
-      out.set(blk, oi); oi += blk.length
-      for (const b of blk) { a1 = (a1 + b) % 65521; a2 = (a2 + a1) % 65521 }
+      out[oi++] = blk.length & 0xff
+      out[oi++] = (blk.length >> 8) & 0xff
+      out[oi++] = ~blk.length & 0xff
+      out[oi++] = (~blk.length >> 8) & 0xff
+      out.set(blk, oi)
+      oi += blk.length
+      for (const b of blk) {
+        a1 = (a1 + b) % 65521
+        a2 = (a2 + a1) % 65521
+      }
     }
     new DataView(out.buffer).setUint32(oi, ((a2 << 16) | a1) >>> 0)
     return out
   }
 
   const sig = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
-  const parts = [sig, chunk('IHDR', ihdr), chunk('IDAT', zlibStore(raw)), chunk('IEND', new Uint8Array(0))]
+  const parts = [
+    sig,
+    chunk('IHDR', ihdr),
+    chunk('IDAT', zlibStore(raw)),
+    chunk('IEND', new Uint8Array(0)),
+  ]
   const total = parts.reduce((n, p) => n + p.length, 0)
   const png = new Uint8Array(total)
   let off = 0
-  for (const p of parts) { png.set(p, off); off += p.length }
+  for (const p of parts) {
+    png.set(p, off)
+    off += p.length
+  }
 
   let bin = ''
   for (const b of png) bin += String.fromCharCode(b)
   return `data:image/png;base64,${btoa(bin)}`
 }
 
+const TRANSPARENT_PNG =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+
 function hashToBytes(hash: string | Uint8Array): Uint8Array {
-  if (typeof hash !== 'string') return hash
-  const bin = atob(hash)
+  if (hash instanceof Uint8Array) return hash
+  if (typeof hash !== 'string') {
+    throw new Error(`[thumbhash] hash must be string or Uint8Array, got: ${typeof hash}`)
+  }
+
+  let s = hash.replace(/-/g, '+').replace(/_/g, '/')
+
+  const pad = (4 - (s.length % 4)) % 4
+  if (pad) s += '='.repeat(pad)
+
+  if (s.length === 0 || s.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(s)) {
+    throw new Error(`[thumbhash] invalid base64: ${JSON.stringify(hash)}`)
+  }
+
+  const bin = atob(s)
   const bytes = new Uint8Array(bin.length)
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
   return bytes
 }
 
 export function decodeThumbHash(hash: string | Uint8Array): string {
-  const bytes = hashToBytes(hash)
-  const { w, h, rgba } = thumbHashToRGBA(bytes)
-  return rgbaToPng(w, h, rgba)
+  try {
+    const bytes = hashToBytes(hash)
+    const { w, h, rgba } = thumbHashToRGBA(bytes)
+    return rgbaToPng(w, h, rgba)
+  } catch (e) {
+    console.warn('[thumbhash] decodeThumbHash failed:', hash, e)
+    return TRANSPARENT_PNG
+  }
 }
 
-export function thumbHashToAverageRGBA(
-  hash: string | Uint8Array,
-): { r: number; g: number; b: number; a: number } {
-  const { min, max } = Math
-  const bytes = hashToBytes(hash)
-  const header = (bytes[0] ?? 0) | ((bytes[1] ?? 0) << 8) | ((bytes[2] ?? 0) << 16)
-  const l = (header & 63) / 63
-  const p = ((header >> 6) & 63) / 31.5 - 1
-  const q = ((header >> 12) & 63) / 31.5 - 1
-  const hasAlpha = header >> 23
-  const a = hasAlpha ? ((bytes[5] ?? 0) & 15) / 15 : 1
-  const b = l - (2 / 3) * p
-  const r = (3 * l - b + q) / 2
-  const g = r - q
-  return {
-    r: max(0, min(1, r)),
-    g: max(0, min(1, g)),
-    b: max(0, min(1, b)),
-    a,
+export function thumbHashToAverageRGBA(hash: string | Uint8Array): {
+  r: number
+  g: number
+  b: number
+  a: number
+} {
+  try {
+    const { min, max } = Math
+    const bytes = hashToBytes(hash)
+    if (bytes.length < 5 || bytes.length > 32) {
+      throw new Error(`[thumbhash] invalid byte length: ${bytes.length}`)
+    }
+    const header = (bytes[0] ?? 0) | ((bytes[1] ?? 0) << 8) | ((bytes[2] ?? 0) << 16)
+    const l = (header & 63) / 63
+    const p = ((header >> 6) & 63) / 31.5 - 1
+    const q = ((header >> 12) & 63) / 31.5 - 1
+    const hasAlpha = header >> 23
+    const a = hasAlpha ? ((bytes[5] ?? 0) & 15) / 15 : 1
+    const b = l - (2 / 3) * p
+    const r = (3 * l - b + q) / 2
+    const g = r - q
+    return {
+      r: max(0, min(1, r)),
+      g: max(0, min(1, g)),
+      b: max(0, min(1, b)),
+      a,
+    }
+  } catch (e) {
+    console.warn('[thumbhash] thumbHashToAverageRGBA failed:', hash, e)
+    return { r: 0, g: 0, b: 0, a: 0 }
   }
 }
 
 export function thumbHashToAverageColor(hash: string | Uint8Array): string {
-  const { r, g, b, a } = thumbHashToAverageRGBA(hash)
+  const avg = thumbHashToAverageRGBA(hash)
+  const { r, g, b, a } = avg
   const to255 = (n: number) => Math.round(n * 255)
   return `rgba(${to255(r)}, ${to255(g)}, ${to255(b)}, ${a.toFixed(3)})`
 }

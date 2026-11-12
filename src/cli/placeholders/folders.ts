@@ -34,7 +34,17 @@ export interface FoldersResult {
   warnings: string[]
 }
 
-const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.avif', '.tiff', '.tif', '.gif', '.svg'])
+const IMAGE_EXTS = new Set([
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.webp',
+  '.avif',
+  '.tiff',
+  '.tif',
+  '.gif',
+  '.svg',
+])
 
 function toPosix(path: string): string {
   return path.split(sep).join('/')
@@ -49,7 +59,8 @@ function walk(dir: string, out: string[]): void {
     if (entry.name.startsWith('.')) continue
     const full = join(dir, entry.name)
     if (entry.isDirectory()) walk(full, out)
-    else if (IMAGE_EXTS.has(entry.name.slice(entry.name.lastIndexOf('.')).toLowerCase())) out.push(full)
+    else if (IMAGE_EXTS.has(entry.name.slice(entry.name.lastIndexOf('.')).toLowerCase()))
+      out.push(full)
   }
 }
 
@@ -105,9 +116,12 @@ export function listFolderImages(
 
 async function runPool<T>(items: T[], concurrency: number, fn: (item: T) => Promise<void>) {
   let index = 0
-  const workers = Array.from({ length: Math.max(1, Math.min(concurrency, items.length)) }, async () => {
-    while (index < items.length) await fn(items[index++]!)
-  })
+  const workers = Array.from(
+    { length: Math.max(1, Math.min(concurrency, items.length)) },
+    async () => {
+      while (index < items.length) await fn(items[index++]!)
+    },
+  )
   await Promise.all(workers)
 }
 
@@ -126,9 +140,17 @@ export async function buildFolderManifest(
 
   const targets: { url: string; job: SourceJob }[] = []
   for (const input of options.dirs) {
-    for (const { abs, url } of listFolderImages(input, options.root, options.publicDir, result.warnings)) {
+    for (const { abs, url } of listFolderImages(
+      input,
+      options.root,
+      options.publicDir,
+      result.warnings,
+    )) {
       result.files.push(abs)
-      targets.push({ url, job: { key: `file:${abs}`, remote: false, filePath: abs, colorOnly: isSvg(abs) } })
+      targets.push({
+        url,
+        job: { key: `file:${abs}`, remote: false, filePath: abs, colorOnly: isSvg(abs) },
+      })
     }
   }
   for (const raw of options.urls) {

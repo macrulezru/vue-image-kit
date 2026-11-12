@@ -9,10 +9,10 @@ export function sanity(options: { projectId: string; dataset: string }): CdnAdap
       const cleanPath = path.startsWith('/') ? path.slice(1) : path
       const params = new URLSearchParams()
 
-      if (opts.width)   params.set('w', String(opts.width))
-      if (opts.height)  params.set('h', String(opts.height))
+      if (opts.width) params.set('w', String(opts.width))
+      if (opts.height) params.set('h', String(opts.height))
       if (opts.quality) params.set('q', String(opts.quality))
-      else              params.set('q', '80')
+      else params.set('q', '80')
 
       if (opts.format && opts.format !== 'auto') {
         params.set('fm', opts.format)
@@ -29,9 +29,7 @@ export function sanity(options: { projectId: string; dataset: string }): CdnAdap
       return `${base}/${cleanPath}${qs ? `?${qs}` : ''}`
     },
     srcset(path, widths, opts = {}) {
-      return widths
-        .map((w) => `${this.url(path, { ...opts, width: w })} ${w}w`)
-        .join(', ')
+      return widths.map((w) => `${this.url(path, { ...opts, width: w })} ${w}w`).join(', ')
     },
   }
 }

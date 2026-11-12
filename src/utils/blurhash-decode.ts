@@ -1,4 +1,5 @@
-const BASE83_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~'
+const BASE83_CHARS =
+  '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~'
 
 export function decode83(str: string, start: number, end: number): number {
   let value = 0
@@ -58,9 +59,7 @@ export function decodeBlurhash(
   const numX = (sizeFlag % 9) + 1
   const expectedLength = 4 + 2 * numX * numY
   if (blurhash.length !== expectedLength) {
-    throw new Error(
-      `Invalid blurhash: expected length ${expectedLength}, got ${blurhash.length}`,
-    )
+    throw new Error(`Invalid blurhash: expected length ${expectedLength}, got ${blurhash.length}`)
   }
 
   const quantisedMaximumValue = decode83(blurhash, 1, 2)
@@ -89,9 +88,7 @@ export function decodeBlurhash(
 
       for (let j = 0; j < numY; j++) {
         for (let i = 0; i < numX; i++) {
-          const basis =
-            Math.cos((Math.PI * x * i) / width) *
-            Math.cos((Math.PI * y * j) / height)
+          const basis = Math.cos((Math.PI * x * i) / width) * Math.cos((Math.PI * y * j) / height)
           const color = colors[j * numX + i]
           r += color[0] * basis
           g += color[1] * basis

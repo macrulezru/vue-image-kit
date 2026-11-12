@@ -14,17 +14,31 @@ export { useLazyLoad } from './composables/useLazyLoad'
 export { useBreakpoints, BREAKPOINTS_KEY } from './composables/useBreakpoints'
 export { useImagePreloader } from './composables/useImagePreloader'
 export { useBackgroundImage } from './composables/useBackgroundImage'
-export type { UseBackgroundImageOptions, UseBackgroundImageReturn } from './composables/useBackgroundImage'
+export type {
+  UseBackgroundImageOptions,
+  UseBackgroundImageReturn,
+} from './composables/useBackgroundImage'
 export { useNetworkAware, isSaveDataEnabled } from './composables/useNetworkAware'
 export { useServerRoute, SERVER_ROUTE_KEY } from './composables/useServerLoader'
 export { PLACEHOLDERS_KEY } from './utils/placeholders'
 export { registerPlaceholder } from './utils/placeholder-registry'
 export type { RegisteredPlaceholder } from './utils/placeholder-registry'
 export { decodeBlurhash } from './utils/blurhash-decode'
-export { decodeThumbHash, thumbHashToAverageRGBA, thumbHashToAverageColor } from './utils/thumbhash-decode'
+export {
+  decodeThumbHash,
+  thumbHashToAverageRGBA,
+  thumbHashToAverageColor,
+} from './utils/thumbhash-decode'
 export { encodeBlurhash, encodeThumbHash } from './utils/encode'
 export type { EncodeSource, EncodeBlurhashOptions, EncodeThumbHashOptions } from './utils/encode'
-export { generateSrcset, generateSizes, generateDensitySrcset, buildSizes, generatePreloadLink, pickSmallestSrcsetUrl } from './utils/srcset'
+export {
+  generateSrcset,
+  generateSizes,
+  generateDensitySrcset,
+  buildSizes,
+  generatePreloadLink,
+  pickSmallestSrcsetUrl,
+} from './utils/srcset'
 export type {
   ImageStatus,
   SrcSet,

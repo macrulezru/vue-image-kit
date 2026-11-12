@@ -27,7 +27,9 @@ function padLeft(s: string, width: number): string {
 export function printImageReport(image: ProcessedImage): void {
   console.log(`[vue-image-kit] ${image.name}`)
   console.log(`  Input   ${toRelative(image.srcAbsPath)}`)
-  console.log(`          ${image.originalFormat} · ${image.originalWidth}×${image.originalHeight} · ${formatBytes(image.originalSizeBytes)}`)
+  console.log(
+    `          ${image.originalFormat} · ${image.originalWidth}×${image.originalHeight} · ${formatBytes(image.originalSizeBytes)}`,
+  )
 
   if (image.variants.length === 0) return
 
@@ -79,6 +81,8 @@ export function printBatchSummary(images: ProcessedImage[]): void {
     const savingsPct = Math.round((1 - totalSmallestBytes / totalInputBytes) * 100)
     const direction = savingsPct >= 0 ? 'saves' : 'is'
     const magnitude = Math.abs(savingsPct)
-    console.log(`  Smallest available format ${direction} ~${magnitude}% ${savingsPct >= 0 ? 'vs. original, on average' : 'bigger than the original, on average'}`)
+    console.log(
+      `  Smallest available format ${direction} ~${magnitude}% ${savingsPct >= 0 ? 'vs. original, on average' : 'bigger than the original, on average'}`,
+    )
   }
 }

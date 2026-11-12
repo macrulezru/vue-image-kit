@@ -81,7 +81,9 @@ export function resolveModuleConfig(options: ModuleOptions, rootDir: string): Re
           root: resolve(rootDir, onDemandOpts.root ?? 'public'),
           ...(onDemandOpts.cacheDir !== undefined ? { cacheDir: onDemandOpts.cacheDir } : {}),
           ...(onDemandOpts.maxAge !== undefined ? { maxAge: onDemandOpts.maxAge } : {}),
-          ...(onDemandOpts.allowedWidths !== undefined ? { allowedWidths: onDemandOpts.allowedWidths } : {}),
+          ...(onDemandOpts.allowedWidths !== undefined
+            ? { allowedWidths: onDemandOpts.allowedWidths }
+            : {}),
           ...(onDemandOpts.maxWidth !== undefined ? { maxWidth: onDemandOpts.maxWidth } : {}),
         }
       : null,
@@ -169,7 +171,10 @@ export default defineNuxtModule<ModuleOptions>({
 
   async setup(options, nuxt) {
     const resolver = createResolver(import.meta.url)
-    const { effectiveRoute, publicConfig, serverConfig } = resolveModuleConfig(options, nuxt.options.rootDir)
+    const { effectiveRoute, publicConfig, serverConfig } = resolveModuleConfig(
+      options,
+      nuxt.options.rootDir,
+    )
 
     ;(nuxt.options.runtimeConfig.public as Record<string, unknown>).vueImageKit = publicConfig
 

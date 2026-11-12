@@ -33,7 +33,16 @@ function fileSize(path: string): number {
   }
 }
 
-export const SUPPORTED_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.tiff', '.tif', '.gif', '.svg'])
+export const SUPPORTED_EXTS = new Set([
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.webp',
+  '.tiff',
+  '.tif',
+  '.gif',
+  '.svg',
+])
 
 type SharpFactory = Awaited<ReturnType<typeof getSharp>>
 type SharpImage = ReturnType<SharpFactory>
@@ -192,7 +201,9 @@ async function buildGifVariants(
       webpSizeBytes = fileSize(webpOutPath)
     } else if (!config.dryRun) {
       const quality = config.quality.webp ?? 80
-      const info = await sharp(srcPath, { animated: true }).webp({ quality, loop: 0 }).toFile(webpOutPath)
+      const info = await sharp(srcPath, { animated: true })
+        .webp({ quality, loop: 0 })
+        .toFile(webpOutPath)
       webpSizeBytes = info.size
     }
 
@@ -228,7 +239,8 @@ async function buildRasterVariants(
 
   for (const width of targetWidths) {
     const isOriginal = width === originalWidth
-    const estimatedHeight = originalWidth > 0 ? Math.round((width * originalHeight) / originalWidth) : 0
+    const estimatedHeight =
+      originalWidth > 0 ? Math.round((width * originalHeight) / originalWidth) : 0
 
     for (const format of config.formats) {
       if (format !== 'jpg' && format !== 'webp' && format !== 'avif') continue
@@ -243,8 +255,13 @@ async function buildRasterVariants(
 
       if (config.skipExisting && existsSync(outPath)) {
         variants.push({
-          absPath: outPath, url, width, height: estimatedHeight, format,
-          sizeBytes: fileSize(outPath), skipped: true,
+          absPath: outPath,
+          url,
+          width,
+          height: estimatedHeight,
+          format,
+          sizeBytes: fileSize(outPath),
+          skipped: true,
         })
         continue
       }
@@ -254,13 +271,15 @@ async function buildRasterVariants(
 
       if (!config.dryRun) {
         const resized = image.clone().resize(width, null, { withoutEnlargement: true })
-        const quality = config.quality[format] ?? (format === 'jpg' ? 85 : format === 'webp' ? 80 : 65)
+        const quality =
+          config.quality[format] ?? (format === 'jpg' ? 85 : format === 'webp' ? 80 : 65)
 
-        const info = format === 'jpg'
-          ? await resized.jpeg({ quality, mozjpeg: true }).toFile(outPath)
-          : format === 'webp'
-            ? await resized.webp({ quality }).toFile(outPath)
-            : await resized.avif({ quality }).toFile(outPath)
+        const info =
+          format === 'jpg'
+            ? await resized.jpeg({ quality, mozjpeg: true }).toFile(outPath)
+            : format === 'webp'
+              ? await resized.webp({ quality }).toFile(outPath)
+              : await resized.avif({ quality }).toFile(outPath)
 
         height = info.height
         sizeBytes = info.size
@@ -294,9 +313,18 @@ async function processOne(
   const originalFormat = extLower.replace(/^\./, '').replace(/^jpeg$/, 'jpg')
   const originalSizeBytes = fileSize(srcPath)
 
-  const variants = extLower === '.gif'
-    ? await buildGifVariants(srcPath, name, originalWidth, originalHeight, outputDir, config, sharp)
-    : await buildRasterVariants(image, name, originalWidth, originalHeight, outputDir, config)
+  const variants =
+    extLower === '.gif'
+      ? await buildGifVariants(
+          srcPath,
+          name,
+          originalWidth,
+          originalHeight,
+          outputDir,
+          config,
+          sharp,
+        )
+      : await buildRasterVariants(image, name, originalWidth, originalHeight, outputDir, config)
 
   let placeholder = ''
   if (config.lqip && !config.dryRun) {
@@ -345,12 +373,25 @@ async function processOne(
   }
 
   return {
-    name, srcAbsPath: srcPath, originalWidth, originalHeight, originalFormat, originalSizeBytes,
-    variants, placeholder, hazehash: hazehashStr, blurhash: blurhashStr, thumbhash: thumbhashStr,
+    name,
+    srcAbsPath: srcPath,
+    originalWidth,
+    originalHeight,
+    originalFormat,
+    originalSizeBytes,
+    variants,
+    placeholder,
+    hazehash: hazehashStr,
+    blurhash: blurhashStr,
+    thumbhash: thumbhashStr,
   }
 }
 
-async function runBatch<T, R>(items: T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+async function runBatch<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
   const results: R[] = []
   for (let i = 0; i < items.length; i += concurrency) {
     const chunk = items.slice(i, i + concurrency)
@@ -382,7 +423,8 @@ export async function generate(config: CliConfig): Promise<void> {
     if (loaded && loaded.configHash !== configHash) {
       console.log('[vue-image-kit] Config changed since last run — reprocessing everything.')
     }
-    incrementalState = loaded && loaded.configHash === configHash ? loaded : { configHash, entries: {} }
+    incrementalState =
+      loaded && loaded.configHash === configHash ? loaded : { configHash, entries: {} }
   }
 
   console.log(`[vue-image-kit] Processing ${srcFiles.length} image(s)…`)

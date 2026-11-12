@@ -8,10 +8,10 @@ export function bunny(baseUrl: string): CdnAdapter {
       const cleanPath = path.startsWith('/') ? path : `/${path}`
       const params = new URLSearchParams()
 
-      if (opts.width)   params.set('width', String(opts.width))
-      if (opts.height)  params.set('height', String(opts.height))
+      if (opts.width) params.set('width', String(opts.width))
+      if (opts.height) params.set('height', String(opts.height))
       if (opts.quality) params.set('quality', String(opts.quality))
-      else              params.set('quality', '80')
+      else params.set('quality', '80')
 
       if (opts.format && opts.format !== 'auto') {
         params.set('format', opts.format)
@@ -26,9 +26,7 @@ export function bunny(baseUrl: string): CdnAdapter {
       return `${base}${cleanPath}${qs ? `?${qs}` : ''}`
     },
     srcset(path, widths, opts = {}) {
-      return widths
-        .map((w) => `${this.url(path, { ...opts, width: w })} ${w}w`)
-        .join(', ')
+      return widths.map((w) => `${this.url(path, { ...opts, width: w })} ${w}w`).join(', ')
     },
   }
 }

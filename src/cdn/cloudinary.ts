@@ -7,12 +7,12 @@ export interface CloudinaryOptions {
 
 function buildTransforms(opts: CdnUrlOptions): string {
   const parts: string[] = []
-  if (opts.width)   parts.push(`w_${opts.width}`)
-  if (opts.height)  parts.push(`h_${opts.height}`)
+  if (opts.width) parts.push(`w_${opts.width}`)
+  if (opts.height) parts.push(`h_${opts.height}`)
   if (opts.quality) parts.push(`q_${opts.quality}`)
-  else              parts.push('q_auto')
-  if (opts.format)  parts.push(opts.format === 'auto' ? 'f_auto' : `f_${opts.format}`)
-  else              parts.push('f_auto')
+  else parts.push('q_auto')
+  if (opts.format) parts.push(opts.format === 'auto' ? 'f_auto' : `f_${opts.format}`)
+  else parts.push('f_auto')
   if (opts.fit) {
     const cropMap: Record<string, string> = { cover: 'fill', contain: 'fit', fill: 'scale' }
     parts.push(`c_${cropMap[opts.fit] ?? 'fill'}`)
@@ -32,9 +32,7 @@ export function cloudinary(options: CloudinaryOptions): CdnAdapter {
       return `${base}/${transforms}/${resourceType}/${cleanPath}`
     },
     srcset(path, widths, opts = {}) {
-      return widths
-        .map((w) => `${this.url(path, { ...opts, width: w })} ${w}w`)
-        .join(', ')
+      return widths.map((w) => `${this.url(path, { ...opts, width: w })} ${w}w`).join(', ')
     },
   }
 }

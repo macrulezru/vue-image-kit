@@ -68,7 +68,13 @@ function sendNotModified(res: ServerResponse, etag: string, maxAge: number): voi
   res.end()
 }
 
-function sendImage(res: ServerResponse, buf: Buffer, mime: string, maxAge: number, etag: string): void {
+function sendImage(
+  res: ServerResponse,
+  buf: Buffer,
+  mime: string,
+  maxAge: number,
+  etag: string,
+): void {
   res.statusCode = 200
   res.setHeader('Content-Type', mime)
   res.setHeader('Cache-Control', `public, max-age=${maxAge}, must-revalidate`)
@@ -138,7 +144,11 @@ export function createImageHandler(options: ImageHandlerOptions): ImageHandler {
 
       const formatParam = url.searchParams.get('format')
       if (formatParam && !(TRANSFORM_FORMATS as readonly string[]).includes(formatParam)) {
-        sendText(res, 400, `Unsupported "format": ${formatParam} (allowed: ${TRANSFORM_FORMATS.join(', ')})`)
+        sendText(
+          res,
+          400,
+          `Unsupported "format": ${formatParam} (allowed: ${TRANSFORM_FORMATS.join(', ')})`,
+        )
         return
       }
 

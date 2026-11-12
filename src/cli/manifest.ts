@@ -54,7 +54,10 @@ export function buildEntry(image: ProcessedImage, widths: number[]): ManifestEnt
 
   const entry: ManifestEntry = {
     name: image.name,
-    src: jpgByWidth.get(image.originalWidth) ?? image.variants.find((v) => v.format === 'jpg')?.url ?? '',
+    src:
+      jpgByWidth.get(image.originalWidth) ??
+      image.variants.find((v) => v.format === 'jpg')?.url ??
+      '',
     srcset: buildSrcset(image),
     webp: webpOriginal?.url ?? '',
     avif: avifOriginal?.url ?? '',
@@ -103,9 +106,7 @@ function buildInterface(widths: number[]): string {
 }
 
 export function generateManifestContent(images: ProcessedImage[], widths: number[]): string {
-  const entries = images
-    .map((img) => `  ${indent(buildEntry(img, widths))}`)
-    .join(',\n')
+  const entries = images.map((img) => `  ${indent(buildEntry(img, widths))}`).join(',\n')
 
   return [
     '// Auto-generated — do not edit manually',

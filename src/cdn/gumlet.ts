@@ -8,8 +8,8 @@ export function gumlet(baseUrl: string): CdnAdapter {
       const cleanPath = path.startsWith('/') ? path : `/${path}`
       const params = new URLSearchParams()
 
-      if (opts.width)   params.set('w', String(opts.width))
-      if (opts.height)  params.set('h', String(opts.height))
+      if (opts.width) params.set('w', String(opts.width))
+      if (opts.height) params.set('h', String(opts.height))
       if (opts.quality) params.set('q', String(opts.quality))
       params.set('format', opts.format ?? 'auto')
 
@@ -30,9 +30,7 @@ export function gumlet(baseUrl: string): CdnAdapter {
       return `${base}${cleanPath}${qs ? `?${qs}` : ''}`
     },
     srcset(path, widths, opts = {}) {
-      return widths
-        .map((w) => `${this.url(path, { ...opts, width: w })} ${w}w`)
-        .join(', ')
+      return widths.map((w) => `${this.url(path, { ...opts, width: w })} ${w}w`).join(', ')
     },
   }
 }

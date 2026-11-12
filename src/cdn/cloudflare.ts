@@ -8,8 +8,8 @@ export function cloudflare(baseUrl: string): CdnAdapter {
       const cleanPath = path.startsWith('/') ? path : `/${path}`
       const parts: string[] = []
 
-      if (opts.width)   parts.push(`width=${opts.width}`)
-      if (opts.height)  parts.push(`height=${opts.height}`)
+      if (opts.width) parts.push(`width=${opts.width}`)
+      if (opts.height) parts.push(`height=${opts.height}`)
       if (opts.quality) parts.push(`quality=${opts.quality}`)
       parts.push(opts.format ? `format=${opts.format}` : 'format=auto')
 
@@ -29,9 +29,7 @@ export function cloudflare(baseUrl: string): CdnAdapter {
       return `${base}/cdn-cgi/image/${parts.join(',')}${cleanPath}`
     },
     srcset(path, widths, opts = {}) {
-      return widths
-        .map((w) => `${this.url(path, { ...opts, width: w })} ${w}w`)
-        .join(', ')
+      return widths.map((w) => `${this.url(path, { ...opts, width: w })} ${w}w`).join(', ')
     },
   }
 }

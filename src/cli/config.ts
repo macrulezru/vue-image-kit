@@ -3,7 +3,9 @@ import { resolve, join } from 'node:path'
 import { hazehashAvailable } from './deps.js'
 import type { CliConfig, PlaceholdersFileConfig, ScanFileConfig } from './types.js'
 
-type PartialCliConfig = Partial<Omit<CliConfig, 'quality'> & { quality: Partial<CliConfig['quality']> }> & {
+type PartialCliConfig = Partial<
+  Omit<CliConfig, 'quality'> & { quality: Partial<CliConfig['quality']> }
+> & {
   scan?: ScanFileConfig
   placeholders?: PlaceholdersFileConfig
 }
@@ -75,8 +77,5 @@ export function mergeConfig(
 }
 
 export function applyTemplate(template: string, name: string, width: number, ext: string): string {
-  return template
-    .replace('{name}', name)
-    .replace('{width}', String(width))
-    .replace('{ext}', ext)
+  return template.replace('{name}', name).replace('{width}', String(width)).replace('{ext}', ext)
 }

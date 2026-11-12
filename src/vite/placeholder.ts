@@ -5,7 +5,11 @@ import { loadCdnModule } from '../cli/cdn-bridge.js'
 import { fileStamp, hasModeData, loadCache, saveCache } from '../cli/placeholders/cache.js'
 import type { PlaceholderCache } from '../cli/placeholders/cache.js'
 import { defaultPlaceholderMode, resolveTuning, tuningKey } from '../cli/placeholders/compute.js'
-import type { PlaceholderData, PlaceholderMode, PlaceholderTuning } from '../cli/placeholders/compute.js'
+import type {
+  PlaceholderData,
+  PlaceholderMode,
+  PlaceholderTuning,
+} from '../cli/placeholders/compute.js'
 import { buildFolderManifest, listFolderImages } from '../cli/placeholders/folders.js'
 import type { FolderInput } from '../cli/placeholders/folders.js'
 import { computeJob, isSvg } from '../cli/placeholders/job.js'
@@ -83,7 +87,12 @@ export interface PlaceholderService {
   mode: PlaceholderMode
   file(filePath: string, mode?: PlaceholderMode): Promise<PlaceholderProps>
   fields(filePath: string, spec: FieldSpec): Promise<FieldResult>
-  manifest(): Promise<{ entries: ManifestEntries; files: string[]; warnings: string[]; failures: { key: string; message: string }[] }>
+  manifest(): Promise<{
+    entries: ManifestEntries
+    files: string[]
+    warnings: string[]
+    failures: { key: string; message: string }[]
+  }>
   watchedDirs(): string[]
   flush(): void
 }
