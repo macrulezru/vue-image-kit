@@ -8,8 +8,8 @@ export function netlify(options: { origin?: string } = {}): CdnAdapter {
       const params = new URLSearchParams()
       params.set('url', path)
 
-      if (opts.width)   params.set('w', String(opts.width))
-      if (opts.height)  params.set('h', String(opts.height))
+      if (opts.width) params.set('w', String(opts.width))
+      if (opts.height) params.set('h', String(opts.height))
       if (opts.format && opts.format !== 'auto') params.set('fm', opts.format)
       if (opts.quality) params.set('q', String(opts.quality))
 
@@ -27,9 +27,7 @@ export function netlify(options: { origin?: string } = {}): CdnAdapter {
       return `${origin}/.netlify/images?${params.toString()}`
     },
     srcset(path, widths, opts = {}) {
-      return widths
-        .map((w) => `${this.url(path, { ...opts, width: w })} ${w}w`)
-        .join(', ')
+      return widths.map((w) => `${this.url(path, { ...opts, width: w })} ${w}w`).join(', ')
     },
   }
 }

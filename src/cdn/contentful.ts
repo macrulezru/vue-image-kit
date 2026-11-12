@@ -6,10 +6,10 @@ export function contentful(): CdnAdapter {
       const url = new URL(path)
       const params = url.searchParams
 
-      if (opts.width)   params.set('w', String(opts.width))
-      if (opts.height)  params.set('h', String(opts.height))
+      if (opts.width) params.set('w', String(opts.width))
+      if (opts.height) params.set('h', String(opts.height))
       if (opts.quality) params.set('q', String(opts.quality))
-      else              params.set('q', '80')
+      else params.set('q', '80')
 
       if (opts.format && opts.format !== 'auto') {
         params.set('fm', opts.format)
@@ -25,9 +25,7 @@ export function contentful(): CdnAdapter {
       return url.toString()
     },
     srcset(path, widths, opts = {}) {
-      return widths
-        .map((w) => `${this.url(path, { ...opts, width: w })} ${w}w`)
-        .join(', ')
+      return widths.map((w) => `${this.url(path, { ...opts, width: w })} ${w}w`).join(', ')
     },
   }
 }

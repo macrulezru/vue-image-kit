@@ -7,7 +7,13 @@ import { loadCdnModule } from '../cdn-bridge.js'
 import { createProgramParser, loadCompiler, scanProject } from '../scan/scanner.js'
 import { findNuxtConfig, nuxtSrcDir } from '../scan/aliases.js'
 import { loadCache, saveCache } from '../placeholders/cache.js'
-import { defaultPlaceholderMode, tuningKey, type ColorStrategy, type PlaceholderMode, type PlaceholderTuning } from '../placeholders/compute.js'
+import {
+  defaultPlaceholderMode,
+  tuningKey,
+  type ColorStrategy,
+  type PlaceholderMode,
+  type PlaceholderTuning,
+} from '../placeholders/compute.js'
 import type { FolderInput } from '../placeholders/folders.js'
 import { runPlaceholders, type PlaceholdersReport, type SkipReason } from '../placeholders/run.js'
 import {
@@ -123,7 +129,8 @@ export function resolveTuningFlags(
   const tuning: PlaceholderTuning = { ...(config ?? {}) }
   if (values.components !== undefined) {
     const match = /^([1-9])x([1-9])$/i.exec(values.components)
-    if (!match) throw new Error(`--components must look like 4x3 (1-9 each), got "${values.components}"`)
+    if (!match)
+      throw new Error(`--components must look like 4x3 (1-9 each), got "${values.components}"`)
     tuning.components = [Number(match[1]), Number(match[2])]
   }
   const sample = positiveInt(values.sample, '--sample')
@@ -131,7 +138,9 @@ export function resolveTuningFlags(
   if (values.budget !== undefined) {
     const budget = Number(values.budget)
     if (!Number.isInteger(budget) || budget < 7 || budget > 48)
-      throw new Error(`--budget must be a whole number of bytes from 7 to 48 (got "${values.budget}")`)
+      throw new Error(
+        `--budget must be a whole number of bytes from 7 to 48 (got "${values.budget}")`,
+      )
     tuning.budget = budget
   }
   if (values.color !== undefined) {

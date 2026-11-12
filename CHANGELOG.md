@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.2] - 2026-12-11
+
+### Fixed
+
+- **A corrupt ThumbHash no longer crashes the whole app with `Failed to execute 'atob' on 'Window'`.** `decodeThumbHash()` called `atob()` on whatever string it was given, so a placeholder that arrived empty, truncated, HTML, or in Base64URL form (`-`/`_` instead of `+`/`/`) threw inside the decoder — and in a Nuxt production build one bad `thumbhash` on one image took the entire page down with `500 Internal Server Error`. `hashToBytes()` now normalizes Base64URL to Base64, pads to a multiple of 4, and validates the alphabet and length before calling `atob`; `thumbHashToRGBA()` rejects byte arrays shorter than 5 or longer than 32 with a clear message instead of decoding garbage. `decodeThumbHash()` returns a transparent 1×1 PNG (`TRANSPARENT_PNG`), `thumbHashToAverageRGBA()` returns `{ r: 0, g: 0, b: 0, a: 0 }` and `thumbHashToAverageColor()` returns `'rgba(0, 0, 0, 0)'` when the hash is invalid — the previous signatures (`string`, `{ r, g, b, a }`, `string`) are unchanged, so no consumer has to be updated. Each failure logs a single `console.warn` with the offending hash, which is enough to find the source of the bad data. `<VImage>`, `manifest-placeholder.ts`, `v-lazy-img` and `useBackgroundImage()` already handle the transparent fallback without changes; a broken placeholder now shows an empty box instead of breaking the page.
+- **`thumbHashToAverageRGBA()` could return `NaN` for a byte array that passed the old length check but carried a truncated header.** It now validates the byte length the same way `thumbHashToRGBA()` does (5–32 bytes) before reading the header, so an out-of-range alpha/DC field can no longer produce a non-finite color.
+
 ## [1.7.1] - 2026-10-07
 
 ### Fixed

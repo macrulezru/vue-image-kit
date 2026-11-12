@@ -1,4 +1,3 @@
-
 declare module '*?vik' {
   const meta: {
     name: string

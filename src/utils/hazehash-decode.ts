@@ -19,10 +19,12 @@ export function loadHazehash(): Promise<HazehashModule | null> {
 
 export async function hazehashToDataUrl(hash: string, size = 32): Promise<string | undefined> {
   if (typeof document === 'undefined') return undefined
+  if (typeof hash !== 'string' || hash.length === 0) return undefined
   const module = await loadHazehash()
   if (!module) return undefined
   try {
     const { width, height, data } = module.decode(hash, { size })
+    if (!width || !height || !data || data.length !== width * height * 4) return undefined
     const canvas = document.createElement('canvas')
     canvas.width = width
     canvas.height = height

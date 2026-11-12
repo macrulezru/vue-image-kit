@@ -1,10 +1,4 @@
-
-export type EncodeSource =
-  | ImageData
-  | HTMLCanvasElement
-  | HTMLImageElement
-  | ImageBitmap
-  | Blob
+export type EncodeSource = ImageData | HTMLCanvasElement | HTMLImageElement | ImageBitmap | Blob
 
 export interface EncodeBlurhashOptions {
   componentX?: number
@@ -45,7 +39,9 @@ function readScaled(img: CanvasImageSource, sw: number, sh: number, maxSize: num
 function imageLoaded(img: HTMLImageElement): Promise<void> {
   return new Promise((resolve, reject) => {
     img.addEventListener('load', () => resolve(), { once: true })
-    img.addEventListener('error', () => reject(new Error('[vue-image-kit] image failed to load')), { once: true })
+    img.addEventListener('error', () => reject(new Error('[vue-image-kit] image failed to load')), {
+      once: true,
+    })
   })
 }
 
@@ -115,7 +111,9 @@ function blurhashFromImageData(data: ImageData, numX: number, numY: number): str
   for (let j = 0; j < numY; j++) {
     for (let i = 0; i < numX; i++) {
       const norm = i === 0 && j === 0 ? 1 : 2
-      let r = 0, g = 0, b = 0
+      let r = 0,
+        g = 0,
+        b = 0
       for (let y = 0; y < height; y++) {
         const fy = Math.cos((Math.PI * j * y) / height)
         for (let x = 0; x < width; x++) {
@@ -137,7 +135,8 @@ function blurhashFromImageData(data: ImageData, numX: number, numY: number): str
     (m, [r, g, b]) => Math.max(m, Math.abs(r), Math.abs(g), Math.abs(b)),
     0,
   )
-  const quantizedMax = acList.length > 0 ? Math.max(0, Math.min(82, Math.floor(maxAC * 166 - 0.5))) : 0
+  const quantizedMax =
+    acList.length > 0 ? Math.max(0, Math.min(82, Math.floor(maxAC * 166 - 0.5))) : 0
   const actualMax = acList.length > 0 ? (quantizedMax + 1) / 166 : 1
 
   const encodeAC = (r: number, g: number, b: number): number => {
@@ -148,9 +147,12 @@ function blurhashFromImageData(data: ImageData, numX: number, numY: number): str
   }
 
   let hash = ''
-  hash += encode83((numX - 1) + (numY - 1) * 9, 1)
+  hash += encode83(numX - 1 + (numY - 1) * 9, 1)
   hash += encode83(quantizedMax, 1)
-  hash += encode83((linearTosRGB(dc[0]) << 16) | (linearTosRGB(dc[1]) << 8) | linearTosRGB(dc[2]), 4)
+  hash += encode83(
+    (linearTosRGB(dc[0]) << 16) | (linearTosRGB(dc[1]) << 8) | linearTosRGB(dc[2]),
+    4,
+  )
   for (const [r, g, b] of acList) hash += encode83(encodeAC(r, g, b), 2)
 
   return hash
@@ -171,7 +173,10 @@ function rgbaToThumbHash(w: number, h: number, rgba: Uint8ClampedArray | Uint8Ar
   if (w > 100 || h > 100) throw new Error(`[vue-image-kit] ${w}x${h} doesn't fit in 100x100`)
   const { PI, round, max, cos, abs } = Math
 
-  let avgR = 0, avgG = 0, avgB = 0, avgA = 0
+  let avgR = 0,
+    avgG = 0,
+    avgB = 0,
+    avgA = 0
   for (let i = 0, j = 0; i < w * h; i++, j += 4) {
     const alpha = rgba[j + 3]! / 255
     avgR += (alpha / 255) * rgba[j]!
@@ -245,8 +250,17 @@ function rgbaToThumbHash(w: number, h: number, rgba: Uint8ClampedArray | Uint8Ar
     (round(31 * lScale) << 18) |
     (hasAlpha << 23)
   const header16 =
-    (isLandscape ? ly : lx) | (round(63 * pScale) << 3) | (round(63 * qScale) << 9) | (isLandscape << 15)
-  const hash: number[] = [header24 & 255, (header24 >> 8) & 255, header24 >> 16, header16 & 255, header16 >> 8]
+    (isLandscape ? ly : lx) |
+    (round(63 * pScale) << 3) |
+    (round(63 * qScale) << 9) |
+    (isLandscape << 15)
+  const hash: number[] = [
+    header24 & 255,
+    (header24 >> 8) & 255,
+    header24 >> 16,
+    header16 & 255,
+    header16 >> 8,
+  ]
   const acStart = hasAlpha ? 6 : 5
   let acIndex = 0
   if (hasAlpha) hash.push(round(15 * aDC) | (round(15 * aScale) << 4))

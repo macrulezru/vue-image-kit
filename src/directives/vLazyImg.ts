@@ -23,7 +23,9 @@ interface InstanceWithContext {
   $?: { appContext?: { provides?: Record<symbol, unknown> } }
 }
 
-function manifestFor(binding: DirectiveBinding<string | LazyImgOptions>): PlaceholderManifest | null {
+function manifestFor(
+  binding: DirectiveBinding<string | LazyImgOptions>,
+): PlaceholderManifest | null {
   const instance = binding.instance as InstanceWithContext | null
   const provided = instance?.$?.appContext?.provides?.[PLACEHOLDERS_KEY as symbol]
   return (provided as PlaceholderManifest | undefined) ?? null

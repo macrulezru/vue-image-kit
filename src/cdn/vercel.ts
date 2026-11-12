@@ -12,9 +12,7 @@ export function vercel(options: { origin?: string } = {}): CdnAdapter {
       return `${origin}/_vercel/image?${params.toString()}`
     },
     srcset(path, widths, opts = {}) {
-      return widths
-        .map((w) => `${this.url(path, { ...opts, width: w })} ${w}w`)
-        .join(', ')
+      return widths.map((w) => `${this.url(path, { ...opts, width: w })} ${w}w`).join(', ')
     },
   }
 }

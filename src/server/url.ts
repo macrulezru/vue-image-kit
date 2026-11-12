@@ -4,7 +4,11 @@ export interface BuildImageUrlOptions {
   quality?: number
 }
 
-export function buildImageUrl(src: string, opts: BuildImageUrlOptions = {}, base = '/_vik/image'): string {
+export function buildImageUrl(
+  src: string,
+  opts: BuildImageUrlOptions = {},
+  base = '/_vik/image',
+): string {
   const params = new URLSearchParams()
   params.set('src', src)
   if (opts.width) params.set('w', String(opts.width))

@@ -472,12 +472,12 @@ export async function runPlaceholders(
         refreshRemote: options.refreshRemote,
       },
       {
-          sharp: deps.sharp,
-          rgbaToThumbHash: deps.rgbaToThumbHash,
-          encodeHazehash: deps.encodeHazehash,
-          cdn: deps.cdn,
-          cache: deps.cache,
-        },
+        sharp: deps.sharp,
+        rgbaToThumbHash: deps.rgbaToThumbHash,
+        encodeHazehash: deps.encodeHazehash,
+        cdn: deps.cdn,
+        cache: deps.cache,
+      },
     )
     Object.assign(manifestEntries, folders.entries)
     report.folderEntries = Object.keys(folders.entries).length

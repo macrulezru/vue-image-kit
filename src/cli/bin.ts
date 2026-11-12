@@ -28,7 +28,8 @@ async function main(): Promise<void> {
   const argv = process.argv.slice(2)
   const commandIndex = argv.findIndex((arg) => !arg.startsWith('-'))
   const command = commandIndex >= 0 ? argv[commandIndex]! : 'generate'
-  const rest = commandIndex >= 0 ? [...argv.slice(0, commandIndex), ...argv.slice(commandIndex + 1)] : argv
+  const rest =
+    commandIndex >= 0 ? [...argv.slice(0, commandIndex), ...argv.slice(commandIndex + 1)] : argv
 
   if (commandIndex < 0 && (argv.includes('--help') || argv.includes('-h'))) {
     console.log(HELP)
@@ -37,7 +38,9 @@ async function main(): Promise<void> {
 
   const run = COMMANDS[command]
   if (!run) {
-    console.error(`[vue-image-kit] Unknown command: "${command}". Available: ${Object.keys(COMMANDS).join(', ')}`)
+    console.error(
+      `[vue-image-kit] Unknown command: "${command}". Available: ${Object.keys(COMMANDS).join(', ')}`,
+    )
     process.exit(1)
   }
 

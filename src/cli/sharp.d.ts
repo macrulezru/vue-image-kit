@@ -18,7 +18,10 @@ declare module 'sharp' {
     resize(
       width: number,
       height?: number | null,
-      options?: { withoutEnlargement?: boolean; fit?: 'cover' | 'contain' | 'fill' | 'inside' | 'outside' },
+      options?: {
+        withoutEnlargement?: boolean
+        fit?: 'cover' | 'contain' | 'fill' | 'inside' | 'outside'
+      },
     ): Sharp
     ensureAlpha(alpha?: number): Sharp
     jpeg(options?: { quality?: number; mozjpeg?: boolean }): Sharp

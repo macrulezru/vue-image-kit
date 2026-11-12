@@ -63,8 +63,7 @@ export function generatePreloadLink(
 ): string {
   const attrs: string[] = [`rel="preload"`, `as="image"`, `href="${href}"`]
   if (options.srcset) attrs.push(`imagesrcset="${options.srcset}"`)
-  if (options.sizes)  attrs.push(`imagesizes="${options.sizes}"`)
-  if (options.type)   attrs.push(`type="${options.type}"`)
+  if (options.sizes) attrs.push(`imagesizes="${options.sizes}"`)
+  if (options.type) attrs.push(`type="${options.type}"`)
   return `<link ${attrs.join(' ')}>`
 }
-

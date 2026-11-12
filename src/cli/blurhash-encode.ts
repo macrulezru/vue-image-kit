@@ -47,14 +47,14 @@ export function encodeBlurhash(
   for (let j = 0; j < numY; j++) {
     for (let i = 0; i < numX; i++) {
       const norm = i === 0 && j === 0 ? 1 : 2
-      let r = 0, g = 0, b = 0
+      let r = 0,
+        g = 0,
+        b = 0
 
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
           const basis =
-            norm *
-            Math.cos((Math.PI * i * x) / width) *
-            Math.cos((Math.PI * j * y) / height)
+            norm * Math.cos((Math.PI * i * x) / width) * Math.cos((Math.PI * j * y) / height)
           const idx = (y * width + x) * 3
           r += basis * sRGBToLinear(pixels[idx]!)
           g += basis * sRGBToLinear(pixels[idx + 1]!)
@@ -73,11 +73,12 @@ export function encodeBlurhash(
     (m, [r, g, b]) => Math.max(m, Math.abs(r), Math.abs(g), Math.abs(b)),
     0,
   )
-  const quantizedMax = acList.length > 0 ? Math.max(0, Math.min(82, Math.floor(maxAC * 166 - 0.5))) : 0
+  const quantizedMax =
+    acList.length > 0 ? Math.max(0, Math.min(82, Math.floor(maxAC * 166 - 0.5))) : 0
   const actualMax = acList.length > 0 ? (quantizedMax + 1) / 166 : 1
 
   let hash = ''
-  hash += encode83((numX - 1) + (numY - 1) * 9, 1)
+  hash += encode83(numX - 1 + (numY - 1) * 9, 1)
   hash += encode83(quantizedMax, 1)
   hash += encode83(encodeDC(dc[0], dc[1], dc[2]), 4)
   for (const [r, g, b] of acList) {
